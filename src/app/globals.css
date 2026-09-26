@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+/* Design tokens (docs/BUILD_SPEC.md section 4). Each one becomes a Tailwind
+   utility, e.g. `bg-navy`, `text-gold-text`, `border-sand`. */
+@theme {
+  --color-navy: #0e2f56;
+  --color-navy-deep: #0a2342;
+  --color-green: #3f6b3e;
+  --color-green-dark: #2f5230;
+  --color-gold: #e0960e;
+  --color-gold-text: #b4740a;
+  --color-gold-light: #f2d9a6;
+  --color-ivory: #fbf8f1;
+  --color-sand: #e7e1d3;
+  --color-ink: #14233a;
+  --color-slate: #3a4659;
+  --color-muted: #4b5563;
+
+  /* Supporting shades used in the mockups */
+  --color-subtle: #6b7280;
+  --color-mist: #dce4ee;
+  --color-fog: #c9d5e4;
+  --color-field: #c9d2dc;
+  --color-on-gold: #2a2410;
+  --color-parchment: #f3eee2;
+  --color-parchment-text: #6b5a33;
+  --color-sage: #eef3ec;
+  --color-sage-border: #9db39a;
+  --color-sage-text: #4f6b4e;
+
+  --font-sans: var(--font-public-sans), system-ui, sans-serif;
+  --font-serif: var(--font-fraunces), Georgia, serif;
+
+  --shadow-card: 0 16px 40px rgb(14 47 86 / 0.1);
+  --shadow-card-strong: 0 20px 48px rgb(10 35 66 / 0.28);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 1rem;
+  }
+
+  body {
+    @apply bg-ivory font-sans text-ink antialiased;
+  }
+
+  a {
+    @apply text-navy transition-colors hover:text-green;
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--color-gold);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+}
