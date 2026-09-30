@@ -21,8 +21,8 @@ export const site: SiteSettings = {
     },
   },
   nav: [
-    { label: "Workshops", href: "/BI101" },
     { label: "About", href: "/about" },
+    { label: "Workshops", href: "/BI101" },
     { label: "Join the Junto", href: "/#join" },
   ],
   featuredEventSlug: "bi101",

@@ -4,37 +4,34 @@ import { RichText } from "@/components/ui/rich-text";
 import { SubscribeForm } from "@/features/subscribe/subscribe-form";
 import type { HomePage } from "@/lib/content/types";
 
-/** Navy "Join the Junto" band with the subscribe form. Anchor target for `/#join`. */
+/** Full-width navy "Join the Junto" band with the subscribe form. Anchor target for `/#join`. */
 export function JoinSection({ content }: { content: HomePage["join"] }) {
   return (
-    <section id="join" aria-labelledby="join-title" className="scroll-mt-4 pb-10 md:pb-24">
-      <Container>
-        <div className="grid gap-6 rounded-[18px] bg-navy px-5 py-8 text-white md:rounded-[20px] md:p-12 lg:grid-cols-12 lg:items-center lg:gap-10 lg:p-16">
-          <div className="flex flex-col gap-5 lg:col-span-6 lg:gap-[22px]">
-            <p className="text-[17px] leading-relaxed text-mist md:text-xl">
-              <RichText value={content.body} />
-            </p>
-            <h2
-              id="join-title"
-              className="font-serif text-[34px] leading-[1.1] font-bold text-gold-light md:text-5xl lg:text-[52px] lg:leading-[1.08]"
-            >
-              {content.heading}
-            </h2>
-            <Link
-              href={content.storyLink.href}
-              className="hidden text-[17px] font-semibold text-white underline hover:text-gold-light lg:block"
-            >
-              {content.storyLink.label}
-            </Link>
-          </div>
-          <SubscribeForm submitLabel={content.submitLabel} className="lg:col-span-5 lg:col-start-8" />
+    <section id="join" aria-labelledby="join-title" className="scroll-mt-4 bg-navy text-white">
+      <Container className="grid gap-10 py-14 md:py-20 lg:grid-cols-12 lg:gap-8 lg:py-24">
+        <div className="flex flex-col gap-6 lg:col-span-5 lg:gap-8">
+          <h2
+            id="join-title"
+            className="max-w-[12ch] font-serif text-[40px] leading-[1.08] font-normal tracking-[-0.01em] text-gold-light md:text-[52px] lg:text-[64px] lg:leading-[1.04]"
+          >
+            {content.heading}
+          </h2>
+          <p className="max-w-[46ch] text-[17px] leading-relaxed text-mist md:text-xl md:leading-relaxed">
+            <RichText value={content.body} />
+          </p>
           <Link
             href={content.storyLink.href}
-            className="text-base font-semibold text-white underline hover:text-gold-light lg:hidden"
+            className="w-fit text-[17px] font-semibold text-white underline underline-offset-4 hover:text-gold-light md:text-lg"
           >
             {content.storyLink.label}
           </Link>
         </div>
+
+        <SubscribeForm
+          submitLabel={content.submitLabel}
+          note={content.formNote}
+          className="lg:col-span-6 lg:col-start-7 lg:self-center"
+        />
       </Container>
     </section>
   );

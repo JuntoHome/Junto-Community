@@ -42,7 +42,3 @@ next-env.d.ts
 
 # allow the example env file
 !.env.example
-
-# Next.js-generated AI agent files (recreated by `next dev`)
-/AGENTS.md
-/CLAUDE.md

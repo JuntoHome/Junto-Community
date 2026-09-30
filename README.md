@@ -83,7 +83,6 @@ Dates are stored as ISO timestamps; every display string ("Wed, Oct 21", "12:00 
 
 Search for `PENDING` in `src/content`:
 
-- About page text: set `about.body` in `pages.ts` (currently `null`).
 - Darryl's photo: add the file to `public/` and set `photo` in `people.ts`.
 - Online platform: set `attendance.online.platform` in `events.ts`.
 

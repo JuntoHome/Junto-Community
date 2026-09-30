@@ -6,9 +6,10 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { getSiteSettings } from "@/lib/content";
 import "./globals.css";
 
+// Variable font: one file per style covers every weight.
 const fraunces = Fraunces({
   subsets: ["latin"],
-  weight: ["500", "700"],
+  style: ["normal", "italic"],
   variable: "--font-fraunces",
   display: "swap",
 });

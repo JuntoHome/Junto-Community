@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { ButtonLink } from "@/components/ui/button";
-import { Container, Eyebrow, Placeholder } from "@/components/ui/primitives";
+import { Container, Eyebrow } from "@/components/ui/primitives";
 import { RichTextBlocks } from "@/components/ui/rich-text";
 import { getPage, getSiteSettings } from "@/lib/content";
 import { pageMetadata } from "@/lib/seo";
@@ -26,7 +26,7 @@ export default async function AboutPage() {
             >
               {page.heading}
             </h1>
-            <p className="text-[17px] leading-normal text-slate md:text-[21px]">{site.tagline}</p>
+            <p className="font-serif text-xl leading-snug font-bold text-gold-text md:text-[28px]">{page.lead}</p>
           </div>
           <div className="mt-2 lg:col-span-4 lg:col-start-9 lg:mt-0 lg:flex lg:justify-end">
             <Image
@@ -42,19 +42,18 @@ export default async function AboutPage() {
         </Container>
       </section>
 
-      <section aria-label="Our story" className="pb-10 md:pb-22">
-        <Container className="lg:grid lg:grid-cols-12 lg:gap-8">
-          <div className="flex flex-col gap-5 text-base leading-[1.7] text-slate md:text-[19px] lg:col-span-9 lg:col-start-2">
-            {page.body ? (
-              <RichTextBlocks blocks={page.body} />
-            ) : (
-              <Placeholder>
-                [ABOUT TEXT: the current GoDaddy About page, formatted into short paragraphs with a few subheads]
-              </Placeholder>
-            )}
-          </div>
-        </Container>
-      </section>
+      {page.body && (
+        <section aria-label="Our story" className="pb-10 md:pb-22">
+          <Container>
+            <div className="mx-auto flex max-w-180 flex-col gap-5 text-base leading-[1.7] text-slate md:text-[19px]">
+              <RichTextBlocks
+                blocks={page.body}
+                headingClassName="mt-6 font-serif text-[26px] leading-tight font-bold text-navy md:mt-10 md:text-4xl"
+              />
+            </div>
+          </Container>
+        </section>
+      )}
 
       <section aria-labelledby="about-cta-title" className="pb-12 md:pb-24">
         <Container>

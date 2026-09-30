@@ -9,7 +9,8 @@
 
 /**
  * Inline rich text as a small Markdown subset: `*em*`, `**strong**` and
- * `[label](href)`. Most headless CMSs can export this easily, and it keeps
+ * `[label](href)`. In block lists, a block starting with `## ` is a subhead
+ * and one starting with `> ` is a pull quote (newlines become line breaks). Most headless CMSs can export this easily, and it keeps
  * content free of JSX.
  */
 export type RichText = string;
@@ -127,27 +128,44 @@ export type Event = {
 
 export type HomePage = {
   seo: Seo;
+  /** Organization-first hero. The featured event shows as a small announcement above the heading. */
   hero: {
-    badge: string;
-    headline: string;
+    heading: string;
+    body: RichText;
+    primaryCta: Link;
+    secondaryCta: Link;
+    /** Short lines shown as a list beside the hero, e.g. "Learn something useful." */
+    pillars: string[];
+  };
+  /** "We bring three things together" section. */
+  approach: {
+    heading: string;
+    link: Link;
+    /** Three cards. `photo: null` shows a tinted icon panel until a photo is supplied. */
+    pillars: Array<{ tag: string; title: string; photo: ImageAsset | null }>;
+    centerLine: string;
+    centerCaption: string;
+    audience: {
+      heading: string;
+      rows: Array<{ label: string; value: string; emphasis?: boolean }>;
+    };
+  };
+  /** Section promoting the site's featured event (`SiteSettings.featuredEventSlug`). The heading is the event name. */
+  featuredEvent: {
+    eyebrow: string;
+    /** Hook question, shown as an italic quote. */
+    hook: string;
     accent: string;
     body: RichText[];
-    primaryCtaLabel: string;
-    secondaryCtaLabel: string;
-  };
-  saveTheDate: {
-    eyebrow: string;
-    ctaLabel: string;
+    detailsLinkLabel: string;
   };
   join: {
     body: RichText;
     heading: string;
     storyLink: Link;
     submitLabel: string;
-  };
-  growth: {
-    heading: string;
-    body: string;
+    /** Small line under the submit button. */
+    formNote?: string;
   };
 };
 
@@ -155,7 +173,8 @@ export type AboutPage = {
   seo: Seo;
   eyebrow: string;
   heading: string;
-  /** `null` until the About text arrives; the UI renders a marked placeholder. */
+  lead: string;
+  /** Rich text blocks. `null` hides the section. */
   body: RichText[] | null;
   cta: {
     heading: string;

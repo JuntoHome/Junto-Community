@@ -22,18 +22,3 @@ export function Pill({ children }: { children: ReactNode }) {
     </span>
   );
 }
-
-/**
- * Clearly marked stand-in for content that has not arrived yet. Easy to find
- * in the UI and in code (search for `<Placeholder`).
- */
-export function Placeholder({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <p
-      data-placeholder
-      className={cn("rounded-xl bg-parchment px-6 py-5 text-base text-parchment-text md:px-8 md:py-7", className)}
-    >
-      {children}
-    </p>
-  );
-}

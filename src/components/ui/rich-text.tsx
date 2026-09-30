@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import type { RichText as RichTextValue } from "@/lib/content/types";
 
 const TOKEN = /(\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)\s]+\))/g;
@@ -35,17 +35,19 @@ export function RichText({ value }: { value: RichTextValue }) {
 }
 
 /**
- * Renders a list of blocks. A block starting with `## ` becomes a subhead;
- * anything else becomes a paragraph.
+ * Renders a list of blocks. A block starting with `## ` becomes a subhead,
+ * one starting with `> ` a pull quote, and anything else a paragraph.
  */
 export function RichTextBlocks({
   blocks,
   paragraphClassName,
   headingClassName = "font-serif text-2xl font-bold text-navy md:text-3xl",
+  quoteClassName = "border-l-4 border-gold py-1 pl-5 font-serif text-xl leading-snug font-bold text-navy md:text-2xl",
 }: {
   blocks: RichTextValue[];
   paragraphClassName?: string;
   headingClassName?: string;
+  quoteClassName?: string;
 }) {
   return (
     <>
@@ -54,6 +56,18 @@ export function RichTextBlocks({
           <h2 key={i} className={headingClassName}>
             {renderInline(block.slice(3))}
           </h2>
+        ) : block.startsWith("> ") ? (
+          <blockquote key={i} className={quoteClassName}>
+            {block
+              .slice(2)
+              .split("\n")
+              .map((line, j) => (
+                <Fragment key={j}>
+                  {j > 0 && <br />}
+                  {renderInline(line)}
+                </Fragment>
+              ))}
+          </blockquote>
         ) : (
           <p key={i} className={paragraphClassName}>
             {renderInline(block)}
