@@ -27,6 +27,7 @@ export const site: SiteSettings = {
   ],
   featuredEventSlug: "bi101",
   headerCtaLabel: "Register for BI101",
+  announcementLinkLabel: "Details and registration",
   footerLinks: [
     { label: "About", href: "/about" },
     { label: "Workshops", href: "/BI101" },

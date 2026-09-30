@@ -8,11 +8,17 @@ export const pages: PageMap = {
         "Junto Community Alliance helps small-business owners discover and use the resources, expertise, and connections in their communities, with the public library at the center.",
     },
     hero: {
-      heading: "Learn Something. Meet Someone. At the Library.",
+      heading: ["Learn Something.", "Meet Someone."],
+      headingAccent: "At the Library.",
       body: "Junto Community Alliance helps small-business owners discover and make better use of the extraordinary resources, expertise, and connections that already exist within their communities.",
       primaryCta: { label: "Join the Junto", href: "/#join" },
       secondaryCta: { label: "Upcoming workshop", href: "/BI101" },
-      pillars: ["Learn something useful.", "Meet someone who can help.", "Take the next step."],
+      photo: {
+        src: "/images/home/hero.png",
+        alt: "Illustration of small-business owners talking around a table in a public library",
+        width: 1641,
+        height: 959,
+      },
     },
     approach: {
       heading: "We bring three things together.",

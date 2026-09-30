@@ -47,6 +47,8 @@ export type SiteSettings = {
   /** Slug of the event the header "Register" button points to. */
   featuredEventSlug: string;
   headerCtaLabel: string;
+  /** Link text in the announcement bar for the featured event. */
+  announcementLinkLabel: string;
   footerLinks: Link[];
   copyright: string;
 };
@@ -128,14 +130,17 @@ export type Event = {
 
 export type HomePage = {
   seo: Seo;
-  /** Organization-first hero. The featured event shows as a small announcement above the heading. */
+  /** Organization-first hero: full-width photo with an overlapping text card. */
   hero: {
-    heading: string;
+    /** Heading lines, each on its own line. */
+    heading: string[];
+    /** Final heading line, shown in green italics. */
+    headingAccent: string;
     body: RichText;
     primaryCta: Link;
     secondaryCta: Link;
-    /** Short lines shown as a list beside the hero, e.g. "Learn something useful." */
-    pillars: string[];
+    /** `null` shows a plain panel until a photo is supplied. */
+    photo: ImageAsset | null;
   };
   /** "We bring three things together" section. */
   approach: {
