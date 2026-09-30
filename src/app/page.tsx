@@ -7,11 +7,11 @@ import { JoinSection } from "@/components/sections/join-section";
 import { Container } from "@/components/ui/primitives";
 import { RichTextBlocks } from "@/components/ui/rich-text";
 import { getEvent, getPage, getSiteSettings } from "@/lib/content";
-import { pageMetadata } from "@/lib/seo";
+import { jsonLdScript, organizationJsonLd, pageMetadata } from "@/lib/seo";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const page = await getPage("home");
-  return pageMetadata(page.seo, "/");
+  const [page, site] = await Promise.all([getPage("home"), getSiteSettings()]);
+  return pageMetadata(page.seo, "/", site);
 }
 
 export default async function HomePage() {
@@ -21,6 +21,7 @@ export default async function HomePage() {
 
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(organizationJsonLd(site)) }} />
       <HomeHero content={hero} />
 
       <ApproachSection content={approach} />

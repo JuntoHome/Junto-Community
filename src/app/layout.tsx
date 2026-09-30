@@ -31,6 +31,10 @@ export async function generateMetadata(): Promise<Metadata> {
     applicationName: site.name,
     openGraph: { type: "website", siteName: site.name, locale: "en_US" },
     twitter: { card: "summary_large_image" },
+    // Google Search Console "HTML tag" verification. Only needed if the site is not verified by DNS.
+    verification: process.env.GOOGLE_SITE_VERIFICATION
+      ? { google: process.env.GOOGLE_SITE_VERIFICATION }
+      : undefined,
   };
 }
 

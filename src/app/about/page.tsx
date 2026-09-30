@@ -7,8 +7,8 @@ import { getPage, getSiteSettings } from "@/lib/content";
 import { pageMetadata } from "@/lib/seo";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const page = await getPage("about");
-  return pageMetadata(page.seo, "/about");
+  const [page, site] = await Promise.all([getPage("about"), getSiteSettings()]);
+  return pageMetadata(page.seo, "/about", site);
 }
 
 export default async function AboutPage() {
