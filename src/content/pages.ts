@@ -42,7 +42,6 @@ export const pages: PageMap = {
         },
       ],
       centerLine: "...with the public library at the center.",
-      centerCaption: "Peoria Public Library",
       audience: {
         heading: "Who it's for",
         rows: [
@@ -83,7 +82,7 @@ export const pages: PageMap = {
     body: [
       "Junto Community Alliance is a Phoenix-based nonprofit organization created to help small-business owners make better use of the resources, expertise, and relationships that already exist within their communities.",
       "The idea begins with a simple observation: communities do not necessarily lack resources.",
-      "Public libraries provide sophisticated research tools, technology, meeting spaces, professional staff, and information resources. SCORE offers experienced mentors and business education. Cities, financial institutions, universities, nonprofits, subject-matter experts, and other organizations offer additional programs, expertise, funding opportunities, guides, and tools.",
+      "Public libraries provide sophisticated research tools, technology, meeting spaces, professional staff, and information resources. Organizations such as SCORE offer experienced mentors and business education. Cities, financial institutions, universities, nonprofits, subject-matter experts, and other organizations contribute additional programs, expertise, funding opportunities, guides, and tools.",
       "The harder challenge is often helping people discover those resources, determine which ones are useful, make the right connections, and follow through.",
       "> A toolkit is not capacity.",
       "Junto Community Alliance helps provide some of that missing capacity.",

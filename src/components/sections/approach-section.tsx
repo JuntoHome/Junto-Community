@@ -60,9 +60,8 @@ export function ApproachSection({ content }: { content: HomePage["approach"] }) 
               );
             })}
           </ul>
-          <div className="flex flex-col gap-2 bg-navy px-6 py-6 sm:flex-row sm:items-center sm:justify-between md:px-8 md:py-7">
+          <div className="bg-navy px-6 py-6 md:px-8 md:py-7">
             <p className="font-serif text-2xl text-gold-light italic md:text-[30px]">{content.centerLine}</p>
-            <p className="font-mono text-sm text-fog">{content.centerCaption}</p>
           </div>
         </div>
 

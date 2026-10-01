@@ -125,6 +125,35 @@ export type Event = {
     heading: string;
     note: string;
   };
+  /** Optional line under the presenter bio linking to related reading. The link opens in a new tab. */
+  readingPrompt?: {
+    lead: RichText;
+    linkLabel: RichText;
+    href: string;
+  };
+  seo: Seo;
+};
+
+export type BookReview = {
+  slug: string;
+  /** Public URL path. */
+  path: string;
+  book: {
+    title: string;
+    author: string;
+  };
+  reviewer: {
+    name: string;
+    role: string;
+  };
+  /** Stars out of 5, or `null` to hide the rating. */
+  rating: number | null;
+  /** Review text. `null` shows a marked placeholder until the text arrives. */
+  body: RichText[] | null;
+  /** Link to the original review (e.g. on Amazon), or `null`. */
+  sourceUrl: string | null;
+  /** Event the page sends readers back to. */
+  eventSlug: string;
   seo: Seo;
 };
 
@@ -149,7 +178,6 @@ export type HomePage = {
     /** Three cards. `photo: null` shows a tinted icon panel until a photo is supplied. */
     pillars: Array<{ tag: string; title: string; photo: ImageAsset | null }>;
     centerLine: string;
-    centerCaption: string;
     audience: {
       heading: string;
       rows: Array<{ label: string; value: string; emphasis?: boolean }>;
