@@ -1,6 +1,8 @@
 "use server";
 
 import { headers } from "next/headers";
+import { after } from "next/server";
+import { notifyNewSubscriber } from "./notify";
 import { isRateLimited } from "./rate-limit";
 import { addSubscriber } from "./repository";
 import { HONEYPOT_FIELD, type SubscribeField, type SubscribeState, subscribeSchema } from "./schema";
@@ -38,6 +40,19 @@ export async function subscribe(_prev: SubscribeState, formData: FormData): Prom
 
   try {
     const result = await addSubscriber(parsed.data);
+
+    // The signup is saved. Email the team after the response is sent, so the
+    // visitor never waits on (or sees an error from) the notification.
+    if (result === "created") {
+      after(async () => {
+        try {
+          await notifyNewSubscriber(parsed.data);
+        } catch (error) {
+          console.error("[subscribe] notification email failed", error);
+        }
+      });
+    }
+
     return { status: "success", message: result === "duplicate" ? DUPLICATE : SUCCESS };
   } catch (error) {
     console.error("[subscribe]", error);
