@@ -1,4 +1,4 @@
-import type { Event, PageKey, PageMap, SiteSettings } from "./types";
+import type { BookReview, Event, PageKey, PageMap, SiteSettings } from "./types";
 
 /**
  * A place content comes from. The site ships with a local source (typed
@@ -10,4 +10,6 @@ export interface ContentSource {
   getEvent(slug: string): Promise<Event | null>;
   listEvents(): Promise<Event[]>;
   getPage<K extends PageKey>(key: K): Promise<PageMap[K]>;
+  getReview(slug: string): Promise<BookReview | null>;
+  listReviews(): Promise<BookReview[]>;
 }

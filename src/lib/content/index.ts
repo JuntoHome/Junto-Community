@@ -19,6 +19,10 @@ export const listEvents = cache(() => source.listEvents());
 
 export const getPage = cache(<K extends PageKey>(key: K) => source.getPage(key));
 
+export const getReview = cache((slug: string) => source.getReview(slug));
+
+export const listReviews = cache(() => source.listReviews());
+
 /** Like `getEvent`, but renders the 404 page when the event does not exist. */
 export async function requireEvent(slug: string) {
   const event = await getEvent(slug);

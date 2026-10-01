@@ -36,44 +36,75 @@ export function RichText({ value }: { value: RichTextValue }) {
 
 /**
  * Renders a list of blocks. A block starting with `## ` becomes a subhead,
- * one starting with `> ` a pull quote, and anything else a paragraph.
+ * `> ` a pull quote, consecutive `- ` blocks a bulleted list, and anything
+ * else a paragraph.
  */
 export function RichTextBlocks({
   blocks,
   paragraphClassName,
   headingClassName = "font-serif text-2xl font-bold text-navy md:text-3xl",
   quoteClassName = "border-l-4 border-gold py-1 pl-5 font-serif text-xl leading-snug font-bold text-navy md:text-2xl",
+  listClassName = "flex list-disc flex-col gap-2.5 pl-6 marker:text-gold",
 }: {
   blocks: RichTextValue[];
   paragraphClassName?: string;
   headingClassName?: string;
   quoteClassName?: string;
+  listClassName?: string;
 }) {
+  // Group consecutive "- " blocks so each run renders as one list.
+  const groups: Array<{ list: string[] } | { block: string }> = [];
+  for (const block of blocks) {
+    const last = groups[groups.length - 1];
+    if (block.startsWith("- ")) {
+      if (last && "list" in last) last.list.push(block.slice(2));
+      else groups.push({ list: [block.slice(2)] });
+    } else {
+      groups.push({ block });
+    }
+  }
+
   return (
     <>
-      {blocks.map((block, i) =>
-        block.startsWith("## ") ? (
-          <h2 key={i} className={headingClassName}>
-            {renderInline(block.slice(3))}
-          </h2>
-        ) : block.startsWith("> ") ? (
-          <blockquote key={i} className={quoteClassName}>
-            {block
-              .slice(2)
-              .split("\n")
-              .map((line, j) => (
-                <Fragment key={j}>
-                  {j > 0 && <br />}
-                  {renderInline(line)}
-                </Fragment>
+      {groups.map((group, i) => {
+        if ("list" in group) {
+          return (
+            <ul key={i} className={listClassName}>
+              {group.list.map((item, j) => (
+                <li key={j}>{renderInline(item)}</li>
               ))}
-          </blockquote>
-        ) : (
+            </ul>
+          );
+        }
+        const { block } = group;
+        if (block.startsWith("## ")) {
+          return (
+            <h2 key={i} className={headingClassName}>
+              {renderInline(block.slice(3))}
+            </h2>
+          );
+        }
+        if (block.startsWith("> ")) {
+          return (
+            <blockquote key={i} className={quoteClassName}>
+              {block
+                .slice(2)
+                .split("\n")
+                .map((line, j) => (
+                  <Fragment key={j}>
+                    {j > 0 && <br />}
+                    {renderInline(line)}
+                  </Fragment>
+                ))}
+            </blockquote>
+          );
+        }
+        return (
           <p key={i} className={paragraphClassName}>
             {renderInline(block)}
           </p>
-        ),
-      )}
+        );
+      })}
     </>
   );
 }

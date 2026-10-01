@@ -60,6 +60,11 @@ export const bi101: Event = {
     heading: "Save your seat",
     note: "In-person seating is limited.",
   },
+  readingPrompt: {
+    lead: "Don't have time to read the book before the workshop?",
+    linkLabel: "Read my review of Darryl's book, *The Culture Architect*.",
+    href: "/reviews/the-culture-architect",
+  },
   seo: {
     title: "Business Insights 101 · Free Workshop, Oct 21 · Junto Community Alliance",
     description:

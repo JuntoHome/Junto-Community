@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ButtonLink } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { Container, Eyebrow, Pill } from "@/components/ui/primitives";
 import { RichText, RichTextBlocks } from "@/components/ui/rich-text";
 import type { Event, SiteSettings } from "@/lib/content/types";
@@ -121,6 +122,25 @@ export function EventPage({ event, site }: { event: Event; site: SiteSettings })
               <div className="flex flex-col gap-4 text-base leading-[1.65] text-slate md:text-lg md:leading-[1.7]">
                 <RichTextBlocks blocks={presenter.bio} />
               </div>
+              {event.readingPrompt && (
+                <p className="mt-2 flex gap-3 rounded-xl bg-parchment px-5 py-4 text-base leading-relaxed text-ink md:text-[17px]">
+                  <Icon name="book" size={22} className="mt-0.5 shrink-0 text-gold-text" />
+                  <span>
+                    <RichText value={event.readingPrompt.lead} />{" "}
+                    {/* Opens in a new tab so the registration page stays open. */}
+                    <a
+                      href={event.readingPrompt.href}
+                      target="_blank"
+                      rel="noopener"
+                      className="font-semibold underline underline-offset-2"
+                    >
+                      <RichText value={event.readingPrompt.linkLabel} />
+                      <span aria-hidden="true"> ↗</span>
+                      <span className="sr-only"> (opens in a new tab)</span>
+                    </a>
+                  </span>
+                </p>
+              )}
             </div>
           </div>
         </Container>

@@ -9,8 +9,8 @@
 
 /**
  * Inline rich text as a small Markdown subset: `*em*`, `**strong**` and
- * `[label](href)`. In block lists, a block starting with `## ` is a subhead
- * and one starting with `> ` is a pull quote (newlines become line breaks). Most headless CMSs can export this easily, and it keeps
+ * `[label](href)`. In block lists, a block starting with `## ` is a subhead,
+ * `> ` a pull quote (newlines become line breaks) and `- ` a bullet. Most headless CMSs can export this easily, and it keeps
  * content free of JSX.
  */
 export type RichText = string;
@@ -142,6 +142,10 @@ export type BookReview = {
     title: string;
     author: string;
   };
+  /** Line under the book title, e.g. "A Reader's Take". */
+  subtitle: string | null;
+  /** Framing sentence shown before the review. */
+  intro: RichText | null;
   reviewer: {
     name: string;
     role: string;

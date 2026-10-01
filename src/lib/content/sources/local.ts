@@ -1,5 +1,6 @@
 import { events } from "@/content/events";
 import { pages } from "@/content/pages";
+import { reviews } from "@/content/reviews";
 import { site } from "@/content/site";
 import type { ContentSource } from "../source";
 
@@ -15,5 +16,11 @@ export const localSource: ContentSource = {
   },
   async getPage(key) {
     return pages[key];
+  },
+  async getReview(slug) {
+    return reviews.find((review) => review.slug === slug) ?? null;
+  },
+  async listReviews() {
+    return reviews;
   },
 };
