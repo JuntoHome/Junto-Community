@@ -6,6 +6,7 @@ export const site: SiteSettings = {
   tagline: "Learn Something. Meet Someone. At the Library.",
   url: "https://www.juntocommunity.org",
   contactEmail: "paul@juntocommunity.org",
+  questionsEmail: "hello@juntocommunity.org",
   logos: {
     wide: {
       src: "/jca-logo-wide.png",

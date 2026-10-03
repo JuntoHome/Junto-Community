@@ -51,7 +51,7 @@ export default async function HomePage() {
             </div>
 
             <div className="lg:col-span-5 lg:col-start-8 lg:pt-8">
-              <EventSummary event={event} contactEmail={site.contactEmail} />
+              <EventSummary event={event} contactEmail={site.questionsEmail} />
             </div>
           </Container>
         </section>

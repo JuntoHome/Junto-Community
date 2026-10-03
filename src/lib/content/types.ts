@@ -38,7 +38,10 @@ export type SiteSettings = {
   tagline: string;
   /** Canonical origin, no trailing slash. */
   url: string;
+  /** Direct contact. Shown in the footer and used for new-subscriber notifications. */
   contactEmail: string;
+  /** General address for visitor questions, e.g. about workshops. */
+  questionsEmail: string;
   logos: {
     wide: ImageAsset;
     stacked: ImageAsset;
