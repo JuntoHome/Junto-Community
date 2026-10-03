@@ -20,8 +20,8 @@ export async function SiteFooter() {
               </Link>
             ))}
           </nav>
-          <a href={`mailto:${site.contactEmail}`} className="text-navy underline underline-offset-2 hover:text-green">
-            {site.contactEmail}
+          <a href={`mailto:${site.questionsEmail}`} className="text-navy underline underline-offset-2 hover:text-green">
+            {site.questionsEmail}
           </a>
           <p className="text-sm md:text-[15px]">{site.copyright}</p>
         </div>
