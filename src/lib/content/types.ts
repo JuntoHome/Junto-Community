@@ -63,8 +63,6 @@ export type Person = {
   role: RichText;
   organization?: string;
   bio: RichText[];
-  /** `null` until a photo is supplied; the UI renders a marked placeholder. */
-  photo: ImageAsset | null;
 };
 
 export type Venue = {

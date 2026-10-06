@@ -74,7 +74,7 @@ Add an `Event` to [src/content/events.ts](src/content/events.ts) (or the CMS lat
 |---|---|
 | Homepage and About copy | [src/content/pages.ts](src/content/pages.ts) |
 | Workshop details, Eventbrite link, date/time | [src/content/events.ts](src/content/events.ts) |
-| Presenter bio and photo | [src/content/people.ts](src/content/people.ts) |
+| Presenter bio | [src/content/people.ts](src/content/people.ts) |
 | Nav, footer, contact email | [src/content/site.ts](src/content/site.ts) |
 
 Dates are stored as ISO timestamps; every display string ("Wed, Oct 21", "12:00 to 2:00 PM MST") is derived from them.
@@ -83,7 +83,6 @@ Dates are stored as ISO timestamps; every display string ("Wed, Oct 21", "12:00 
 
 Search for `PENDING` in `src/content`:
 
-- Darryl's photo: add the file to `public/` and set `photo` in `people.ts`.
 - Online platform: set `attendance.online.platform` in `events.ts`.
 
 ## Important

@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import { ButtonLink } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
@@ -91,27 +90,8 @@ export function EventPage({ event, site }: { event: Event; site: SiteSettings })
       {/* Presenter */}
       <section aria-labelledby="presenter-title" className="pt-11 md:pt-20 lg:pt-0">
         <Container>
-          <div className="grid gap-4 rounded-[18px] border border-sand bg-white px-[22px] py-7 md:grid-cols-12 md:gap-10 md:rounded-[20px] md:px-12 md:py-12 lg:px-16 lg:py-14">
-            <div className="md:col-span-4 lg:col-span-3 md:flex md:justify-center">
-              {presenter.photo ? (
-                <Image
-                  src={presenter.photo.src}
-                  alt={presenter.photo.alt}
-                  width={presenter.photo.width}
-                  height={presenter.photo.height}
-                  sizes="(min-width: 768px) 220px, 140px"
-                  className="size-35 rounded-full object-cover md:size-55"
-                />
-              ) : (
-                <div
-                  data-placeholder
-                  className="flex size-35 items-center justify-center rounded-full border-2 border-dashed border-sage-border bg-sage p-4 text-center text-[13px] text-sage-text md:size-55 md:p-6 md:text-sm"
-                >
-                  [PHOTO: {presenter.name}]
-                </div>
-              )}
-            </div>
-            <div className="flex flex-col gap-4 md:col-span-8 lg:col-span-9 md:gap-[18px]">
+          <div className="rounded-[18px] border border-sand bg-white px-[22px] py-7 md:rounded-[20px] md:px-12 md:py-12 lg:px-16 lg:py-14">
+            <div className="flex max-w-220 flex-col gap-4 md:gap-[18px]">
               <Eyebrow className="text-[13px] tracking-[0.14em] md:text-sm">Your presenter</Eyebrow>
               <h2 id="presenter-title" className="font-serif text-[30px] font-bold text-navy md:text-[40px]">
                 {presenter.name}
