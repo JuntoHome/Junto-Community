@@ -15,6 +15,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.9,
     })),
     { url: `${site.url}/about`, lastModified, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${site.url}/library-intelligence`, lastModified, changeFrequency: "monthly", priority: 0.7 },
     // Reviews are listed once they have text.
     ...reviews
       .filter((review) => review.body)

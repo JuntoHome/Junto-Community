@@ -197,6 +197,12 @@ export type HomePage = {
     body: RichText[];
     detailsLinkLabel: string;
   };
+  /** Small teaser for the latest Library Intelligence note, shown below the featured event. */
+  noteTeaser: {
+    label: string;
+    title: string;
+    link: Link;
+  };
   join: {
     body: RichText;
     heading: string;
@@ -221,9 +227,46 @@ export type AboutPage = {
   };
 };
 
+/** One research note on the Library Intelligence page. */
+export type ResearchNote = {
+  /** Anchor id on the page. The archive links to it. */
+  slug: string;
+  /** Month shown in the archive, e.g. "October 2026". */
+  date: string;
+  /** Small label above the title, e.g. "October 2026 | Research note 01". */
+  label: string;
+  title: string;
+  subtitle: string;
+  body: RichText[];
+  /** Attribution shown after "Source:". Opens in a new tab. */
+  source: Link | null;
+};
+
+export type LibraryIntelligencePage = {
+  seo: Seo;
+  heading: string;
+  intro: string;
+  editorNote: {
+    heading: string;
+    body: RichText[];
+    signature: string;
+  };
+  /** Newest first. Every note is listed in the archive automatically. */
+  notes: ResearchNote[];
+  furtherReading: {
+    heading: string;
+    /** External links. Each opens in a new tab. */
+    items: Array<Link & { description: string }>;
+  };
+  archiveHeading: string;
+  /** Link back to the workshop, at the bottom of the page. */
+  eventLink: Link;
+};
+
 export type PageMap = {
   home: HomePage;
   about: AboutPage;
+  libraryIntelligence: LibraryIntelligencePage;
 };
 
 export type PageKey = keyof PageMap;

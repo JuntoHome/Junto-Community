@@ -1,4 +1,5 @@
 import type { PageMap } from "@/lib/content/types";
+import { libraryIntelligence } from "./library-intelligence";
 
 export const pages: PageMap = {
   home: {
@@ -60,6 +61,11 @@ export const pages: PageMap = {
         "Seating at the Peoria Public Library is limited. But those who cannot attend in person can join us online for free.",
       ],
       detailsLinkLabel: "Workshop details",
+    },
+    noteTeaser: {
+      label: "From Library Intelligence",
+      title: "How libraries are responding to changes in Facebook links",
+      link: { label: "Read the note", href: "/library-intelligence" },
     },
     join: {
       body: "Junto Community brings together people who are passionate about learning, entrepreneurship, and community. There's nothing to buy, and all you need to get started is a library card.",
@@ -123,4 +129,5 @@ export const pages: PageMap = {
       link: { label: "Join the Junto", href: "/#join" },
     },
   },
+  libraryIntelligence,
 };

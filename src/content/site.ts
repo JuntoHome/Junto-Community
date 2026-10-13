@@ -24,6 +24,7 @@ export const site: SiteSettings = {
   nav: [
     { label: "About", href: "/about" },
     { label: "Workshops", href: "/BI101" },
+    { label: "Library Intelligence", href: "/library-intelligence" },
     { label: "Join the Junto", href: "/#join" },
   ],
   featuredEventSlug: "bi101",

@@ -57,6 +57,21 @@ export default async function HomePage() {
         </section>
       )}
 
+      {/* Library Intelligence teaser: small and secondary, below the workshop call to action */}
+      <section aria-label="Library Intelligence" className="border-t border-sand">
+        <Container className="flex flex-col gap-2 py-6 md:flex-row md:items-baseline md:justify-between md:gap-8 md:py-7">
+          <p className="text-base text-slate md:text-[17px]">
+            <span className="font-semibold text-green">{page.noteTeaser.label}:</span> {page.noteTeaser.title}
+          </p>
+          <Link
+            href={page.noteTeaser.link.href}
+            className="w-fit shrink-0 text-base font-semibold underline underline-offset-4 md:text-[17px]"
+          >
+            {page.noteTeaser.link.label}
+          </Link>
+        </Container>
+      </section>
+
       <JoinSection content={page.join} />
     </>
   );

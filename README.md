@@ -73,6 +73,7 @@ Add an `Event` to [src/content/events.ts](src/content/events.ts) (or the CMS lat
 | What | Where |
 |---|---|
 | Homepage and About copy | [src/content/pages.ts](src/content/pages.ts) |
+| Library Intelligence page (add research notes to the top of `notes`) | [src/content/library-intelligence.ts](src/content/library-intelligence.ts) |
 | Workshop details, Eventbrite link, date/time | [src/content/events.ts](src/content/events.ts) |
 | Presenter bio | [src/content/people.ts](src/content/people.ts) |
 | Nav, footer, contact email | [src/content/site.ts](src/content/site.ts) |
