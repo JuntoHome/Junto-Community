@@ -92,6 +92,10 @@ Search for `PENDING` in `src/content`:
 - `SUPABASE_SERVICE_ROLE_KEY` is server-only (`import "server-only"` guards it). Never prefix it with `NEXT_PUBLIC_`.
 - No em-dashes in site copy (client preference).
 
+## Supabase keep-alive
+
+Supabase pauses a free project after 7 days without activity. A Vercel Cron Job ([vercel.json](vercel.json)) calls `/api/cron/keep-alive` once a day at 15:00 UTC (8 AM Arizona), which runs one small query. It needs `CRON_SECRET` set in Vercel; Vercel sends it with each cron request and the route rejects calls without it. Check runs under Vercel → Project → Settings → Cron Jobs.
+
 ## Deploying
 
 Vercel project `junto-community` auto-deploys from `main`. Set the two Supabase environment variables in the Vercel project settings.
