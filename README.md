@@ -94,7 +94,7 @@ Search for `PENDING` in `src/content`:
 
 ## Supabase keep-alive
 
-Supabase pauses a free project after 7 days without activity. A Vercel Cron Job ([vercel.json](vercel.json)) calls `/api/cron/keep-alive` once a day at 15:00 UTC (8 AM Arizona), which runs one small query. It needs `CRON_SECRET` set in Vercel; Vercel sends it with each cron request and the route rejects calls without it. Check runs under Vercel → Project → Settings → Cron Jobs.
+Supabase pauses a free project after 7 days without activity. A Vercel Cron Job ([vercel.json](vercel.json)) calls `/api/cron/keep-alive` every hour, on the hour. Each run writes one row to the `keep_alive` table (created by the SQL in `supabase/migrations/`), so there is a dated record of every run; rows older than 30 days are pruned. It needs `CRON_SECRET` set in Vercel; Vercel sends it with each cron request and the route rejects calls without it. Check runs under Vercel → Project → Settings → Cron Jobs.
 
 ## Deploying
 
