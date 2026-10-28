@@ -101,6 +101,21 @@ Search for `PENDING` in `src/content`:
 
 Supabase pauses a free project after 7 days without activity. A Vercel Cron Job ([vercel.json](vercel.json)) calls `/api/cron/keep-alive` every hour, on the hour. Each run writes one row to the `keep_alive` table (created by the SQL in `supabase/migrations/`), so there is a dated record of every run; rows older than 30 days are pruned. It needs `CRON_SECRET` set in Vercel; Vercel sends it with each cron request and the route rejects calls without it. Check runs under Vercel → Project → Settings → Cron Jobs.
 
+## Admin access
+
+Only people in the `admins` table can use `/admin`. Public sign-up is turned off in Supabase (Authentication → Sign In / Providers), and Supabase sends its invite and password emails through Resend (Authentication → Emails → SMTP Settings).
+
+To add an admin:
+
+1. Supabase → Authentication → Users → Add user → Send invitation, with their email.
+2. In the SQL editor:
+   ```sql
+   insert into public.admins (user_id, email)
+   select id, email from auth.users where email = 'name@example.com';
+   ```
+
+To remove one: `delete from public.admins where email = 'name@example.com';` (deleting the user under Authentication → Users also removes them).
+
 ## Deploying
 
 Vercel project `junto-community` auto-deploys from `main` to the live site. Pushes to other branches (such as `dev`) get a preview URL. Set the variables from [.env.example](.env.example) in the Vercel project settings, for both Production and Preview.
