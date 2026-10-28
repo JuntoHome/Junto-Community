@@ -13,11 +13,15 @@ export type Admin = { userId: string; email: string };
  */
 export const getAdmin = cache(async (): Promise<Admin | null> => {
   const supabase = await createSupabaseServerClient();
-  const { data: claims } = await supabase.auth.getClaims();
-  const userId = claims?.claims.sub;
-  if (!userId) return null;
+  // getUser() asks Supabase Auth, so a session that has been logged out is rejected
+  // at once. getClaims() only checks the token's signature, and a copied token
+  // stays valid until it expires (up to an hour).
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
 
-  const { data } = await supabase.from("admins").select("user_id, email").eq("user_id", userId).maybeSingle();
+  const { data } = await supabase.from("admins").select("user_id, email").eq("user_id", user.id).maybeSingle();
   return data ? { userId: data.user_id, email: data.email } : null;
 });
 

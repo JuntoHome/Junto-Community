@@ -43,3 +43,14 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
 
   redirect("/admin");
 }
+
+/**
+ * Ends the session on this device and returns to login. Deleting the auth cookies
+ * in a Server Action also clears Next's client-side page cache, so Back can't show
+ * an admin page again.
+ */
+export async function logout() {
+  const supabase = await createSupabaseServerClient();
+  await supabase.auth.signOut({ scope: "local" });
+  redirect("/admin/login");
+}
