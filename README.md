@@ -30,7 +30,8 @@ src/
   app/                  Routes only. Each page fetches content and composes components.
     (site)/             Public pages, inside the site header and footer. The group name is not in the URL.
     admin/              CMS admin area: its own layout, not indexed.
-      login/            The only admin page open to logged-out visitors.
+      login/            Open to logged-out visitors, with forgot-password/ and
+                        set-password/ (where invite and reset emails lead).
       (protected)/      Everything else. Its layout checks for an admin; each page and
                         each admin Server Action must also call requireAdmin() first.
   content/              Today's content, as typed TypeScript data (site, events, people, pages).
@@ -121,6 +122,8 @@ To add an admin:
    ```
 
 To remove one: `delete from public.admins where email = 'name@example.com';` (deleting the user under Authentication → Users also removes them).
+
+The invite and reset-password emails must use the templates in [supabase/templates/](supabase/templates/) (paste each into Supabase → Authentication → Emails → Templates, with the subject from its first comment). They link to `/admin/set-password` with a one-time code that is only used when the form is submitted, so email scanners that open links can't use it up. The links use the Site URL, so they always open the live site.
 
 ## Deploying
 

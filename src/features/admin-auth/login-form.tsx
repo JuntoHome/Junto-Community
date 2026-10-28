@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useId } from "react";
 import { buttonClasses } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
@@ -8,7 +9,7 @@ import type { LoginState } from "./schema";
 
 const initialState: LoginState = {};
 
-const inputClasses = cn(
+export const inputClasses = cn(
   "h-12 rounded-md border border-field bg-white px-4 text-base text-ink transition-colors",
   "hover:border-slate focus:border-navy focus:outline-none",
 );
@@ -59,6 +60,10 @@ export function LoginForm({ className }: { className?: string }) {
       <button type="submit" disabled={pending} className={buttonClasses("navy", "md", "w-full")}>
         {pending ? "Logging in..." : "Log in"}
       </button>
+
+      <Link href="/admin/forgot-password" className="w-fit text-[15px] font-semibold">
+        Forgot your password?
+      </Link>
     </form>
   );
 }

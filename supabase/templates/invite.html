@@ -1,0 +1,6 @@
+<!-- Supabase → Authentication → Emails → Templates → Invite user.
+     Subject: You're invited to manage the JCA website -->
+<h2>You're invited to manage the Junto Community Alliance website</h2>
+<p>You've been added as an admin of juntocommunity.org. Choose a password to get started:</p>
+<p><a href="{{ .SiteURL }}/admin/set-password?token_hash={{ .TokenHash }}&type=invite">Choose your password</a></p>
+<p>The link works once. If it has expired, ask for a new one at {{ .SiteURL }}/admin/forgot-password.</p>
