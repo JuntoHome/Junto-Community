@@ -4,7 +4,7 @@ import { getSiteSettings } from "@/lib/content";
 export default async function robots(): Promise<MetadataRoute.Robots> {
   const site = await getSiteSettings();
   return {
-    rules: { userAgent: "*", allow: "/" },
+    rules: { userAgent: "*", allow: "/", disallow: "/admin" },
     sitemap: `${site.url}/sitemap.xml`,
   };
 }

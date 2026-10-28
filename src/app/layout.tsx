@@ -1,9 +1,5 @@
-import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Public_Sans } from "next/font/google";
-import { AnnouncementBar } from "@/components/layout/announcement-bar";
-import { SiteFooter } from "@/components/layout/site-footer";
-import { SiteHeader } from "@/components/layout/site-header";
 import { getSiteSettings } from "@/lib/content";
 import "./globals.css";
 
@@ -52,13 +48,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         >
           Skip to content
         </a>
-        <AnnouncementBar />
-        <SiteHeader />
-        <main id="main" className="flex-1">
-          {children}
-        </main>
-        <SiteFooter />
-        <Analytics />
+        {/* Public pages get the site header and footer from (site)/layout.tsx; /admin has its own layout. */}
+        {children}
       </body>
     </html>
   );

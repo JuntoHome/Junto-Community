@@ -28,6 +28,8 @@ Content, UI and features are kept apart, so a CMS, more workshops or an app can 
 ```
 src/
   app/                  Routes only. Each page fetches content and composes components.
+    (site)/             Public pages, inside the site header and footer. The group name is not in the URL.
+    admin/              CMS admin area: its own layout, not indexed.
   content/              Today's content, as typed TypeScript data (site, events, people, pages).
   lib/content/          The content API that every page uses, plus the source interface.
     types.ts            The content model: the contract between content and UI.
@@ -40,9 +42,12 @@ src/
     event/              Event cards and the full EventPage template.
     sections/           Page sections (Join the Junto band).
   features/subscribe/   Subscribe: zod schema, Server Action, Supabase repository, form.
-  lib/supabase/         Server-only Supabase admin client.
+  lib/supabase/         Supabase clients:
+    admin.ts            Service role, bypasses row level security. Subscribe form and cron only.
+    server.ts           Acts as the logged-in admin, so row level security applies. Use in /admin.
+    session.ts          Refreshes the admin login on /admin requests (called from proxy.ts).
   lib/seo.ts            Page metadata and Event JSON-LD.
-  proxy.ts              Redirects /bi101 (any casing) to /BI101.
+  proxy.ts              Redirects /bi101 (any casing) to /BI101 and keeps the admin login fresh.
 supabase/migrations/    Database schema.
 ```
 
@@ -98,4 +103,4 @@ Supabase pauses a free project after 7 days without activity. A Vercel Cron Job 
 
 ## Deploying
 
-Vercel project `junto-community` auto-deploys from `main`. Set the two Supabase environment variables in the Vercel project settings.
+Vercel project `junto-community` auto-deploys from `main` to the live site. Pushes to other branches (such as `dev`) get a preview URL. Set the variables from [.env.example](.env.example) in the Vercel project settings, for both Production and Preview.
