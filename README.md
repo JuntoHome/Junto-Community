@@ -42,6 +42,9 @@ src/
     event/              Event cards and the full EventPage template.
     sections/           Page sections (Join the Junto band).
   features/subscribe/   Subscribe: zod schema, Server Action, Supabase repository, form.
+  features/admin-auth/  Admin login: zod schema, Server Action, form.
+  lib/auth.ts           getAdmin(): the logged-in admin for this request, or null.
+  lib/rate-limit.ts     Per-IP attempt limit for public forms (subscribe, login).
   lib/supabase/         Supabase clients:
     admin.ts            Service role, bypasses row level security. Subscribe form and cron only.
     server.ts           Acts as the logged-in admin, so row level security applies. Use in /admin.

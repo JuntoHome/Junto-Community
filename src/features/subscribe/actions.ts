@@ -2,8 +2,8 @@
 
 import { headers } from "next/headers";
 import { after } from "next/server";
+import { getClientIp, isRateLimited } from "@/lib/rate-limit";
 import { notifyNewSubscriber } from "./notify";
-import { isRateLimited } from "./rate-limit";
 import { addSubscriber } from "./repository";
 import { HONEYPOT_FIELD, type SubscribeField, type SubscribeState, subscribeSchema } from "./schema";
 
@@ -32,9 +32,7 @@ export async function subscribe(_prev: SubscribeState, formData: FormData): Prom
     return { status: "error", message: "Please check the highlighted fields.", fieldErrors, values };
   }
 
-  const h = await headers();
-  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
-  if (isRateLimited(ip)) {
+  if (isRateLimited(`subscribe:${getClientIp(await headers())}`)) {
     return { status: "error", message: "Too many attempts. Please try again in a few minutes.", values };
   }
 

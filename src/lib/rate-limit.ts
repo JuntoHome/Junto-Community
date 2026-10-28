@@ -23,3 +23,8 @@ export function isRateLimited(key: string, now = Date.now()) {
 
   return recent.length > MAX_ATTEMPTS;
 }
+
+/** The visitor's IP from Vercel's forwarding headers, used as the rate-limit key. */
+export function getClientIp(h: { get(name: string): string | null }) {
+  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
+}
