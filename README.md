@@ -30,6 +30,9 @@ src/
   app/                  Routes only. Each page fetches content and composes components.
     (site)/             Public pages, inside the site header and footer. The group name is not in the URL.
     admin/              CMS admin area: its own layout, not indexed.
+      login/            The only admin page open to logged-out visitors.
+      (protected)/      Everything else. Its layout checks for an admin; each page and
+                        each admin Server Action must also call requireAdmin() first.
   content/              Today's content, as typed TypeScript data (site, events, people, pages).
   lib/content/          The content API that every page uses, plus the source interface.
     types.ts            The content model: the contract between content and UI.
@@ -43,7 +46,7 @@ src/
     sections/           Page sections (Join the Junto band).
   features/subscribe/   Subscribe: zod schema, Server Action, Supabase repository, form.
   features/admin-auth/  Admin login: zod schema, Server Action, form.
-  lib/auth.ts           getAdmin(): the logged-in admin for this request, or null.
+  lib/auth.ts           getAdmin() returns the logged-in admin or null; requireAdmin() redirects to login.
   lib/rate-limit.ts     Per-IP attempt limit for public forms (subscribe, login).
   lib/supabase/         Supabase clients:
     admin.ts            Service role, bypasses row level security. Subscribe form and cron only.
