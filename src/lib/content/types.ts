@@ -263,10 +263,31 @@ export type LibraryIntelligencePage = {
   eventLink: Link;
 };
 
+/** Wording around the "Who Can Help?" profiles. The profiles themselves come from the CMS (features/profiles). */
+export type WhoCanHelpPage = {
+  seo: Seo;
+  heading: string;
+  intro: string;
+  /** Shown on the overview and on every profile page. */
+  note: string;
+  /** Shown when no profile is published yet. */
+  emptyMessage: string;
+  cardLinkLabel: string;
+  backLinkLabel: string;
+  sections: {
+    howTheyHelp: string;
+    whoShouldExplore: string;
+    history: string;
+    whereToBegin: string;
+    contact: string;
+  };
+};
+
 export type PageMap = {
   home: HomePage;
   about: AboutPage;
   libraryIntelligence: LibraryIntelligencePage;
+  whoCanHelp: WhoCanHelpPage;
 };
 
 export type PageKey = keyof PageMap;

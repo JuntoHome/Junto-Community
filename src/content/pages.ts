@@ -1,5 +1,6 @@
 import type { PageMap } from "@/lib/content/types";
 import { libraryIntelligence } from "./library-intelligence";
+import { whoCanHelp } from "./who-can-help";
 
 export const pages: PageMap = {
   home: {
@@ -130,4 +131,5 @@ export const pages: PageMap = {
     },
   },
   libraryIntelligence,
+  whoCanHelp,
 };
