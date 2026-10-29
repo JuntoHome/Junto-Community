@@ -11,8 +11,12 @@ export const PROFILES_PATH = "/who-can-help";
 /** Cache tag for every public profile read. Saving a profile in /admin revalidates it. */
 export const PROFILES_TAG = "profiles";
 
-/** Shown on the public site within a minute of a change, even without revalidation. */
-const REVALIDATE_SECONDS = 60;
+/**
+ * How stale public profile data may get. The first visit after this serves the old copy
+ * while a new one is built, so 30 seconds keeps every change visible within a minute.
+ * Keep the pages' `revalidate` exports the same.
+ */
+const REVALIDATE_SECONDS = 30;
 
 const COLUMNS =
   "id, name, slug, tagline, intro, how_they_help, who_should_explore, history, contact_name, contact_role, contact_email, contact_phone, website_url, logo_path, updated_at";

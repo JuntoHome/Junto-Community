@@ -14,9 +14,9 @@ import { pageMetadata } from "@/lib/seo";
 
 type Props = { params: Promise<{ slug: string }> };
 
-// Published profiles are built ahead of time and refreshed at most once a minute.
-// A profile published later is built on its first visit.
-export const revalidate = 60;
+// Published profiles are built ahead of time and refreshed every 30 seconds, so changes show
+// within a minute (see features/profiles/queries.ts). A profile published later is built on its first visit.
+export const revalidate = 30;
 
 export async function generateStaticParams() {
   try {

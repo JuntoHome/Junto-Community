@@ -5,8 +5,8 @@ import { listPublishedProfiles, PROFILES_PATH } from "@/features/profiles/querie
 import { getPage, getSiteSettings } from "@/lib/content";
 import { pageMetadata } from "@/lib/seo";
 
-// Built ahead of time and refreshed at most once a minute, so a newly published profile appears within a minute.
-export const revalidate = 60;
+// Built ahead of time and refreshed every 30 seconds, so changes show within a minute (see features/profiles/queries.ts).
+export const revalidate = 30;
 
 export async function generateMetadata(): Promise<Metadata> {
   const [page, site] = await Promise.all([getPage("whoCanHelp"), getSiteSettings()]);

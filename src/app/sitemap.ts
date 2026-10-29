@@ -3,7 +3,7 @@ import { listPublishedProfiles, PROFILES_PATH } from "@/features/profiles/querie
 import { getSiteSettings, listEvents, listReviews } from "@/lib/content";
 
 // Profiles change without a deploy. The sitemap refreshes with the profile data
-// (at most once a minute, see features/profiles/queries.ts), so they are listed without one.
+// (see features/profiles/queries.ts), so they are listed without one.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [site, events, reviews, profiles] = await Promise.all([
     getSiteSettings(),

@@ -25,6 +25,8 @@ export const site: SiteSettings = {
     { label: "About", href: "/about" },
     { label: "Workshops", href: "/BI101" },
     { label: "Library Intelligence", href: "/library-intelligence" },
+    // Same name as the page heading in who-can-help.ts.
+    { label: "Who Can Help?", href: "/who-can-help" },
     { label: "Join the Junto", href: "/#join" },
   ],
   featuredEventSlug: "bi101",

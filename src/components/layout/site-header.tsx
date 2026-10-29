@@ -26,7 +26,8 @@ export async function SiteHeader() {
           />
         </Link>
 
-        <nav aria-label="Main" className="hidden items-center gap-9 text-base font-medium lg:flex">
+        {/* Five links and the button need about 860px, so the inline menu starts at 1280px (xl); below that, the menu button. */}
+        <nav aria-label="Main" className="hidden items-center gap-9 text-base font-medium whitespace-nowrap xl:flex">
           <NavLinks links={site.nav} />
           {cta && (
             <ButtonLink href={cta.href} size="sm">

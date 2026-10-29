@@ -23,7 +23,7 @@ export function MobileMenu({ links, cta }: { links: Link[]; cta: Link | null }) 
   }, [open]);
 
   return (
-    <div className="lg:hidden">
+    <div className="xl:hidden">
       <button
         type="button"
         onClick={() => setOpenedOn(open ? null : pathname)}

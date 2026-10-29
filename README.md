@@ -102,7 +102,7 @@ Dates are stored as ISO timestamps; every display string ("Wed, Oct 21", "12:00 
 Search for `PENDING` in `src/content`:
 
 - Online platform: set `attendance.online.platform` in `events.ts`.
-- "Who Can Help?" page name and wording are drafts: confirm with Paul ([src/content/who-can-help.ts](src/content/who-can-help.ts)). The address `/who-can-help` is `PROFILES_PATH` in [src/features/profiles/queries.ts](src/features/profiles/queries.ts), plus the matcher in `proxy.ts`.
+- "Who Can Help?" page name and wording are drafts: confirm with Paul ([src/content/who-can-help.ts](src/content/who-can-help.ts)). The address `/who-can-help` is `PROFILES_PATH` in [src/features/profiles/queries.ts](src/features/profiles/queries.ts), plus the matcher in `proxy.ts`; the menu label is in [src/content/site.ts](src/content/site.ts).
 
 ## Important
 
