@@ -43,6 +43,7 @@ src/
   components/
     ui/                 Primitives: buttons, icons, rich text, placeholders.
     layout/             Header, mobile menu, footer.
+    admin/              Admin header and navigation. Add a new admin module in modules.ts.
     event/              Event cards and the full EventPage template.
     sections/           Page sections (Join the Junto band).
   features/subscribe/   Subscribe: zod schema, Server Action, Supabase repository, form.
