@@ -15,15 +15,23 @@ function renderInline(text: string): ReactNode[] {
     const link = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(part);
     if (link) {
       const [, label, href] = link;
-      return href.startsWith("/") ? (
-        <Link key={i} href={href} className="font-semibold">
-          {label}
-        </Link>
-      ) : (
-        <a key={i} href={href} className="font-semibold">
-          {label}
-        </a>
-      );
+      if (href.startsWith("/") && !href.startsWith("//")) {
+        return (
+          <Link key={i} href={href} className="font-semibold">
+            {label}
+          </Link>
+        );
+      }
+      // Only web, email and phone links. Text can come from the CMS, so anything else
+      // (javascript:, data:, ...) is shown as plain text.
+      if (/^(https?:\/\/|mailto:|tel:)/i.test(href)) {
+        return (
+          <a key={i} href={href} className="font-semibold">
+            {label}
+          </a>
+        );
+      }
+      return label;
     }
     return part;
   });

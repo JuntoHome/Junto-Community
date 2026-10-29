@@ -48,14 +48,17 @@ src/
     sections/           Page sections (Join the Junto band).
   features/subscribe/   Subscribe: zod schema, Server Action, Supabase repository, form.
   features/admin-auth/  Admin login: zod schema, Server Action, form.
+  features/profiles/    "Who Can Help?" profiles from Supabase: cached public queries, card, logo, text formatting.
   lib/auth.ts           getAdmin() returns the logged-in admin or null; requireAdmin() redirects to login.
   lib/rate-limit.ts     Per-IP attempt limit for public forms (subscribe, login).
   lib/supabase/         Supabase clients:
     admin.ts            Service role, bypasses row level security. Subscribe form and cron only.
     server.ts           Acts as the logged-in admin, so row level security applies. Use in /admin.
+    public.ts           Reads as an anonymous visitor (published content only). Use in cached public pages.
     session.ts          Refreshes the admin login on /admin requests (called from proxy.ts).
   lib/seo.ts            Page metadata and Event JSON-LD.
-  proxy.ts              Redirects /bi101 (any casing) to /BI101 and keeps the admin login fresh.
+  proxy.ts              Redirects /bi101 (any casing) to /BI101, capitalised profile addresses to lowercase,
+                        and keeps the admin login fresh.
 supabase/migrations/    Database schema.
 ```
 
@@ -90,6 +93,7 @@ Add an `Event` to [src/content/events.ts](src/content/events.ts) (or the CMS lat
 | Workshop details, Eventbrite link, date/time | [src/content/events.ts](src/content/events.ts) |
 | Presenter bio | [src/content/people.ts](src/content/people.ts) |
 | Nav, footer, contact email | [src/content/site.ts](src/content/site.ts) |
+| Wording around the profiles (page name, intro, "not a sponsored listing" note, section titles) | [src/content/who-can-help.ts](src/content/who-can-help.ts) |
 
 Dates are stored as ISO timestamps; every display string ("Wed, Oct 21", "12:00 to 2:00 PM MST") is derived from them.
 
@@ -98,6 +102,7 @@ Dates are stored as ISO timestamps; every display string ("Wed, Oct 21", "12:00 
 Search for `PENDING` in `src/content`:
 
 - Online platform: set `attendance.online.platform` in `events.ts`.
+- "Who Can Help?" page name and wording are drafts: confirm with Paul ([src/content/who-can-help.ts](src/content/who-can-help.ts)). The address `/who-can-help` is `PROFILES_PATH` in [src/features/profiles/queries.ts](src/features/profiles/queries.ts), plus the matcher in `proxy.ts`.
 
 ## Important
 
