@@ -48,7 +48,8 @@ src/
     sections/           Page sections (Join the Junto band).
   features/subscribe/   Subscribe: zod schema, Server Action, Supabase repository, form.
   features/admin-auth/  Admin login: zod schema, Server Action, form.
-  features/profiles/    "Who Can Help?" profiles from Supabase: cached public queries, card, logo, text formatting.
+  features/profiles/    "Who Can Help?" profiles from Supabase: cached public queries, card, logo, text formatting;
+                        admin-queries.ts and admin-profile-list.tsx for the admin (uncached, read as the admin).
   lib/auth.ts           getAdmin() returns the logged-in admin or null; requireAdmin() redirects to login.
   lib/rate-limit.ts     Per-IP attempt limit for public forms (subscribe, login).
   lib/supabase/         Supabase clients:
