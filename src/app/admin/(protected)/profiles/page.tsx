@@ -3,7 +3,7 @@ import Link from "next/link";
 import { AdminPage } from "@/components/admin/admin-page";
 import { ButtonLink } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
-import { AdminProfileList } from "@/features/profiles/admin-profile-list";
+import { AdminProfileList, NoProfilesYet } from "@/features/profiles/admin-profile-list";
 import { listProfilesForAdmin } from "@/features/profiles/admin-queries";
 import { PROFILES_PATH } from "@/features/profiles/queries";
 import { requireAdmin } from "@/lib/auth";
@@ -37,9 +37,9 @@ export default async function ProfilesPage() {
       {profiles.length > 0 ? (
         <AdminProfileList profiles={profiles} adminEmail={admin.email} />
       ) : (
-        <p className="rounded-xl bg-parchment px-6 py-5 text-base text-parchment-text md:text-[17px]">
-          No profiles yet. Choose &ldquo;Add a profile&rdquo; to write the first one.
-        </p>
+        <div className="rounded-[18px] border border-sand bg-white">
+          <NoProfilesYet />
+        </div>
       )}
     </AdminPage>
   );

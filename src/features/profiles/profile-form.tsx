@@ -14,7 +14,8 @@ import { buttonClasses } from "@/components/ui/button";
 import { inputClasses, textareaClasses } from "@/components/ui/form";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/cn";
-import type { ProfileField, ProfileFormState, ProfileFormValues } from "./schema";
+import type { ProfileStatus } from "./admin-queries";
+import { PUBLISH_FIELDS, type ProfileField, type ProfileFormState, type ProfileFormValues } from "./schema";
 import { SLUG_MAX, slugify } from "./slug";
 
 const LABELS: Record<ProfileField, string> = {
@@ -40,8 +41,19 @@ const TAGS = {
 
 const fieldId = (field: ProfileField) => `profile-${field}`;
 
-/** What the "Ready to publish?" panel ticks off: the name plus every "Needed to publish" field. */
-const PUBLISH_CHECKLIST: ProfileField[] = ["name", "tagline", "intro", "howTheyHelp", "whoShouldExplore", "websiteUrl"];
+/** What the side panel ticks off: the name plus every "Needed to publish" field. */
+const PUBLISH_CHECKLIST: ProfileField[] = ["name", ...PUBLISH_FIELDS];
+
+const CHECKLIST_TEXT = {
+  draft: {
+    title: "Ready to publish?",
+    note: "Drafts can be saved at any time. This list only matters for publishing.",
+  },
+  published: {
+    title: "Must stay filled in",
+    note: "This profile is on the public site, so these can't be left empty. Changes go live when you save.",
+  },
+};
 
 /** While typing, keep a trailing hyphen so "score-" can go on to become "score-phoenix". */
 function typedSlug(value: string) {
@@ -121,6 +133,7 @@ const code = "rounded bg-white/70 px-1 font-mono text-[14px]";
 export function ProfileForm({
   action,
   initialValues,
+  status,
   addressPrefix,
   submitLabel,
   cancelHref,
@@ -128,6 +141,8 @@ export function ProfileForm({
 }: {
   action: (prev: ProfileFormState, formData: FormData) => Promise<ProfileFormState>;
   initialValues: ProfileFormValues;
+  /** "new" while adding a profile. */
+  status: "new" | ProfileStatus;
   /** Shown before the page address, e.g. "www.juntocommunity.org/who-can-help/". */
   addressPrefix: string;
   submitLabel: string;
@@ -138,7 +153,9 @@ export function ProfileForm({
   const { values, fieldErrors: errors = {}, message } = state;
   const errorFields = Object.keys(errors) as ProfileField[];
 
-  // The page address follows the name until it's changed by hand.
+  // The page address follows the name until it's changed by hand. A published profile's
+  // address stays put: changing it breaks links to the page.
+  const published = status === "published";
   const [name, setName] = useState(values.name);
   const [slug, setSlug] = useState(values.slug || slugify(values.name));
   const [slugEdited, setSlugEdited] = useState(Boolean(values.slug) && values.slug !== slugify(values.name));
@@ -156,6 +173,7 @@ export function ProfileForm({
     });
   };
   const done = filled.size;
+  const checklist = CHECKLIST_TEXT[published ? "published" : "draft"];
 
   // After a save that didn't go through, take keyboard and screen reader users to the summary.
   const summaryRef = useRef<HTMLDivElement>(null);
@@ -236,7 +254,7 @@ export function ProfileForm({
                 defaultValue: undefined,
                 onChange: (event) => {
                   setName(event.target.value);
-                  if (!slugEdited) setSlug(slugify(event.target.value));
+                  if (!published && !slugEdited) setSlug(slugify(event.target.value));
                 },
               })
             }
@@ -244,13 +262,29 @@ export function ProfileForm({
           <Field
             field="slug"
             hint={
-              <>
-                Filled in from the name; change it only if you need to. The page will be at{" "}
-                <span className="font-semibold text-ink wrap-anywhere">
-                  {addressPrefix}
-                  {slug || "…"}
-                </span>
-              </>
+              published ? (
+                <>
+                  The page is at{" "}
+                  <span className="font-semibold text-ink wrap-anywhere">{addressPrefix + initialValues.slug}</span>.{" "}
+                  {slug && slug !== initialValues.slug ? (
+                    <>
+                      It will move to{" "}
+                      <span className="font-semibold text-ink wrap-anywhere">{addressPrefix + slug}</span> when you
+                      save, and links to the old address will stop working.
+                    </>
+                  ) : (
+                    "If you change it, links to the old address will stop working."
+                  )}
+                </>
+              ) : (
+                <>
+                  Filled in from the name; change it only if you need to. The page will be at{" "}
+                  <span className="font-semibold text-ink wrap-anywhere">
+                    {addressPrefix}
+                    {slug || "…"}
+                  </span>
+                </>
+              )
             }
             error={errors.slug}
           >
@@ -371,10 +405,10 @@ export function ProfileForm({
 
       {/* Wide screens: what's still missing before the profile can be published. */}
       <aside
-        aria-label="Ready to publish?"
+        aria-label={checklist.title}
         className="hidden rounded-[18px] border border-sand bg-white p-5 xl:sticky xl:top-8 xl:block"
       >
-        <h2 className="font-serif text-lg font-bold text-navy">Ready to publish?</h2>
+        <h2 className="font-serif text-lg font-bold text-navy">{checklist.title}</h2>
         <p className="mt-1 text-sm text-muted">
           {done} of {PUBLISH_CHECKLIST.length} needed fields filled in
         </p>
@@ -409,9 +443,7 @@ export function ProfileForm({
             );
           })}
         </ul>
-        <p className="mt-4 border-t border-sand pt-4 text-sm text-muted">
-          Drafts can be saved at any time. This list only matters for publishing.
-        </p>
+        <p className="mt-4 border-t border-sand pt-4 text-sm text-muted">{checklist.note}</p>
       </aside>
     </form>
   );

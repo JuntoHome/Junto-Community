@@ -27,6 +27,7 @@ export default async function NewProfilePage() {
       <ProfileForm
         action={createProfile}
         initialValues={emptyProfileValues}
+        status="new"
         addressPrefix={`${new URL(site.url).host}${PROFILES_PATH}/`}
         submitLabel="Save draft"
         cancelHref="/admin/profiles"

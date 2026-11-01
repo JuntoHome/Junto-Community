@@ -61,6 +61,14 @@ export type ProfileInput = z.output<typeof profileDraftSchema>;
 export type ProfileField = keyof ProfileInput;
 export const PROFILE_FIELDS = Object.keys(profileDraftSchema.in.shape) as ProfileField[];
 
+/** What a profile needs besides its name before it can be public (the database's profiles_published_complete check). */
+export const PUBLISH_FIELDS: ProfileField[] = ["tagline", "intro", "howTheyHelp", "whoShouldExplore", "websiteUrl"];
+
+/** The publish fields that are still empty. Parsed values are already trimmed. */
+export function missingPublishFields(profile: ProfileInput): ProfileField[] {
+  return PUBLISH_FIELDS.filter((field) => !profile[field]);
+}
+
 /** Every field as the form holds it: plain strings, empty when not filled in. */
 export type ProfileFormValues = Record<ProfileField, string>;
 

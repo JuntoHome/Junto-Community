@@ -5,6 +5,8 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const nextConfig: NextConfig = {
   // Don't generate AGENTS.md / CLAUDE.md on `next dev`.
   agentRules: false,
+  // Keep `next dev`'s badge off the admin sidebar's buttons in the bottom-left corner.
+  devIndicators: { position: "bottom-right" },
   env: {
     // When this version of the site was built: the sitemap's "last modified" for pages that only change on deploy.
     BUILT_AT: new Date().toISOString(),

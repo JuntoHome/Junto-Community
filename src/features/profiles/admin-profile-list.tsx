@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { ButtonLink } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import type { ProfileStatus, ProfileSummary } from "./admin-queries";
@@ -20,6 +22,24 @@ export function StatusBadge({ status }: { status: ProfileStatus }) {
 }
 
 export const editPath = (profile: ProfileSummary) => `/admin/profiles/${profile.id}`;
+
+/** Shown in place of the profiles until the first one is added. */
+export function NoProfilesYet() {
+  return (
+    <div className="flex flex-col items-center px-6 py-12 text-center">
+      <span className="flex size-12 items-center justify-center rounded-full bg-sage text-green">
+        <Icon name="users" size={24} />
+      </span>
+      <p className="mt-4 font-semibold text-ink">No profiles yet</p>
+      <p className="mt-1 max-w-80 text-[15px] text-muted">
+        Add the first organization. You can save it as a draft and finish it later.
+      </p>
+      <ButtonLink href="/admin/profiles/new" variant="outline" size="sm" className="mt-5">
+        Add the first profile
+      </ButtonLink>
+    </div>
+  );
+}
 
 function NameLink({ profile }: { profile: ProfileSummary }) {
   return (

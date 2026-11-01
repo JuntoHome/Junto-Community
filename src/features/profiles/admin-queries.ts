@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { ProfileFormValues } from "./schema";
 
 export type ProfileStatus = "draft" | "published";
 
@@ -27,6 +28,24 @@ type SummaryRow = {
   editor: { email: string } | null;
 };
 
+/** One profile with every field, as the edit form shows it. */
+export type AdminProfile = ProfileSummary & { values: ProfileFormValues };
+
+const DETAIL_COLUMNS = `${SUMMARY_COLUMNS}, tagline, intro, how_they_help, who_should_explore, history, website_url, contact_name, contact_role, contact_email, contact_phone`;
+
+type DetailRow = SummaryRow & {
+  tagline: string | null;
+  intro: string | null;
+  how_they_help: string | null;
+  who_should_explore: string | null;
+  history: string | null;
+  website_url: string | null;
+  contact_name: string | null;
+  contact_role: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+};
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function toSummary(row: SummaryRow): ProfileSummary {
@@ -37,6 +56,26 @@ function toSummary(row: SummaryRow): ProfileSummary {
     status: row.status,
     updatedAt: row.updated_at,
     updatedBy: row.editor?.email ?? null,
+  };
+}
+
+function toAdminProfile(row: DetailRow): AdminProfile {
+  return {
+    ...toSummary(row),
+    values: {
+      name: row.name,
+      slug: row.slug,
+      tagline: row.tagline ?? "",
+      intro: row.intro ?? "",
+      howTheyHelp: row.how_they_help ?? "",
+      whoShouldExplore: row.who_should_explore ?? "",
+      history: row.history ?? "",
+      websiteUrl: row.website_url ?? "",
+      contactName: row.contact_name ?? "",
+      contactRole: row.contact_role ?? "",
+      contactEmail: row.contact_email ?? "",
+      contactPhone: row.contact_phone ?? "",
+    },
   };
 }
 
@@ -58,15 +97,15 @@ export async function listProfilesForAdmin(): Promise<ProfileSummary[]> {
 }
 
 /** One profile by id, or null (unknown or deleted). Asked once per request, however many callers. */
-export const getProfileForAdmin = cache(async (id: string): Promise<ProfileSummary | null> => {
+export const getProfileForAdmin = cache(async (id: string): Promise<AdminProfile | null> => {
   if (!UUID.test(id)) return null;
   const db = await createSupabaseServerClient();
   const { data, error } = await db
     .from("profiles")
-    .select(SUMMARY_COLUMNS)
+    .select(DETAIL_COLUMNS)
     .eq("id", id)
     .is("deleted_at", null)
     .maybeSingle();
   if (error) throw new Error(`Couldn't load profile ${id}: ${error.message}`);
-  return data ? toSummary(data as unknown as SummaryRow) : null;
+  return data ? toAdminProfile(data as unknown as DetailRow) : null;
 });

@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { AdminPage } from "@/components/admin/admin-page";
 import { ButtonLink } from "@/components/ui/button";
 import { Icon, type IconName } from "@/components/ui/icon";
-import { editPath, StatusBadge } from "@/features/profiles/admin-profile-list";
+import { editPath, NoProfilesYet, StatusBadge } from "@/features/profiles/admin-profile-list";
 import { listProfilesForAdmin, type ProfileSummary } from "@/features/profiles/admin-queries";
 import { PROFILES_PATH } from "@/features/profiles/queries";
 import { type Admin, requireAdmin } from "@/lib/auth";
@@ -157,18 +157,7 @@ export default async function AdminHomePage() {
               ))}
             </ul>
           ) : (
-            <div className="flex flex-col items-center px-6 py-12 text-center">
-              <span className="flex size-12 items-center justify-center rounded-full bg-sage text-green">
-                <Icon name="users" size={24} />
-              </span>
-              <p className="mt-4 font-semibold text-ink">No profiles yet</p>
-              <p className="mt-1 max-w-80 text-[15px] text-muted">
-                Add the first organization. You can save it as a draft and finish it later.
-              </p>
-              <ButtonLink href="/admin/profiles/new" variant="outline" size="sm" className="mt-5">
-                Add the first profile
-              </ButtonLink>
-            </div>
+            <NoProfilesYet />
           )}
         </section>
 
