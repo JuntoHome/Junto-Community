@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { AdminHeader } from "@/components/admin/admin-header";
+import { AdminShell } from "@/components/admin/admin-shell";
 import { getAdmin } from "@/lib/auth";
 
 export const metadata: Metadata = {
@@ -7,16 +7,11 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-/** The CMS admin area: its own header, none of the public site's header, footer or analytics. */
+/**
+ * The CMS admin area: none of the public site's header, footer or analytics. Logged-in admins
+ * get the sidebar layout; the login and password pages get a plain header.
+ */
 export default async function AdminLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const admin = await getAdmin();
-
-  return (
-    <>
-      <AdminHeader admin={admin} />
-      <main id="main" className="flex-1">
-        {children}
-      </main>
-    </>
-  );
+  return <AdminShell admin={admin}>{children}</AdminShell>;
 }

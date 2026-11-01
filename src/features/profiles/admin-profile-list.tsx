@@ -1,18 +1,12 @@
 import Link from "next/link";
 import { cn } from "@/lib/cn";
+import { formatDateTime } from "@/lib/format";
 import type { ProfileStatus, ProfileSummary } from "./admin-queries";
 import { PROFILES_PATH } from "./queries";
 
-// Admins work in Arizona (no daylight saving), like the subscribe notifications.
-const updatedFormat = new Intl.DateTimeFormat("en-US", {
-  dateStyle: "medium",
-  timeStyle: "short",
-  timeZone: "America/Phoenix",
-});
-
 const statusLabels: Record<ProfileStatus, string> = { published: "Published", draft: "Draft" };
 
-function StatusBadge({ status }: { status: ProfileStatus }) {
+export function StatusBadge({ status }: { status: ProfileStatus }) {
   return (
     <span
       className={cn(
@@ -25,7 +19,7 @@ function StatusBadge({ status }: { status: ProfileStatus }) {
   );
 }
 
-const editPath = (profile: ProfileSummary) => `/admin/profiles/${profile.id}`;
+export const editPath = (profile: ProfileSummary) => `/admin/profiles/${profile.id}`;
 
 function NameLink({ profile }: { profile: ProfileSummary }) {
   return (
@@ -43,7 +37,7 @@ function Updated({ profile, adminEmail }: { profile: ProfileSummary; adminEmail:
   const by = profile.updatedBy === adminEmail ? "you" : profile.updatedBy;
   return (
     <>
-      <time dateTime={profile.updatedAt}>{updatedFormat.format(new Date(profile.updatedAt))}</time>
+      <time dateTime={profile.updatedAt}>{formatDateTime(profile.updatedAt)}</time>
       {by && <span className="block text-sm text-subtle wrap-anywhere">by {by}</span>}
     </>
   );

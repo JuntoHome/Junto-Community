@@ -1,9 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { type ComponentProps, type ReactNode, useActionState, useEffect, useRef, useState } from "react";
+import {
+  type ComponentProps,
+  type FormEvent,
+  type ReactNode,
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { buttonClasses } from "@/components/ui/button";
 import { inputClasses, textareaClasses } from "@/components/ui/form";
+import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/cn";
 import type { ProfileField, ProfileFormState, ProfileFormValues } from "./schema";
 import { SLUG_MAX, slugify } from "./slug";
@@ -30,6 +39,9 @@ const TAGS = {
 } as const;
 
 const fieldId = (field: ProfileField) => `profile-${field}`;
+
+/** What the "Ready to publish?" panel ticks off: the name plus every "Needed to publish" field. */
+const PUBLISH_CHECKLIST: ProfileField[] = ["name", "tagline", "intro", "howTheyHelp", "whoShouldExplore", "websiteUrl"];
 
 /** While typing, keep a trailing hyphen so "score-" can go on to become "score-phoenix". */
 function typedSlug(value: string) {
@@ -131,6 +143,20 @@ export function ProfileForm({
   const [slug, setSlug] = useState(values.slug || slugify(values.name));
   const [slugEdited, setSlugEdited] = useState(Boolean(values.slug) && values.slug !== slugify(values.name));
 
+  // Fields of the checklist that have something in them, updated as the admin types.
+  const [filled, setFilled] = useState(() => new Set(PUBLISH_CHECKLIST.filter((field) => values[field].trim())));
+  const trackFilled = (event: FormEvent<HTMLFormElement>) => {
+    const { name: field, value } = event.target as HTMLInputElement;
+    if (!PUBLISH_CHECKLIST.includes(field as ProfileField)) return;
+    setFilled((prev) => {
+      const next = new Set(prev);
+      if (value.trim()) next.add(field as ProfileField);
+      else next.delete(field as ProfileField);
+      return next;
+    });
+  };
+  const done = filled.size;
+
   // After a save that didn't go through, take keyboard and screen reader users to the summary.
   const summaryRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -158,183 +184,235 @@ export function ProfileForm({
   );
 
   return (
-    <form action={formAction} noValidate className={cn("flex max-w-180 flex-col gap-6", className)}>
-      {(errorFields.length > 0 || message) && (
-        <div
-          ref={summaryRef}
-          tabIndex={-1}
-          role="alert"
-          className="rounded-xl border-2 border-red-700 bg-white p-5 focus:outline-none md:p-6"
-        >
-          <h2 className="text-lg font-bold text-red-700">
-            {message ?? "The profile wasn't saved. Please fix the following:"}
-          </h2>
-          {errorFields.length > 0 && (
-            <ul className="mt-3 flex list-disc flex-col gap-1.5 pl-5 text-red-700">
-              {errorFields.map((field) => (
-                <li key={field}>
-                  <a
-                    href={`#${fieldId(field)}`}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      document.getElementById(fieldId(field))?.focus();
-                    }}
-                    className="font-semibold text-red-700 underline hover:text-red-900"
-                  >
-                    {LABELS[field]}: {errors[field]}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+    <form
+      action={formAction}
+      onInput={trackFilled}
+      noValidate
+      className={cn("grid gap-8 xl:grid-cols-[minmax(0,1fr)_16rem] xl:items-start", className)}
+    >
+      <div className="flex max-w-180 min-w-0 flex-col gap-6">
+        {(errorFields.length > 0 || message) && (
+          <div
+            ref={summaryRef}
+            tabIndex={-1}
+            role="alert"
+            className="rounded-xl border-2 border-red-700 bg-white p-5 focus:outline-none md:p-6"
+          >
+            <h2 className="text-lg font-bold text-red-700">
+              {message ?? "The profile wasn't saved. Please fix the following:"}
+            </h2>
+            {errorFields.length > 0 && (
+              <ul className="mt-3 flex list-disc flex-col gap-1.5 pl-5 text-red-700">
+                {errorFields.map((field) => (
+                  <li key={field}>
+                    <a
+                      href={`#${fieldId(field)}`}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        document.getElementById(fieldId(field))?.focus();
+                      }}
+                      className="font-semibold text-red-700 underline hover:text-red-900"
+                    >
+                      {LABELS[field]}: {errors[field]}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
 
-      <Section title="The organization">
-        <Field
-          field="name"
-          tag="required"
-          hint="As the organization writes it, e.g. SCORE Greater Phoenix."
-          error={errors.name}
-        >
-          {(control) =>
-            textInput(control, {
-              maxLength: 200,
-              value: name,
-              defaultValue: undefined,
-              onChange: (event) => {
-                setName(event.target.value);
-                if (!slugEdited) setSlug(slugify(event.target.value));
-              },
-            })
-          }
-        </Field>
-        <Field
-          field="slug"
-          hint={
-            <>
-              Filled in from the name; change it only if you need to. The page will be at{" "}
-              <span className="font-semibold text-ink wrap-anywhere">
-                {addressPrefix}
-                {slug || "…"}
-              </span>
-            </>
-          }
-          error={errors.slug}
-        >
-          {(control) =>
-            textInput(control, {
-              maxLength: SLUG_MAX,
-              autoCapitalize: "none",
-              spellCheck: false,
-              value: slug,
-              defaultValue: undefined,
-              onChange: (event) => {
-                setSlugEdited(event.target.value.trim() !== "");
-                setSlug(typedSlug(event.target.value));
-              },
-              // Emptied: follow the name again. Otherwise drop a trailing hyphen.
-              onBlur: () => setSlug(slugify(slug || name)),
-            })
-          }
-        </Field>
-        <Field
-          field="tagline"
-          tag="publish"
-          hint="One line, shown under the name on the overview and on the profile."
-          error={errors.tagline}
-        >
-          {(control) => textInput(control, { maxLength: 300 })}
-        </Field>
-      </Section>
-
-      <Section title="Profile text">
-        <details className="rounded-lg bg-parchment px-4 py-3 text-[15px] text-parchment-text">
-          <summary className="cursor-pointer font-semibold">Formatting tips</summary>
-          <ul className="mt-2 flex list-disc flex-col gap-1.5 pl-5">
-            <li>Leave a blank line between paragraphs.</li>
-            <li>
-              Start a line with <code className={code}>- </code> to make a bullet point.
-            </li>
-            <li>
-              Put two stars around words to make them bold: <code className={code}>**free mentoring**</code>
-            </li>
-            <li>
-              Write a link like this: <code className={code}>[SCORE&apos;s website](https://www.score.org)</code>
-            </li>
-          </ul>
-        </details>
-        <Field field="intro" tag="publish" hint="The opening paragraph or two." error={errors.intro}>
-          {(control) => textArea(control, 5)}
-        </Field>
-        <Field
-          field="howTheyHelp"
-          tag="publish"
-          hint="What they offer small-business owners."
-          error={errors.howTheyHelp}
-        >
-          {(control) => textArea(control, 10)}
-        </Field>
-        <Field
-          field="whoShouldExplore"
-          tag="publish"
-          hint="The owners and businesses who will get the most from them."
-          error={errors.whoShouldExplore}
-        >
-          {(control) => textArea(control, 7)}
-        </Field>
-        <Field field="history" hint="Optional. Their history, if it helps readers trust them." error={errors.history}>
-          {(control) => textArea(control, 6)}
-        </Field>
-      </Section>
-
-      <Section title="Where to begin">
-        <Field
-          field="websiteUrl"
-          tag="publish"
-          hint="The page where visitors should start, e.g. https://www.score.org/phoenix."
-          error={errors.websiteUrl}
-        >
-          {(control) =>
-            textInput(control, { inputMode: "url", maxLength: 2000, autoCapitalize: "none", spellCheck: false })
-          }
-        </Field>
-      </Section>
-
-      <Section title="Point of contact" description="Optional. Shown at the end of the profile.">
-        <div className="grid gap-6 md:grid-cols-2">
-          <Field field="contactName" error={errors.contactName}>
-            {(control) => textInput(control, { maxLength: 200 })}
-          </Field>
-          <Field field="contactRole" error={errors.contactRole}>
-            {(control) => textInput(control, { maxLength: 200 })}
-          </Field>
-          <Field field="contactEmail" error={errors.contactEmail}>
+        <Section title="The organization">
+          <Field
+            field="name"
+            tag="required"
+            hint="As the organization writes it, e.g. SCORE Greater Phoenix."
+            error={errors.name}
+          >
             {(control) =>
               textInput(control, {
-                type: "email",
-                inputMode: "email",
-                maxLength: 254,
-                autoCapitalize: "none",
-                spellCheck: false,
+                maxLength: 200,
+                value: name,
+                defaultValue: undefined,
+                onChange: (event) => {
+                  setName(event.target.value);
+                  if (!slugEdited) setSlug(slugify(event.target.value));
+                },
               })
             }
           </Field>
-          <Field field="contactPhone" error={errors.contactPhone}>
-            {(control) => textInput(control, { type: "tel", inputMode: "tel", maxLength: 50 })}
+          <Field
+            field="slug"
+            hint={
+              <>
+                Filled in from the name; change it only if you need to. The page will be at{" "}
+                <span className="font-semibold text-ink wrap-anywhere">
+                  {addressPrefix}
+                  {slug || "…"}
+                </span>
+              </>
+            }
+            error={errors.slug}
+          >
+            {(control) =>
+              textInput(control, {
+                maxLength: SLUG_MAX,
+                autoCapitalize: "none",
+                spellCheck: false,
+                value: slug,
+                defaultValue: undefined,
+                onChange: (event) => {
+                  setSlugEdited(event.target.value.trim() !== "");
+                  setSlug(typedSlug(event.target.value));
+                },
+                // Emptied: follow the name again. Otherwise drop a trailing hyphen.
+                onBlur: () => setSlug(slugify(slug || name)),
+              })
+            }
           </Field>
-        </div>
-      </Section>
+          <Field
+            field="tagline"
+            tag="publish"
+            hint="One line, shown under the name on the overview and on the profile."
+            error={errors.tagline}
+          >
+            {(control) => textInput(control, { maxLength: 300 })}
+          </Field>
+        </Section>
 
-      {/* Stays in view at the bottom of the screen while scrolling through the form. */}
-      <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-sand bg-ivory pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-        <button type="submit" disabled={pending} className={buttonClasses("navy", "md", "cursor-pointer")}>
-          {pending ? "Saving..." : submitLabel}
-        </button>
-        <Link href={cancelHref} className="font-semibold">
-          Cancel
-        </Link>
+        <Section title="Profile text">
+          <details className="rounded-lg bg-parchment px-4 py-3 text-[15px] text-parchment-text">
+            <summary className="cursor-pointer font-semibold">Formatting tips</summary>
+            <ul className="mt-2 flex list-disc flex-col gap-1.5 pl-5">
+              <li>Leave a blank line between paragraphs.</li>
+              <li>
+                Start a line with <code className={code}>- </code> to make a bullet point.
+              </li>
+              <li>
+                Put two stars around words to make them bold: <code className={code}>**free mentoring**</code>
+              </li>
+              <li>
+                Write a link like this: <code className={code}>[SCORE&apos;s website](https://www.score.org)</code>
+              </li>
+            </ul>
+          </details>
+          <Field field="intro" tag="publish" hint="The opening paragraph or two." error={errors.intro}>
+            {(control) => textArea(control, 5)}
+          </Field>
+          <Field
+            field="howTheyHelp"
+            tag="publish"
+            hint="What they offer small-business owners."
+            error={errors.howTheyHelp}
+          >
+            {(control) => textArea(control, 10)}
+          </Field>
+          <Field
+            field="whoShouldExplore"
+            tag="publish"
+            hint="The owners and businesses who will get the most from them."
+            error={errors.whoShouldExplore}
+          >
+            {(control) => textArea(control, 7)}
+          </Field>
+          <Field field="history" hint="Optional. Their history, if it helps readers trust them." error={errors.history}>
+            {(control) => textArea(control, 6)}
+          </Field>
+        </Section>
+
+        <Section title="Where to begin">
+          <Field
+            field="websiteUrl"
+            tag="publish"
+            hint="The page where visitors should start, e.g. https://www.score.org/phoenix."
+            error={errors.websiteUrl}
+          >
+            {(control) =>
+              textInput(control, { inputMode: "url", maxLength: 2000, autoCapitalize: "none", spellCheck: false })
+            }
+          </Field>
+        </Section>
+
+        <Section title="Point of contact" description="Optional. Shown at the end of the profile.">
+          <div className="grid gap-6 md:grid-cols-2">
+            <Field field="contactName" error={errors.contactName}>
+              {(control) => textInput(control, { maxLength: 200 })}
+            </Field>
+            <Field field="contactRole" error={errors.contactRole}>
+              {(control) => textInput(control, { maxLength: 200 })}
+            </Field>
+            <Field field="contactEmail" error={errors.contactEmail}>
+              {(control) =>
+                textInput(control, {
+                  type: "email",
+                  inputMode: "email",
+                  maxLength: 254,
+                  autoCapitalize: "none",
+                  spellCheck: false,
+                })
+              }
+            </Field>
+            <Field field="contactPhone" error={errors.contactPhone}>
+              {(control) => textInput(control, { type: "tel", inputMode: "tel", maxLength: 50 })}
+            </Field>
+          </div>
+        </Section>
+
+        {/* Stays in view at the bottom of the screen while scrolling through the form. */}
+        <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-sand bg-ivory pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <button type="submit" disabled={pending} className={buttonClasses("navy", "md", "cursor-pointer")}>
+            {pending ? "Saving..." : submitLabel}
+          </button>
+          <Link href={cancelHref} className="font-semibold">
+            Cancel
+          </Link>
+        </div>
       </div>
+
+      {/* Wide screens: what's still missing before the profile can be published. */}
+      <aside
+        aria-label="Ready to publish?"
+        className="hidden rounded-[18px] border border-sand bg-white p-5 xl:sticky xl:top-8 xl:block"
+      >
+        <h2 className="font-serif text-lg font-bold text-navy">Ready to publish?</h2>
+        <p className="mt-1 text-sm text-muted">
+          {done} of {PUBLISH_CHECKLIST.length} needed fields filled in
+        </p>
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-sand">
+          <div
+            className="h-full rounded-full bg-green transition-[width] duration-300"
+            style={{ width: `${(done / PUBLISH_CHECKLIST.length) * 100}%` }}
+          />
+        </div>
+        <ul className="mt-4 flex flex-col gap-1">
+          {PUBLISH_CHECKLIST.map((field) => {
+            const ok = filled.has(field);
+            return (
+              <li key={field}>
+                <button
+                  type="button"
+                  onClick={() => document.getElementById(fieldId(field))?.focus()}
+                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-md py-1 text-left text-[15px] text-ink hover:text-green"
+                >
+                  <span
+                    className={cn(
+                      "flex size-5 shrink-0 items-center justify-center rounded-full border",
+                      ok ? "border-green bg-green text-white" : "border-field bg-white",
+                    )}
+                  >
+                    {ok && <Icon name="check" size={13} strokeWidth={3} />}
+                  </span>
+                  {LABELS[field]}
+                  <span className="sr-only">{ok ? " (filled in)" : " (still needed)"}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="mt-4 border-t border-sand pt-4 text-sm text-muted">
+          Drafts can be saved at any time. This list only matters for publishing.
+        </p>
+      </aside>
     </form>
   );
 }

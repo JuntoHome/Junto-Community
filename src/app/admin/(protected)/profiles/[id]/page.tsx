@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AdminPage } from "@/components/admin/admin-page";
 import { FlashNotice } from "@/components/admin/flash-notice";
-import { Container } from "@/components/ui/primitives";
 import { getProfileForAdmin } from "@/features/profiles/admin-queries";
 import { requireAdmin } from "@/lib/auth";
 
@@ -21,17 +20,16 @@ export default async function EditProfilePage({ params, searchParams }: Props) {
   if (!profile) notFound();
 
   return (
-    <Container className="py-10 md:py-14">
-      <Link href="/admin/profiles" className="text-[15px] font-semibold">
-        ← All profiles
-      </Link>
-      <h1 className="mt-6 font-serif text-3xl leading-tight font-bold text-navy md:text-4xl">{profile.name}</h1>
+    <AdminPage
+      back={{ href: "/admin/profiles", label: "All profiles" }}
+      title={profile.name}
+      description="Editing profiles is being built now."
+    >
       {created && (
-        <div className="mt-6 max-w-180">
+        <div className="max-w-180">
           <FlashNotice>Saved as a draft. It isn&apos;t on the public site.</FlashNotice>
         </div>
       )}
-      <p className="mt-3 text-base text-slate md:text-[17px]">Editing profiles is being built now.</p>
-    </Container>
+    </AdminPage>
   );
 }

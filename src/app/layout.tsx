@@ -40,7 +40,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${fraunces.variable} ${publicSans.variable}`}>
+    // data-scroll-behavior lets Next turn off globals.css's smooth scrolling while changing pages.
+    <html lang="en" data-scroll-behavior="smooth" className={`${fraunces.variable} ${publicSans.variable}`}>
       <body className="flex min-h-dvh flex-col">
         <a
           href="#main"

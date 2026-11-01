@@ -52,3 +52,28 @@ export function formatAddress(venue: Venue) {
 export function formatPrice(price: number) {
   return price === 0 ? "Free" : `$${price.toFixed(2)}`;
 }
+
+// Admin dates are shown in Arizona time (no daylight saving), where JCA's admins work.
+const adminDateTime = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: "America/Phoenix",
+});
+const adminDate = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "America/Phoenix" });
+const relative = new Intl.RelativeTimeFormat("en-US", { numeric: "auto" });
+
+/** "Oct 30, 2026, 8:26 AM" in Arizona time. */
+export function formatDateTime(iso: string) {
+  return adminDateTime.format(new Date(iso));
+}
+
+/** "just now", "5 minutes ago", "3 hours ago", "yesterday", "4 days ago", then the date ("Oct 30, 2026"). */
+export function timeAgo(iso: string, now: Date) {
+  const seconds = Math.round((Date.parse(iso) - now.getTime()) / 1000);
+  const elapsed = Math.abs(seconds);
+  if (elapsed < 60) return "just now";
+  if (elapsed < 3600) return relative.format(Math.round(seconds / 60), "minute");
+  if (elapsed < 86400) return relative.format(Math.round(seconds / 3600), "hour");
+  if (elapsed < 7 * 86400) return relative.format(Math.round(seconds / 86400), "day");
+  return adminDate.format(new Date(iso));
+}

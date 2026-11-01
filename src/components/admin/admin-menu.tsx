@@ -1,14 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useId, useState } from "react";
-import { buttonClasses } from "@/components/ui/button";
+import { useEffect, useId, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
-import { logout } from "@/features/admin-auth/actions";
-import { AdminNavLinks } from "./admin-nav-links";
+import { AdminBrand } from "./admin-brand";
+import { AdminSidebar } from "./admin-sidebar";
 
-/** The admin navigation on phones: a menu button that opens a panel under the header. */
+/** Below 1024px: a top bar with the brand and a menu button that slides the sidebar in from the left. */
 export function AdminMenu({ email }: { email: string }) {
   const pathname = usePathname();
   // Remember which page the menu was opened on, so it closes itself on navigation.
@@ -16,46 +14,77 @@ export function AdminMenu({ email }: { email: string }) {
   const open = openedOn === pathname;
   const close = () => setOpenedOn(null);
   const panelId = useId();
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpenedOn(null);
+    const button = menuButton.current;
+    const items = () => [...(panel.current?.querySelectorAll<HTMLElement>("a, button") ?? [])];
+    items()[0]?.focus();
+    document.body.style.overflow = "hidden";
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpenedOn(null);
+      // Keep Tab inside the menu while it covers the page.
+      if (e.key === "Tab") {
+        const all = items();
+        const first = all[0];
+        const last = all[all.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
+      }
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+      button?.focus();
+    };
   }, [open]);
 
   return (
-    <div className="md:hidden">
-      <button
-        type="button"
-        onClick={() => setOpenedOn(open ? null : pathname)}
-        aria-expanded={open}
-        aria-controls={panelId}
-        aria-label={open ? "Close menu" : "Open menu"}
-        className="flex size-11 cursor-pointer items-center justify-center rounded-lg border border-sand text-navy"
-      >
-        <Icon name={open ? "close" : "menu"} size={22} />
-      </button>
+    <div className="contents lg:hidden">
+      <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-sand bg-white px-5 md:px-8">
+        <AdminBrand />
+        <button
+          ref={menuButton}
+          type="button"
+          onClick={() => setOpenedOn(pathname)}
+          aria-expanded={open}
+          aria-controls={panelId}
+          aria-label="Open menu"
+          className="flex size-11 cursor-pointer items-center justify-center rounded-lg border border-sand text-navy"
+        >
+          <Icon name="menu" size={22} />
+        </button>
+      </header>
 
-      <nav
-        id={panelId}
-        aria-label="Admin"
-        hidden={!open}
-        className="absolute inset-x-0 top-full border-b border-sand bg-white px-5 pt-2 pb-6 shadow-card"
-      >
-        <div className="flex flex-col text-lg font-medium">
-          <AdminNavLinks onNavigate={close} className="border-b border-sand py-3.5" />
-          <Link href="/" onClick={close} className="border-b border-sand py-3.5 text-ink no-underline">
-            View site
-          </Link>
-        </div>
-        <p className="mt-5 truncate text-[15px] text-slate">Logged in as {email}</p>
-        <form action={logout} className="mt-3">
-          <button type="submit" className={buttonClasses("outline", "sm", "w-full cursor-pointer")}>
-            Log out
+      <div id={panelId} hidden={!open} className="fixed inset-0 z-40">
+        <div aria-hidden="true" onClick={close} className="absolute inset-0 bg-navy-deep/60" />
+        <div
+          ref={panel}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Admin menu"
+          className="absolute inset-y-0 left-0 w-72 max-w-[85vw] overflow-y-auto bg-navy-deep shadow-card-strong"
+        >
+          <button
+            type="button"
+            onClick={close}
+            aria-label="Close menu"
+            className="absolute top-6 right-3 flex size-10 cursor-pointer items-center justify-center rounded-lg text-white hover:bg-white/10"
+          >
+            <Icon name="close" size={22} />
           </button>
-        </form>
-      </nav>
+          <AdminSidebar email={email} onNavigate={close} />
+        </div>
+      </div>
     </div>
   );
 }
