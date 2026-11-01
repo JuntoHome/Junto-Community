@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useActionState, useId } from "react";
 import { buttonClasses } from "@/components/ui/button";
+import { inputClasses } from "@/components/ui/form";
 import { cn } from "@/lib/cn";
 import { setPassword } from "./actions";
-import { inputClasses } from "./login-form";
 import type { PasswordLinkType, SetPasswordState } from "./schema";
 
 const initialState: SetPasswordState = {};

@@ -41,7 +41,7 @@ src/
     sources/local.ts    Reads from src/content. Add sources/<cms>.ts next to it.
     index.ts            getSiteSettings, getEvent, listEvents, getPage (cached per request).
   components/
-    ui/                 Primitives: buttons, icons, rich text, placeholders.
+    ui/                 Primitives: buttons, icons, rich text, form field styles, placeholders.
     layout/             Header, mobile menu, footer.
     admin/              Admin header and navigation. Add a new admin module in modules.ts.
     event/              Event cards and the full EventPage template.
@@ -49,7 +49,8 @@ src/
   features/subscribe/   Subscribe: zod schema, Server Action, Supabase repository, form.
   features/admin-auth/  Admin login: zod schema, Server Action, form.
   features/profiles/    "Who Can Help?" profiles from Supabase: cached public queries, card, logo, text formatting;
-                        admin-queries.ts and admin-profile-list.tsx for the admin (uncached, read as the admin).
+                        for the admin, uncached queries and the list (admin-*), and the add/edit form: zod schema,
+                        Server Actions, repository (writes as the admin), slug.ts for page addresses.
   lib/auth.ts           getAdmin() returns the logged-in admin or null; requireAdmin() redirects to login.
   lib/rate-limit.ts     Per-IP attempt limit for public forms (subscribe, login).
   lib/supabase/         Supabase clients:

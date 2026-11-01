@@ -3,16 +3,12 @@
 import Link from "next/link";
 import { useActionState, useId } from "react";
 import { buttonClasses } from "@/components/ui/button";
+import { inputClasses } from "@/components/ui/form";
 import { cn } from "@/lib/cn";
 import { login } from "./actions";
 import type { LoginState } from "./schema";
 
 const initialState: LoginState = {};
-
-export const inputClasses = cn(
-  "h-12 rounded-md border border-field bg-white px-4 text-base text-ink transition-colors",
-  "hover:border-slate focus:border-navy focus:outline-none",
-);
 
 /** Email and password login for the admin area. There is deliberately no sign-up link. */
 export function LoginForm({ className }: { className?: string }) {

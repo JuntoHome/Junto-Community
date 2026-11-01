@@ -5,6 +5,7 @@ import { Container } from "@/components/ui/primitives";
 export const metadata: Metadata = { title: "Not found" };
 
 // Shown inside the admin layout when an admin page calls notFound(), e.g. a deleted profile.
+// It lives in (protected) so pages for logged-out visitors (login) never carry it.
 export default function AdminNotFound() {
   return (
     <Container className="py-10 md:py-14">
