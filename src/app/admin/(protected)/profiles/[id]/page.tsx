@@ -12,7 +12,10 @@ import { requireAdmin } from "@/lib/auth";
 import { getSiteSettings } from "@/lib/content";
 import { formatDateTime, timeAgo } from "@/lib/format";
 
-type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string; saved?: string }> };
+type Props = {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ created?: string; saved?: string; published?: string; hidden?: string }>;
+};
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   await requireAdmin();
@@ -33,10 +36,14 @@ export default async function EditProfilePage({ params, searchParams }: Props) {
   const by = profile.updatedBy === admin.email ? "you" : profile.updatedBy;
   const flash = flags.created
     ? "Saved as a draft. It isn't on the public site."
-    : flags.saved &&
-      (published
-        ? "Changes saved. They're live on the public site."
-        : "Changes saved. This profile is a draft, so it isn't on the public site.");
+    : flags.published
+      ? "Published. It's on the public site now."
+      : flags.hidden
+        ? "Hidden from the public site. It's a draft again, so only admins can see it."
+        : flags.saved &&
+          (published
+            ? "Changes saved. They're live on the public site."
+            : "Changes saved. This profile is a draft, so it isn't on the public site.");
 
   return (
     <AdminPage
@@ -47,7 +54,9 @@ export default async function EditProfilePage({ params, searchParams }: Props) {
         <>
           <span className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <StatusBadge status={profile.status} />
-            {published ? "On the public site. Changes go live as soon as you save." : "Only admins can see drafts."}
+            {published
+              ? "On the public site. Changes go live as soon as you save."
+              : "Only admins can see drafts. Publish it when it's ready."}
           </span>
           <span className="mt-2 block text-[15px] text-muted">
             Last saved{" "}
@@ -85,7 +94,6 @@ export default async function EditProfilePage({ params, searchParams }: Props) {
         initialValues={profile.values}
         status={profile.status}
         addressPrefix={`${new URL(site.url).host}${PROFILES_PATH}/`}
-        submitLabel="Save changes"
         cancelHref="/admin/profiles"
       />
     </AdminPage>

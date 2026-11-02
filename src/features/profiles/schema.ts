@@ -64,15 +64,18 @@ export const PROFILE_FIELDS = Object.keys(profileDraftSchema.in.shape) as Profil
 /** What a profile needs besides its name before it can be public (the database's profiles_published_complete check). */
 export const PUBLISH_FIELDS: ProfileField[] = ["tagline", "intro", "howTheyHelp", "whoShouldExplore", "websiteUrl"];
 
-/** The publish fields that are still empty. Parsed values are already trimmed. */
-export function missingPublishFields(profile: ProfileInput): ProfileField[] {
-  return PUBLISH_FIELDS.filter((field) => !profile[field]);
+/** The publish fields that are still empty or only spaces, as typed or as parsed. */
+export function missingPublishFields(profile: Record<ProfileField, string>): ProfileField[] {
+  return PUBLISH_FIELDS.filter((field) => !profile[field].trim());
 }
 
 /** Every field as the form holds it: plain strings, empty when not filled in. */
 export type ProfileFormValues = Record<ProfileField, string>;
 
 export const emptyProfileValues = Object.fromEntries(PROFILE_FIELDS.map((field) => [field, ""])) as ProfileFormValues;
+
+/** The form's buttons: save keeps the status, publish makes the profile public, hide makes it a draft again. */
+export type ProfileIntent = "save" | "publish" | "hide";
 
 /** What the profile form shows after a save that didn't go through. A successful save redirects instead. */
 export type ProfileFormState = {

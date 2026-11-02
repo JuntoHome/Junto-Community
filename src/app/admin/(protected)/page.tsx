@@ -67,7 +67,7 @@ function UpdatedBy({ profile, admin, now }: { profile: ProfileSummary; admin: Ad
 const steps = [
   { title: "Add a profile", text: "Save it as a draft at any point. Drafts stay private." },
   { title: "Fill in the essentials", text: "Everything marked “Needed to publish” has to be filled in first." },
-  { title: "Publish", text: "It appears on the public site within a minute, and you can hide it again at any time." },
+  { title: "Publish", text: "It appears on the public site straight away, and you can hide it again at any time." },
 ];
 
 export default async function AdminHomePage() {

@@ -20,7 +20,7 @@ export default async function NewProfilePage() {
       description={
         <>
           Save a draft whenever you like, even with only the name filled in. Drafts aren&apos;t shown on the public
-          site. Fields marked &ldquo;Needed to publish&rdquo; must be filled in before the profile can go live.
+          site. To publish, fill in every field marked &ldquo;Needed to publish&rdquo;.
         </>
       }
     >
@@ -29,7 +29,6 @@ export default async function NewProfilePage() {
         initialValues={emptyProfileValues}
         status="new"
         addressPrefix={`${new URL(site.url).host}${PROFILES_PATH}/`}
-        submitLabel="Save draft"
         cancelHref="/admin/profiles"
       />
     </AdminPage>

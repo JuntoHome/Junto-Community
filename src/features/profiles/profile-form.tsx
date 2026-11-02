@@ -10,12 +10,19 @@ import {
   useRef,
   useState,
 } from "react";
-import { buttonClasses } from "@/components/ui/button";
+import { type ButtonVariant, buttonClasses } from "@/components/ui/button";
 import { inputClasses, textareaClasses } from "@/components/ui/form";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/cn";
 import type { ProfileStatus } from "./admin-queries";
-import { PUBLISH_FIELDS, type ProfileField, type ProfileFormState, type ProfileFormValues } from "./schema";
+import {
+  PROFILE_FIELDS,
+  PUBLISH_FIELDS,
+  type ProfileField,
+  type ProfileFormState,
+  type ProfileFormValues,
+  type ProfileIntent,
+} from "./schema";
 import { SLUG_MAX, slugify } from "./slug";
 
 const LABELS: Record<ProfileField, string> = {
@@ -47,12 +54,26 @@ const PUBLISH_CHECKLIST: ProfileField[] = ["name", ...PUBLISH_FIELDS];
 const CHECKLIST_TEXT = {
   draft: {
     title: "Ready to publish?",
-    note: "Drafts can be saved at any time. This list only matters for publishing.",
+    note: "You can save a draft at any time. Publish once all of these are filled in.",
   },
   published: {
     title: "Must stay filled in",
     note: "This profile is on the public site, so these can't be left empty. Changes go live when you save.",
   },
+};
+
+type SubmitButton = { intent: ProfileIntent; label: string; pendingLabel: string; variant: ButtonVariant };
+
+// The first button is the one pressing Enter in a field uses, so Enter only ever saves.
+const BUTTONS: Record<"draft" | "published", SubmitButton[]> = {
+  draft: [
+    { intent: "save", label: "Save draft", pendingLabel: "Saving...", variant: "outline" },
+    { intent: "publish", label: "Publish", pendingLabel: "Publishing...", variant: "navy" },
+  ],
+  published: [
+    { intent: "save", label: "Save changes", pendingLabel: "Saving...", variant: "navy" },
+    { intent: "hide", label: "Hide from site", pendingLabel: "Hiding...", variant: "outline" },
+  ],
 };
 
 /** While typing, keep a trailing hyphen so "score-" can go on to become "score-phoenix". */
@@ -135,23 +156,24 @@ export function ProfileForm({
   initialValues,
   status,
   addressPrefix,
-  submitLabel,
   cancelHref,
   className,
 }: {
+  /** Gets the clicked button's intent as "intent" in the form data. */
   action: (prev: ProfileFormState, formData: FormData) => Promise<ProfileFormState>;
   initialValues: ProfileFormValues;
   /** "new" while adding a profile. */
   status: "new" | ProfileStatus;
   /** Shown before the page address, e.g. "www.juntocommunity.org/who-can-help/". */
   addressPrefix: string;
-  submitLabel: string;
   cancelHref: string;
   className?: string;
 }) {
   const [state, formAction, pending] = useActionState(action, { values: initialValues });
   const { values, fieldErrors: errors = {}, message } = state;
-  const errorFields = Object.keys(errors) as ProfileField[];
+  const errorFields = PROFILE_FIELDS.filter((field) => errors[field]);
+  // Which button was pressed, so it can say "Publishing..." while the others wait.
+  const [intent, setIntent] = useState<ProfileIntent>("save");
 
   // The page address follows the name until it's changed by hand. A published profile's
   // address stays put: changing it breaks links to the page.
@@ -394,9 +416,19 @@ export function ProfileForm({
 
         {/* Stays in view at the bottom of the screen while scrolling through the form. */}
         <div className="sticky bottom-0 z-10 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-sand bg-ivory pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <button type="submit" disabled={pending} className={buttonClasses("navy", "md", "cursor-pointer")}>
-            {pending ? "Saving..." : submitLabel}
-          </button>
+          {BUTTONS[published ? "published" : "draft"].map((button) => (
+            <button
+              key={button.intent}
+              type="submit"
+              name="intent"
+              value={button.intent}
+              disabled={pending}
+              onClick={() => setIntent(button.intent)}
+              className={buttonClasses(button.variant, "md", "cursor-pointer")}
+            >
+              {pending && intent === button.intent ? button.pendingLabel : button.label}
+            </button>
+          ))}
           <Link href={cancelHref} className="font-semibold">
             Cancel
           </Link>
