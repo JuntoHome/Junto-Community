@@ -7,8 +7,9 @@ import { SiteHeader } from "./site-header";
 /**
  * Header, footer and analytics around every public page. Used by the (site)
  * layout and the 404 page; the admin area has its own layout without them.
+ * Admin previews leave analytics out, so they don't count as visits.
  */
-export function SiteShell({ children }: { children: ReactNode }) {
+export function SiteShell({ children, analytics = true }: { children: ReactNode; analytics?: boolean }) {
   return (
     <>
       <AnnouncementBar />
@@ -17,7 +18,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
         {children}
       </main>
       <SiteFooter />
-      <Analytics />
+      {analytics && <Analytics />}
     </>
   );
 }

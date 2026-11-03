@@ -7,7 +7,7 @@ import { updateProfile } from "@/features/profiles/actions";
 import { StatusBadge } from "@/features/profiles/admin-profile-list";
 import { getProfileForAdmin } from "@/features/profiles/admin-queries";
 import { ProfileForm } from "@/features/profiles/profile-form";
-import { PROFILES_PATH } from "@/features/profiles/queries";
+import { PREVIEW_PATH, PROFILES_PATH } from "@/features/profiles/queries";
 import { requireAdmin } from "@/lib/auth";
 import { getSiteSettings } from "@/lib/content";
 import { formatDateTime, timeAgo } from "@/lib/format";
@@ -68,7 +68,7 @@ export default async function EditProfilePage({ params, searchParams }: Props) {
         </>
       }
       actions={
-        published && (
+        published ? (
           <ButtonLink
             href={`${PROFILES_PATH}/${profile.slug}`}
             target="_blank"
@@ -77,6 +77,17 @@ export default async function EditProfilePage({ params, searchParams }: Props) {
             size="sm"
           >
             View on site <span aria-hidden="true">↗</span>
+            <span className="sr-only"> (opens in a new tab)</span>
+          </ButtonLink>
+        ) : (
+          // One tab per profile, so previewing again after a save reuses it.
+          <ButtonLink
+            href={`${PREVIEW_PATH}/${profile.id}`}
+            target={`preview-${profile.id}`}
+            variant="outline"
+            size="sm"
+          >
+            Preview <span aria-hidden="true">↗</span>
             <span className="sr-only"> (opens in a new tab)</span>
           </ButtonLink>
         )

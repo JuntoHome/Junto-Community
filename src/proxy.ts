@@ -6,7 +6,7 @@ const CANONICAL_PATHS = ["/BI101"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (pathname.startsWith("/admin")) return refreshSession(request);
+  if (pathname.startsWith("/admin") || pathname.startsWith("/preview/")) return refreshSession(request);
 
   const canonical = pathname.startsWith("/who-can-help/")
     ? pathname.toLowerCase()
@@ -25,7 +25,8 @@ export const config = {
     "/:path([bB][iI]101)",
     // Profile addresses with a capital letter, sent to the lowercase address (features/profiles PROFILES_PATH).
     "/who-can-help/:slug(.*[A-Z].*)",
-    // The admin area, to keep the login session fresh. Public pages never touch auth.
+    // The admin area and its previews, to keep the login session fresh. Public pages never touch auth.
     "/admin/:path*",
+    "/preview/:path*",
   ],
 };

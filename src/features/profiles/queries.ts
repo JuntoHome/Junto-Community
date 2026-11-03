@@ -8,6 +8,9 @@ import type { Profile } from "./types";
 /** Base path of the public profile pages. Each profile lives at `${PROFILES_PATH}/<slug>`. */
 export const PROFILES_PATH = "/who-can-help";
 
+/** Admin-only preview of a profile, drafts included: `${PREVIEW_PATH}/<id>`. Kept out of search engines (robots.ts). */
+export const PREVIEW_PATH = "/preview/profiles";
+
 /** Cache tag for every public profile read. Saving a profile in /admin revalidates it. */
 export const PROFILES_TAG = "profiles";
 
@@ -21,7 +24,8 @@ const REVALIDATE_SECONDS = 30;
 const COLUMNS =
   "id, name, slug, tagline, intro, how_they_help, who_should_explore, history, contact_name, contact_role, contact_email, contact_phone, website_url, logo_path, updated_at";
 
-type ProfileRow = {
+/** A profile's columns as the public page needs them. */
+export type ProfileRow = {
   id: string;
   name: string;
   slug: string;
@@ -42,8 +46,8 @@ type ProfileRow = {
 const LOGO_BUCKET = "profile-logos";
 
 // The database only lets a profile be published once the required fields are filled in,
-// so the fallbacks below are never shown; they keep the types honest.
-function toProfile(row: ProfileRow, db: SupabaseClient): Profile {
+// so visitors never see the empty fallbacks below. A draft's preview can have them.
+export function toProfile(row: ProfileRow, db: SupabaseClient): Profile {
   return {
     id: row.id,
     name: row.name,

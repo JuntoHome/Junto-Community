@@ -4,7 +4,7 @@ import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import type { ProfileStatus, ProfileSummary } from "./admin-queries";
-import { PROFILES_PATH } from "./queries";
+import { PREVIEW_PATH, PROFILES_PATH } from "./queries";
 
 const statusLabels: Record<ProfileStatus, string> = { published: "Published", draft: "Draft" };
 
@@ -63,16 +63,21 @@ function Updated({ profile, adminEmail }: { profile: ProfileSummary; adminEmail:
   );
 }
 
-/** Edit, and View on site once published. The name links to the edit page too; this makes it obvious. */
+/** Edit, then Preview for a draft or View on site once published. The name links to the edit page too; this makes it obvious. */
 function Actions({ profile, className }: { profile: ProfileSummary; className?: string }) {
   return (
     <div className={cn("flex gap-5 text-[15px] font-semibold whitespace-nowrap", className)}>
       <Link href={editPath(profile)}>
         Edit<span className="sr-only"> {profile.name}</span>
       </Link>
-      {profile.status === "published" && (
+      {profile.status === "published" ? (
         <a href={`${PROFILES_PATH}/${profile.slug}`} target="_blank" rel="noopener noreferrer">
           View<span className="sr-only"> {profile.name}</span> on site <span aria-hidden="true">↗</span>
+          <span className="sr-only"> (opens in a new tab)</span>
+        </a>
+      ) : (
+        <a href={`${PREVIEW_PATH}/${profile.id}`} target={`preview-${profile.id}`}>
+          Preview<span className="sr-only"> {profile.name}</span> <span aria-hidden="true">↗</span>
           <span className="sr-only"> (opens in a new tab)</span>
         </a>
       )}

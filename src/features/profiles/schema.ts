@@ -61,6 +61,22 @@ export type ProfileInput = z.output<typeof profileDraftSchema>;
 export type ProfileField = keyof ProfileInput;
 export const PROFILE_FIELDS = Object.keys(profileDraftSchema.in.shape) as ProfileField[];
 
+/** What the admin screens call each field. */
+export const PROFILE_LABELS: Record<ProfileField, string> = {
+  name: "Organization name",
+  slug: "Page address",
+  tagline: "Tagline",
+  intro: "Introduction",
+  howTheyHelp: "How they can help",
+  whoShouldExplore: "Who should explore",
+  history: "Background",
+  websiteUrl: "Website",
+  contactName: "Contact name",
+  contactRole: "Role",
+  contactEmail: "Email",
+  contactPhone: "Phone",
+};
+
 /** What a profile needs besides its name before it can be public (the database's profiles_published_complete check). */
 export const PUBLISH_FIELDS: ProfileField[] = ["tagline", "intro", "howTheyHelp", "whoShouldExplore", "websiteUrl"];
 

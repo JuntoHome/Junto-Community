@@ -17,6 +17,7 @@ import { cn } from "@/lib/cn";
 import type { ProfileStatus } from "./admin-queries";
 import {
   PROFILE_FIELDS,
+  PROFILE_LABELS,
   PUBLISH_FIELDS,
   type ProfileField,
   type ProfileFormState,
@@ -24,21 +25,6 @@ import {
   type ProfileIntent,
 } from "./schema";
 import { SLUG_MAX, slugify } from "./slug";
-
-const LABELS: Record<ProfileField, string> = {
-  name: "Organization name",
-  slug: "Page address",
-  tagline: "Tagline",
-  intro: "Introduction",
-  howTheyHelp: "How they can help",
-  whoShouldExplore: "Who should explore",
-  history: "Background",
-  websiteUrl: "Website",
-  contactName: "Contact name",
-  contactRole: "Role",
-  contactEmail: "Email",
-  contactPhone: "Phone",
-};
 
 // "publish" marks what the database needs before a profile can go live (profiles_published_complete).
 const TAGS = {
@@ -104,7 +90,7 @@ function Field({
   return (
     <div className="flex flex-col gap-2">
       <label htmlFor={id} className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-base font-semibold text-ink">
-        {LABELS[field]}
+        {PROFILE_LABELS[field]}
         {tag && (
           <span
             className={cn(
@@ -253,7 +239,7 @@ export function ProfileForm({
                       }}
                       className="font-semibold text-red-700 underline hover:text-red-900"
                     >
-                      {LABELS[field]}: {errors[field]}
+                      {PROFILE_LABELS[field]}: {errors[field]}
                     </a>
                   </li>
                 ))}
@@ -468,7 +454,7 @@ export function ProfileForm({
                   >
                     {ok && <Icon name="check" size={13} strokeWidth={3} />}
                   </span>
-                  {LABELS[field]}
+                  {PROFILE_LABELS[field]}
                   <span className="sr-only">{ok ? " (filled in)" : " (still needed)"}</span>
                 </button>
               </li>

@@ -2,7 +2,9 @@ import "server-only";
 
 import { cache } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { type ProfileRow, toProfile } from "./queries";
 import type { ProfileFormValues } from "./schema";
+import type { Profile } from "./types";
 
 export type ProfileStatus = "draft" | "published";
 
@@ -45,6 +47,11 @@ type DetailRow = SummaryRow & {
   contact_email: string | null;
   contact_phone: string | null;
 };
+
+/** One profile with every field, plus the page visitors would see (the preview). */
+export type ProfilePreview = AdminProfile & { page: Profile };
+
+const PREVIEW_COLUMNS = `${DETAIL_COLUMNS}, logo_path`;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -108,4 +115,20 @@ export const getProfileForAdmin = cache(async (id: string): Promise<AdminProfile
     .maybeSingle();
   if (error) throw new Error(`Couldn't load profile ${id}: ${error.message}`);
   return data ? toAdminProfile(data as unknown as DetailRow) : null;
+});
+
+/** One profile by id as its public page would show it, drafts included, or null (unknown or deleted). */
+export const getProfilePreview = cache(async (id: string): Promise<ProfilePreview | null> => {
+  if (!UUID.test(id)) return null;
+  const db = await createSupabaseServerClient();
+  const { data, error } = await db
+    .from("profiles")
+    .select(PREVIEW_COLUMNS)
+    .eq("id", id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error) throw new Error(`Couldn't load profile ${id}: ${error.message}`);
+  if (!data) return null;
+  const row = data as unknown as DetailRow & ProfileRow;
+  return { ...toAdminProfile(row), page: toProfile(row, db) };
 });
