@@ -2,7 +2,8 @@ import "server-only";
 
 import { cache } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { type ProfileRow, toProfile } from "./queries";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { logoUrl, type ProfileRow, toProfile } from "./queries";
 import type { ProfileFormValues } from "./schema";
 import type { Profile } from "./types";
 
@@ -30,10 +31,10 @@ type SummaryRow = {
   editor: { email: string } | null;
 };
 
-/** One profile with every field, as the edit form shows it. */
-export type AdminProfile = ProfileSummary & { values: ProfileFormValues };
+/** One profile with every field and its logo's link, as the edit form shows it. */
+export type AdminProfile = ProfileSummary & { values: ProfileFormValues; logoUrl: string | null };
 
-const DETAIL_COLUMNS = `${SUMMARY_COLUMNS}, tagline, intro, how_they_help, who_should_explore, history, website_url, contact_name, contact_role, contact_email, contact_phone`;
+const DETAIL_COLUMNS = `${SUMMARY_COLUMNS}, tagline, intro, how_they_help, who_should_explore, history, website_url, contact_name, contact_role, contact_email, contact_phone, logo_path`;
 
 type DetailRow = SummaryRow & {
   tagline: string | null;
@@ -46,12 +47,11 @@ type DetailRow = SummaryRow & {
   contact_role: string | null;
   contact_email: string | null;
   contact_phone: string | null;
+  logo_path: string | null;
 };
 
 /** One profile with every field, plus the page visitors would see (the preview). */
 export type ProfilePreview = AdminProfile & { page: Profile };
-
-const PREVIEW_COLUMNS = `${DETAIL_COLUMNS}, logo_path`;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -66,9 +66,10 @@ function toSummary(row: SummaryRow): ProfileSummary {
   };
 }
 
-function toAdminProfile(row: DetailRow): AdminProfile {
+function toAdminProfile(row: DetailRow, db: SupabaseClient): AdminProfile {
   return {
     ...toSummary(row),
+    logoUrl: logoUrl(db, row.logo_path),
     values: {
       name: row.name,
       slug: row.slug,
@@ -114,7 +115,7 @@ export const getProfileForAdmin = cache(async (id: string): Promise<AdminProfile
     .is("deleted_at", null)
     .maybeSingle();
   if (error) throw new Error(`Couldn't load profile ${id}: ${error.message}`);
-  return data ? toAdminProfile(data as unknown as DetailRow) : null;
+  return data ? toAdminProfile(data as unknown as DetailRow, db) : null;
 });
 
 /** One profile by id as its public page would show it, drafts included, or null (unknown or deleted). */
@@ -123,14 +124,14 @@ export const getProfilePreview = cache(async (id: string): Promise<ProfilePrevie
   const db = await createSupabaseServerClient();
   const { data, error } = await db
     .from("profiles")
-    .select(PREVIEW_COLUMNS)
+    .select(DETAIL_COLUMNS)
     .eq("id", id)
     .is("deleted_at", null)
     .maybeSingle();
   if (error) throw new Error(`Couldn't load profile ${id}: ${error.message}`);
   if (!data) return null;
   const row = data as unknown as DetailRow & ProfileRow;
-  return { ...toAdminProfile(row), page: toProfile(row, db) };
+  return { ...toAdminProfile(row, db), page: toProfile(row, db) };
 });
 
 /** A deleted profile's name, for the message after deleting it, or null (unknown or not deleted). */

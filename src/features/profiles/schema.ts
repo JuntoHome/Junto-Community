@@ -61,11 +61,20 @@ export type ProfileInput = z.output<typeof profileDraftSchema>;
 export type ProfileField = keyof ProfileInput;
 export const PROFILE_FIELDS = Object.keys(profileDraftSchema.in.shape) as ProfileField[];
 
+/** The form's fields: the profile's text, plus its logo (a file). */
+export type FormField = ProfileField | "logo";
+
+/** The form's fields in the order the form shows them. */
+export const FORM_FIELDS: FormField[] = PROFILE_FIELDS.flatMap((field) =>
+  field === "tagline" ? [field, "logo"] : field,
+);
+
 /** What the admin screens call each field. */
-export const PROFILE_LABELS: Record<ProfileField, string> = {
+export const PROFILE_LABELS: Record<FormField, string> = {
   name: "Organization name",
   slug: "Page address",
   tagline: "Tagline",
+  logo: "Logo",
   intro: "Introduction",
   howTheyHelp: "How they can help",
   whoShouldExplore: "Who should explore",
@@ -96,7 +105,26 @@ export type ProfileIntent = "save" | "publish" | "hide";
 /** What the profile form shows after a save that didn't go through. A successful save redirects instead. */
 export type ProfileFormState = {
   values: ProfileFormValues;
-  fieldErrors?: Partial<Record<ProfileField, string>>;
+  fieldErrors?: Partial<Record<FormField, string>>;
   /** A problem that isn't about one field, e.g. the database couldn't be reached. */
   message?: string;
 };
+
+// Logos: what the profile-logos bucket accepts (supabase/migrations/20261029010000_create_profile_logos_bucket.sql).
+export const LOGO_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
+export type LogoType = (typeof LOGO_TYPES)[number];
+export const LOGO_MAX_BYTES = 2 * 1024 * 1024;
+export const LOGO_WRONG_TYPE = "Please choose a PNG, JPG or WebP image.";
+
+/** Why a logo of this size can't be used, or null if it can. */
+export function logoSizeProblem(bytes: number): string | null {
+  if (bytes <= LOGO_MAX_BYTES) return null;
+  const mb = Math.ceil((bytes / 1024 / 1024) * 10) / 10;
+  return `That image is ${mb} MB. Please choose one of 2 MB or less.`;
+}
+
+/** Why a chosen file can't be used as a logo, going by the type the browser reports; null if it can. */
+export function logoFileProblem(file: { type: string; size: number }): string | null {
+  if (!(LOGO_TYPES as readonly string[]).includes(file.type) || file.size === 0) return LOGO_WRONG_TYPE;
+  return logoSizeProblem(file.size);
+}

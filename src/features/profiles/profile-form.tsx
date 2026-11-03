@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import {
   type ComponentProps,
@@ -16,7 +17,10 @@ import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/cn";
 import type { ProfileStatus } from "./admin-queries";
 import {
-  PROFILE_FIELDS,
+  FORM_FIELDS,
+  type FormField,
+  LOGO_TYPES,
+  logoFileProblem,
   PROFILE_LABELS,
   PUBLISH_FIELDS,
   type ProfileField,
@@ -32,7 +36,7 @@ const TAGS = {
   publish: { label: "Needed to publish", className: "bg-parchment text-parchment-text" },
 } as const;
 
-const fieldId = (field: ProfileField) => `profile-${field}`;
+const fieldId = (field: FormField) => `profile-${field}`;
 
 /** What the side panel ticks off: the name plus every "Needed to publish" field. */
 const PUBLISH_CHECKLIST: ProfileField[] = ["name", ...PUBLISH_FIELDS];
@@ -136,18 +140,140 @@ function Section({ title, description, children }: { title: string; description?
 
 const code = "rounded bg-white/70 px-1 font-mono text-[14px]";
 
+type ChosenLogo = { file: File; url: string };
+
+/** The logo, saved with the rest of the form: a preview, and buttons to choose, replace or remove it. */
+function LogoField({
+  savedUrl,
+  chosen,
+  removing,
+  error,
+  disabled,
+  onChoose,
+  onRemove,
+  onUndo,
+}: {
+  savedUrl: string | null;
+  chosen: ChosenLogo | null;
+  removing: boolean;
+  error?: string;
+  disabled: boolean;
+  onChoose: (file: File) => void;
+  onRemove: () => void;
+  onUndo: () => void;
+}) {
+  const id = fieldId("logo");
+  const shown = chosen?.url ?? (removing ? null : savedUrl);
+  const ids = { hint: `${id}-hint`, status: `${id}-status`, error: `${id}-error` };
+  return (
+    <div className="flex flex-col gap-2">
+      <label htmlFor={id} className="text-base font-semibold text-ink">
+        {PROFILE_LABELS.logo}
+      </label>
+      <p id={ids.hint} className="text-sm text-muted">
+        Optional. A PNG, JPG or WebP image of 2 MB or less. A wide logo on a white or see-through background looks best.
+      </p>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+        <div className="relative flex h-20 w-64 max-w-full items-center justify-center rounded-lg border border-field bg-white">
+          {shown ? (
+            <Image
+              src={shown}
+              alt={chosen ? "New logo" : "Current logo"}
+              fill
+              unoptimized
+              className="object-contain p-2"
+            />
+          ) : (
+            <span className="text-sm text-muted">No logo</span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          {/* Hidden but focusable; the label below is its button. A chosen file is read here and kept in state. */}
+          <input
+            id={id}
+            type="file"
+            accept={LOGO_TYPES.join(",")}
+            disabled={disabled}
+            aria-describedby={[ids.hint, (chosen || removing) && ids.status, error && ids.error]
+              .filter(Boolean)
+              .join(" ")}
+            aria-invalid={error ? true : undefined}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) onChoose(file);
+            }}
+            className="peer sr-only"
+          />
+          <label
+            htmlFor={id}
+            className={buttonClasses(
+              "outline",
+              "sm",
+              "cursor-pointer peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-gold peer-disabled:cursor-not-allowed peer-disabled:opacity-60",
+            )}
+          >
+            {shown ? "Replace logo" : "Choose a logo"}
+          </label>
+          {shown && (
+            <button
+              type="button"
+              onClick={onRemove}
+              disabled={disabled}
+              className="min-h-11 cursor-pointer font-semibold text-navy hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Remove logo
+            </button>
+          )}
+        </div>
+      </div>
+      {(chosen || removing) && (
+        <p id={ids.status} className="text-[15px] text-ink">
+          {chosen ? (
+            <>
+              New logo chosen: <span className="font-semibold wrap-anywhere">{chosen.file.name}</span>. It&apos;s saved
+              when you save the profile.
+            </>
+          ) : (
+            "The logo will be removed when you save the profile."
+          )}{" "}
+          <button
+            type="button"
+            onClick={onUndo}
+            disabled={disabled}
+            className="cursor-pointer font-semibold text-navy underline underline-offset-2 disabled:cursor-not-allowed"
+          >
+            Undo
+          </button>
+        </p>
+      )}
+      {error && (
+        <p id={ids.error} className="text-[15px] font-medium text-red-700">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** Every profile field, grouped as on the public page. Used to add a profile and to edit one. */
 export function ProfileForm({
   action,
   initialValues,
+  logoUrl = null,
   status,
   addressPrefix,
   cancelHref,
   className,
 }: {
-  /** Gets the clicked button's intent as "intent" in the form data. */
+  /**
+   * Gets the clicked button's intent as "intent" in the form data, a newly chosen logo
+   * as "logo", and "removeLogo" = "1" to remove the current one.
+   */
   action: (prev: ProfileFormState, formData: FormData) => Promise<ProfileFormState>;
   initialValues: ProfileFormValues;
+  /** The saved logo's link, if it has one. */
+  logoUrl?: string | null;
   /** "new" while adding a profile. */
   status: "new" | ProfileStatus;
   /** Shown before the page address, e.g. "www.juntocommunity.org/who-can-help/". */
@@ -157,7 +283,7 @@ export function ProfileForm({
 }) {
   const [state, formAction, pending] = useActionState(action, { values: initialValues });
   const { values, fieldErrors: errors = {}, message } = state;
-  const errorFields = PROFILE_FIELDS.filter((field) => errors[field]);
+  const errorFields = FORM_FIELDS.filter((field) => errors[field]);
   // Which button was pressed, so it can say "Publishing..." while the others wait.
   const [intent, setIntent] = useState<ProfileIntent>("save");
 
@@ -182,6 +308,23 @@ export function ProfileForm({
   };
   const done = filled.size;
   const checklist = CHECKLIST_TEXT[published ? "published" : "draft"];
+
+  // The logo is sent with the form. A chosen file is kept here rather than in the file
+  // input, which empties when the form resets, so it survives a save that didn't go through.
+  const [newLogo, setNewLogo] = useState<ChosenLogo | null>(null);
+  const [removeLogo, setRemoveLogo] = useState(false);
+  const [logoProblem, setLogoProblem] = useState<string>();
+  const changeLogo = (file: File | null, remove = false) => {
+    if (newLogo) URL.revokeObjectURL(newLogo.url);
+    setNewLogo(file && { file, url: URL.createObjectURL(file) });
+    setRemoveLogo(remove);
+    setLogoProblem(undefined);
+  };
+  const submit = (formData: FormData) => {
+    if (newLogo) formData.set("logo", newLogo.file);
+    else if (removeLogo) formData.set("removeLogo", "1");
+    formAction(formData);
+  };
 
   // After a save that didn't go through, take keyboard and screen reader users to the summary.
   const summaryRef = useRef<HTMLDivElement>(null);
@@ -211,7 +354,7 @@ export function ProfileForm({
 
   return (
     <form
-      action={formAction}
+      action={submit}
       onInput={trackFilled}
       noValidate
       className={cn("grid gap-8 xl:grid-cols-[minmax(0,1fr)_16rem] xl:items-start", className)}
@@ -320,6 +463,20 @@ export function ProfileForm({
           >
             {(control) => textInput(control, { maxLength: 300 })}
           </Field>
+          <LogoField
+            savedUrl={logoUrl}
+            chosen={newLogo}
+            removing={removeLogo}
+            error={logoProblem ?? errors.logo}
+            disabled={pending}
+            onChoose={(file) => {
+              const problem = logoFileProblem(file);
+              if (problem) setLogoProblem(problem);
+              else changeLogo(file);
+            }}
+            onRemove={() => changeLogo(null, Boolean(logoUrl))}
+            onUndo={() => changeLogo(null)}
+          />
         </Section>
 
         <Section title="Profile text">

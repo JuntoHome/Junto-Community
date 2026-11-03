@@ -16,7 +16,8 @@ export type SaveProfileResult =
   | { status: "incomplete" };
 
 export type UpdateProfileResult =
-  | { status: "saved"; published: boolean }
+  /** `oldLogo`: the logo file this save replaced or removed, to delete now. */
+  | { status: "saved"; published: boolean; oldLogo: string | null }
   | { status: "duplicate-slug" }
   /** Published or being published, and a field it needs is empty. */
   | { status: "incomplete" }
@@ -57,14 +58,19 @@ function toRow(input: ProfileInput) {
 }
 
 /**
- * Adds a profile, as a draft or published. Writes as the logged-in admin, so row level
- * security checks they're an admin, and the database records them as the last editor.
+ * Adds a profile, as a draft or published, with an uploaded logo's path if there is one.
+ * Writes as the logged-in admin, so row level security checks they're an admin, and the
+ * database records them as the last editor.
  */
-export async function insertProfile(input: ProfileInput, status: ProfileStatus): Promise<SaveProfileResult> {
+export async function insertProfile(
+  input: ProfileInput,
+  status: ProfileStatus,
+  logoPath: string | null = null,
+): Promise<SaveProfileResult> {
   const db = await createSupabaseServerClient();
   const { data, error } = await db
     .from("profiles")
-    .insert({ ...toRow(input), status })
+    .insert({ ...toRow(input), status, logo_path: logoPath })
     .select("id")
     .single();
   if (!error) return { status: "saved", id: data.id };
@@ -74,24 +80,33 @@ export async function insertProfile(input: ProfileInput, status: ProfileStatus):
 }
 
 /**
- * Saves a profile's fields, and its status when given (publish or hide); otherwise the
- * status stays as it is. Writes as the logged-in admin, and the database records them as
- * the last editor.
+ * Saves a profile's fields. The status changes only when given (publish or hide), and the
+ * logo only when given: a newly uploaded file's path, or null to remove it. Writes as the
+ * logged-in admin, and the database records them as the last editor.
  */
 export async function updateProfileFields(
   id: string,
   input: ProfileInput,
-  status?: ProfileStatus,
+  { status, logoPath }: { status?: ProfileStatus; logoPath?: string | null } = {},
 ): Promise<UpdateProfileResult> {
   const db = await createSupabaseServerClient();
+  let oldLogo: string | null = null;
+  if (logoPath !== undefined) {
+    const { data, error } = await db.from("profiles").select("logo_path").eq("id", id).maybeSingle();
+    if (error) throw new Error(`Couldn't load profile ${id}: ${error.message}`);
+    oldLogo = data?.logo_path ?? null;
+  }
   const { data, error } = await db
     .from("profiles")
-    .update({ ...toRow(input), ...(status && { status }) })
+    .update({ ...toRow(input), ...(status && { status }), ...(logoPath !== undefined && { logo_path: logoPath }) })
     .eq("id", id)
     .is("deleted_at", null)
     .select("status")
     .maybeSingle();
-  if (!error) return data ? { status: "saved", published: data.status === "published" } : { status: "not-found" };
+  if (!error) {
+    if (!data) return { status: "not-found" };
+    return { status: "saved", published: data.status === "published", oldLogo: oldLogo !== logoPath ? oldLogo : null };
+  }
   const known = knownError(error);
   if (known) return known;
   throw new Error(`Couldn't save profile ${id}: ${error.message}`);

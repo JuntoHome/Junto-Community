@@ -43,7 +43,13 @@ export type ProfileRow = {
   updated_at: string;
 };
 
-const LOGO_BUCKET = "profile-logos";
+/** Supabase Storage bucket for profile logos. Anyone can view a logo by its link. */
+export const LOGO_BUCKET = "profile-logos";
+
+/** A logo's public link, from its path in the bucket. */
+export function logoUrl(db: SupabaseClient, path: string | null): string | null {
+  return path ? db.storage.from(LOGO_BUCKET).getPublicUrl(path).data.publicUrl : null;
+}
 
 // The database only lets a profile be published once the required fields are filled in,
 // so visitors never see the empty fallbacks below. A draft's preview can have them.
@@ -64,7 +70,7 @@ export function toProfile(row: ProfileRow, db: SupabaseClient): Profile {
       phone: row.contact_phone || null,
     },
     websiteUrl: row.website_url ?? "",
-    logoUrl: row.logo_path ? db.storage.from(LOGO_BUCKET).getPublicUrl(row.logo_path).data.publicUrl : null,
+    logoUrl: logoUrl(db, row.logo_path),
     updatedAt: row.updated_at,
   };
 }

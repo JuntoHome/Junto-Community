@@ -104,6 +104,7 @@ export default async function EditProfilePage({ params, searchParams }: Props) {
         key={profile.updatedAt}
         action={updateProfile.bind(null, profile.id)}
         initialValues={profile.values}
+        logoUrl={profile.logoUrl}
         status={profile.status}
         addressPrefix={`${new URL(site.url).host}${PROFILES_PATH}/`}
         cancelHref="/admin/profiles"
