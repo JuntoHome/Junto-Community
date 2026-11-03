@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LINK_WITH_TEXT } from "./links";
 import { SLUG_MAX, slugify } from "./slug";
 
 // Limits match the checks on public.profiles (supabase/migrations/20261029000000_create_profiles.sql).
@@ -13,17 +14,50 @@ const longText = z
 
 const webAddress = z.url({ protocol: /^https?$/, hostname: z.regexes.domain });
 
+/** "www.score.org" becomes "https://www.score.org". */
+const withProtocol = (v: string) => (v && !/^[a-z][a-z0-9+.-]*:\/\//i.test(v) ? `https://${v}` : v);
+
+/** A web page's full address: no spaces, and no "name:password@" before the site. */
+const isWebAddress = (v: string) => webAddress.safeParse(v).success && !/\s/.test(v) && !/^https?:\/\/[^/]*@/i.test(v);
+
 /** Empty, or a web page. "www.score.org" is saved as "https://www.score.org". */
 const websiteUrl = z
   .string()
   .trim()
-  .transform((v) => (v && !/^[a-z][a-z0-9+.-]*:\/\//i.test(v) ? `https://${v}` : v))
+  .transform(withProtocol)
   .pipe(z.string().max(2000, tooLong(2000)))
-  .refine(
-    // No spaces, and no "name:password@" before the site.
-    (v) => v === "" || (webAddress.safeParse(v).success && !/\s/.test(v) && !/^https?:\/\/[^/]*@/i.test(v)),
-    "Please enter a full web address, e.g. https://www.score.org.",
-  );
+  .refine((v) => v === "" || isWebAddress(v), "Please enter a full web address, e.g. https://www.score.org.");
+
+export const MAX_LINKS = 10;
+
+/**
+ * Official sources / useful links: one per line, each a web address or [text](address).
+ * Empty lines are skipped, and "www.score.org" is saved as "https://www.score.org".
+ */
+const links = z.string().transform((value, ctx) => {
+  const lines = value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length > MAX_LINKS) {
+    ctx.addIssue({ code: "custom", message: `Please list ${MAX_LINKS} links or fewer.` });
+    return z.NEVER;
+  }
+  const saved: string[] = [];
+  for (const [index, line] of lines.entries()) {
+    const withText = LINK_WITH_TEXT.exec(line);
+    const address = withProtocol(withText ? withText[2] : line);
+    if (line.length > 2000 || !isWebAddress(address)) {
+      ctx.addIssue({
+        code: "custom",
+        message: `Line ${index + 1} isn't a web address. Put one address on each line, e.g. https://www.score.org.`,
+      });
+      return z.NEVER;
+    }
+    saved.push(withText ? `[${withText[1]}](${address})` : address);
+  }
+  return saved;
+});
 
 const contactEmail = z
   .string()
@@ -42,10 +76,11 @@ export const profileDraftSchema = z
     slug: z.string().trim().max(SLUG_MAX, tooLong(SLUG_MAX)),
     tagline: text(300),
     intro: longText,
-    howTheyHelp: longText,
-    whoShouldExplore: longText,
-    history: longText,
+    worthExploring: longText,
+    peopleToKnow: longText,
+    gettingStarted: longText,
     websiteUrl,
+    links,
     contactName: text(200),
     contactRole: text(200),
     contactEmail,
@@ -76,10 +111,11 @@ export const PROFILE_LABELS: Record<FormField, string> = {
   tagline: "Tagline",
   logo: "Logo",
   intro: "Introduction",
-  howTheyHelp: "How they can help",
-  whoShouldExplore: "Who should explore",
-  history: "Background",
+  worthExploring: "Worth exploring",
+  peopleToKnow: "People to know",
+  gettingStarted: "Getting started",
   websiteUrl: "Website",
+  links: "Official sources / useful links",
   contactName: "Contact name",
   contactRole: "Role",
   contactEmail: "Email",
@@ -87,7 +123,14 @@ export const PROFILE_LABELS: Record<FormField, string> = {
 };
 
 /** What a profile needs besides its name before it can be public (the database's profiles_published_complete check). */
-export const PUBLISH_FIELDS: ProfileField[] = ["tagline", "intro", "howTheyHelp", "whoShouldExplore", "websiteUrl"];
+export const PUBLISH_FIELDS: ProfileField[] = [
+  "tagline",
+  "intro",
+  "worthExploring",
+  "peopleToKnow",
+  "gettingStarted",
+  "websiteUrl",
+];
 
 /** The publish fields that are still empty or only spaces, as typed or as parsed. */
 export function missingPublishFields(profile: Record<ProfileField, string>): ProfileField[] {

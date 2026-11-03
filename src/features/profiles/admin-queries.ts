@@ -34,7 +34,7 @@ type SummaryRow = {
 /** One profile with every field and its logo's link, as the edit form shows it. */
 export type AdminProfile = ProfileSummary & { values: ProfileFormValues; logoUrl: string | null };
 
-const DETAIL_COLUMNS = `${SUMMARY_COLUMNS}, tagline, intro, how_they_help, who_should_explore, history, website_url, contact_name, contact_role, contact_email, contact_phone, logo_path`;
+const DETAIL_COLUMNS = `${SUMMARY_COLUMNS}, tagline, intro, how_they_help, who_should_explore, history, website_url, contact_name, contact_role, contact_email, contact_phone, links, logo_path`;
 
 type DetailRow = SummaryRow & {
   tagline: string | null;
@@ -47,6 +47,7 @@ type DetailRow = SummaryRow & {
   contact_role: string | null;
   contact_email: string | null;
   contact_phone: string | null;
+  links: string[] | null;
   logo_path: string | null;
 };
 
@@ -75,10 +76,11 @@ function toAdminProfile(row: DetailRow, db: SupabaseClient): AdminProfile {
       slug: row.slug,
       tagline: row.tagline ?? "",
       intro: row.intro ?? "",
-      howTheyHelp: row.how_they_help ?? "",
-      whoShouldExplore: row.who_should_explore ?? "",
-      history: row.history ?? "",
+      worthExploring: row.how_they_help ?? "",
+      peopleToKnow: row.who_should_explore ?? "",
+      gettingStarted: row.history ?? "",
       websiteUrl: row.website_url ?? "",
+      links: (row.links ?? []).join("\n"),
       contactName: row.contact_name ?? "",
       contactRole: row.contact_role ?? "",
       contactEmail: row.contact_email ?? "",

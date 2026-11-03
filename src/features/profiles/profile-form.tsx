@@ -21,6 +21,7 @@ import {
   type FormField,
   LOGO_TYPES,
   logoFileProblem,
+  MAX_LINKS,
   PROFILE_LABELS,
   PUBLISH_FIELDS,
   type ProfileField,
@@ -139,6 +140,7 @@ function Section({ title, description, children }: { title: string; description?
 }
 
 const code = "rounded bg-white/70 px-1 font-mono text-[14px]";
+const hintCode = "rounded bg-sand/60 px-1 font-mono text-[13px] text-ink";
 
 type ChosenLogo = { file: File; url: string };
 
@@ -499,36 +501,62 @@ export function ProfileForm({
             {(control) => textArea(control, 5)}
           </Field>
           <Field
-            field="howTheyHelp"
+            field="worthExploring"
             tag="publish"
-            hint="What they offer small-business owners."
-            error={errors.howTheyHelp}
+            hint="One or two memorable reasons to explore them."
+            error={errors.worthExploring}
           >
-            {(control) => textArea(control, 10)}
+            {(control) => textArea(control, 8)}
           </Field>
           <Field
-            field="whoShouldExplore"
+            field="peopleToKnow"
             tag="publish"
-            hint="The owners and businesses who will get the most from them."
-            error={errors.whoShouldExplore}
+            hint="Who to talk to, or how to get introduced, e.g. a mentor through their request process."
+            error={errors.peopleToKnow}
           >
-            {(control) => textArea(control, 7)}
-          </Field>
-          <Field field="history" hint="Optional. Their history, if it helps readers trust them." error={errors.history}>
-            {(control) => textArea(control, 6)}
+            {(control) => textArea(control, 5)}
           </Field>
         </Section>
 
-        <Section title="Where to begin">
+        <Section title="Getting started" description="Shown together in a box near the end of the profile.">
+          <Field
+            field="gettingStarted"
+            tag="publish"
+            hint="A practical first step, e.g. which page to start on or how to request an appointment."
+            error={errors.gettingStarted}
+          >
+            {(control) => textArea(control, 5)}
+          </Field>
           <Field
             field="websiteUrl"
             tag="publish"
-            hint="The page where visitors should start, e.g. https://www.score.org/phoenix."
+            hint="The page where visitors should start. Shown as a button, e.g. https://www.score.org/az/greater-phoenix/."
             error={errors.websiteUrl}
           >
             {(control) =>
               textInput(control, { inputMode: "url", maxLength: 2000, autoCapitalize: "none", spellCheck: false })
             }
+          </Field>
+          <Field
+            field="links"
+            hint={
+              <>
+                Optional. One web address per line, up to {MAX_LINKS}. Listed at the end of the profile. To show words
+                instead of the address, write <code className={hintCode}>[Workshops](https://...)</code>
+              </>
+            }
+            error={errors.links}
+          >
+            {(control) => (
+              <textarea
+                rows={4}
+                defaultValue={values.links}
+                autoCapitalize="none"
+                spellCheck={false}
+                className={textareaClasses}
+                {...control}
+              />
+            )}
           </Field>
         </Section>
 

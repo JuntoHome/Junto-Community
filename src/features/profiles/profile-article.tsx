@@ -4,6 +4,7 @@ import { Container, Eyebrow } from "@/components/ui/primitives";
 import { RichTextBlocks } from "@/components/ui/rich-text";
 import type { WhoCanHelpPage } from "@/lib/content/types";
 import { cn } from "@/lib/cn";
+import type { UsefulLink } from "./links";
 import { ProfileLogo } from "./profile-logo";
 import { PROFILES_PATH } from "./queries";
 import { PROFILE_LABELS, type ProfileField } from "./schema";
@@ -26,6 +27,11 @@ function NotFilledIn({ field, className }: { field: ProfileField; className?: st
 }
 
 const notFilledInClass = "border-field text-muted";
+const notFilledInOnNavyClass = "border-white/40 text-mist";
+
+// Getting started sits in the navy box, so its text and links are light.
+const onNavyClass =
+  "flex flex-col gap-4 text-base leading-[1.7] text-mist md:text-[17px] [&_a]:text-white [&_a]:underline [&_a]:underline-offset-2 [&_a:hover]:text-gold-light [&_strong]:text-white";
 
 function Text({ field, text }: { field: ProfileField; text: string }) {
   return text.trim() ? (
@@ -86,7 +92,29 @@ function Contact({ contact, title }: { contact: Profile["contact"]; title: strin
   );
 }
 
-/** A profile as visitors see it. Used by the public profile page and the admin preview. */
+/** Official sources / useful links, at the end of the profile. Each opens in a new tab. */
+function UsefulLinks({ links, title }: { links: UsefulLink[]; title: string }) {
+  if (links.length === 0) return null;
+  return (
+    <section aria-labelledby="useful-links" className="mt-10 md:mt-12">
+      <h2 id="useful-links" className="font-serif text-2xl leading-tight font-bold text-navy md:text-[28px]">
+        {title}
+      </h2>
+      <ul className="mt-4 flex list-disc flex-col gap-2.5 pl-6 text-base marker:text-gold md:text-[17px]">
+        {links.map((link, index) => (
+          <li key={index}>
+            <a href={link.url} target="_blank" rel="noopener noreferrer" className="font-semibold wrap-anywhere">
+              {link.label} <span aria-hidden="true">↗</span>
+              <span className="sr-only"> (opens in a new tab)</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** A profile as visitors see it, in Paul's order. Used by the public profile page and the admin preview. */
 export function ProfileArticle({ profile, page }: { profile: Profile; page: WhoCanHelpPage }) {
   const { sections } = page;
 
@@ -120,39 +148,51 @@ export function ProfileArticle({ profile, page }: { profile: Profile; page: WhoC
           <Text field="intro" text={profile.intro} />
         </div>
 
-        <Section id="how-they-help" title={sections.howTheyHelp} field="howTheyHelp" text={profile.howTheyHelp} />
         <Section
-          id="who-should-explore"
-          title={sections.whoShouldExplore}
-          field="whoShouldExplore"
-          text={profile.whoShouldExplore}
+          id="worth-exploring"
+          title={sections.worthExploring}
+          field="worthExploring"
+          text={profile.worthExploring}
         />
-        {profile.history && <Section id="history" title={sections.history} field="history" text={profile.history} />}
+        <Section id="people-to-know" title={sections.peopleToKnow} field="peopleToKnow" text={profile.peopleToKnow} />
 
         <section
-          aria-labelledby="where-to-begin"
+          aria-labelledby="getting-started"
           className="mt-12 rounded-[18px] bg-navy px-6 py-7 text-white md:mt-16 md:px-9 md:py-9"
         >
-          <h2 id="where-to-begin" className="font-serif text-2xl text-gold-light md:text-[28px]">
-            {sections.whereToBegin}
+          <h2 id="getting-started" className="font-serif text-2xl text-gold-light md:text-[28px]">
+            {sections.gettingStarted}
           </h2>
+          <div className={cn(onNavyClass, "mt-4")}>
+            {profile.gettingStarted.trim() ? (
+              <RichTextBlocks
+                blocks={toBlocks(profile.gettingStarted)}
+                headingClassName="font-serif text-xl font-bold text-white"
+                quoteClassName="border-l-4 border-gold py-1 pl-5 font-serif text-lg font-bold text-white"
+              />
+            ) : (
+              <NotFilledIn field="gettingStarted" className={notFilledInOnNavyClass} />
+            )}
+          </div>
           {profile.websiteUrl ? (
             <ButtonLink
               href={profile.websiteUrl}
               target="_blank"
               rel="noopener noreferrer"
               variant="gold"
-              className="mt-5 max-w-full break-all"
+              className="mt-6 max-w-full break-all"
             >
               Visit {displayHost(profile.websiteUrl)}
               <span aria-hidden="true">↗</span>
               <span className="sr-only">(opens in a new tab)</span>
             </ButtonLink>
           ) : (
-            <NotFilledIn field="websiteUrl" className="mt-5 border-white/40 text-mist" />
+            <NotFilledIn field="websiteUrl" className={cn("mt-6", notFilledInOnNavyClass)} />
           )}
           <Contact contact={profile.contact} title={sections.contact} />
         </section>
+
+        <UsefulLinks links={profile.links} title={sections.links} />
 
         <Link href={PROFILES_PATH} className="mt-10 w-fit text-[15px] font-semibold md:mt-12">
           ← {page.backLinkLabel}

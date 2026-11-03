@@ -274,11 +274,12 @@ export type WhoCanHelpPage = {
   emptyMessage: string;
   cardLinkLabel: string;
   backLinkLabel: string;
+  /** Headings on each profile page, in Paul's order. */
   sections: {
-    howTheyHelp: string;
-    whoShouldExplore: string;
-    history: string;
-    whereToBegin: string;
+    worthExploring: string;
+    peopleToKnow: string;
+    gettingStarted: string;
+    links: string;
     contact: string;
   };
 };

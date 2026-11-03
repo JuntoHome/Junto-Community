@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
 import { getSupabasePublic } from "@/lib/supabase/public";
+import { toUsefulLink } from "./links";
 import type { Profile } from "./types";
 
 /** Base path of the public profile pages. Each profile lives at `${PROFILES_PATH}/<slug>`. */
@@ -22,9 +23,13 @@ export const PROFILES_TAG = "profiles";
 const REVALIDATE_SECONDS = 30;
 
 const COLUMNS =
-  "id, name, slug, tagline, intro, how_they_help, who_should_explore, history, contact_name, contact_role, contact_email, contact_phone, website_url, logo_path, updated_at";
+  "id, name, slug, tagline, intro, how_they_help, who_should_explore, history, contact_name, contact_role, contact_email, contact_phone, website_url, links, logo_path, updated_at";
 
-/** A profile's columns as the public page needs them. */
+/**
+ * A profile's columns as the public page needs them. Three keep their first names:
+ * how_they_help is "Worth exploring", who_should_explore "People to know" and history
+ * "Getting started".
+ */
 export type ProfileRow = {
   id: string;
   name: string;
@@ -39,6 +44,7 @@ export type ProfileRow = {
   contact_email: string | null;
   contact_phone: string | null;
   website_url: string | null;
+  links: string[] | null;
   logo_path: string | null;
   updated_at: string;
 };
@@ -60,9 +66,9 @@ export function toProfile(row: ProfileRow, db: SupabaseClient): Profile {
     slug: row.slug,
     tagline: row.tagline ?? "",
     intro: row.intro ?? "",
-    howTheyHelp: row.how_they_help ?? "",
-    whoShouldExplore: row.who_should_explore ?? "",
-    history: row.history?.trim() ? row.history : null,
+    worthExploring: row.how_they_help ?? "",
+    peopleToKnow: row.who_should_explore ?? "",
+    gettingStarted: row.history ?? "",
     contact: {
       name: row.contact_name || null,
       role: row.contact_role || null,
@@ -70,6 +76,7 @@ export function toProfile(row: ProfileRow, db: SupabaseClient): Profile {
       phone: row.contact_phone || null,
     },
     websiteUrl: row.website_url ?? "",
+    links: (row.links ?? []).map(toUsefulLink),
     logoUrl: logoUrl(db, row.logo_path),
     updatedAt: row.updated_at,
   };

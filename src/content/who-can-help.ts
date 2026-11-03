@@ -15,10 +15,10 @@ export const whoCanHelp: WhoCanHelpPage = {
   cardLinkLabel: "Read the profile",
   backLinkLabel: "All organizations",
   sections: {
-    howTheyHelp: "How they can help",
-    whoShouldExplore: "Who should explore",
-    history: "Background",
-    whereToBegin: "Where to begin",
+    worthExploring: "Worth exploring",
+    peopleToKnow: "People to know",
+    gettingStarted: "Getting started",
+    links: "Official sources / useful links",
     contact: "Point of contact",
   },
 };

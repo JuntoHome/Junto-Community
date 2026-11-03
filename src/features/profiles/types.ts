@@ -1,3 +1,5 @@
+import type { UsefulLink } from "./links";
+
 /** A published "Who Can Help?" profile, as the public pages show it. */
 export type Profile = {
   id: string;
@@ -6,9 +8,11 @@ export type Profile = {
   tagline: string;
   /** Long text: paragraphs separated by a blank line, "- " bullets, **bold**, [links](https://...). */
   intro: string;
-  howTheyHelp: string;
-  whoShouldExplore: string;
-  history: string | null;
+  worthExploring: string;
+  peopleToKnow: string;
+  gettingStarted: string;
+  /** Official sources / useful links, in the order they were typed. */
+  links: UsefulLink[];
   contact: {
     name: string | null;
     role: string | null;

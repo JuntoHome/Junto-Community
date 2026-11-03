@@ -38,7 +38,11 @@ function knownError(error: PostgrestError): { status: "duplicate-slug" } | { sta
   return null;
 }
 
-/** Database columns for a profile's fields. Empty optional fields are stored as null. */
+/**
+ * Database columns for a profile's fields. Empty text is stored as null. Three columns keep
+ * their first names: how_they_help is "Worth exploring", who_should_explore "People to know"
+ * and history "Getting started".
+ */
 function toRow(input: ProfileInput) {
   const orNull = (value: string) => value || null;
   return {
@@ -46,10 +50,11 @@ function toRow(input: ProfileInput) {
     slug: input.slug,
     tagline: orNull(input.tagline),
     intro: orNull(input.intro),
-    how_they_help: orNull(input.howTheyHelp),
-    who_should_explore: orNull(input.whoShouldExplore),
-    history: orNull(input.history),
+    how_they_help: orNull(input.worthExploring),
+    who_should_explore: orNull(input.peopleToKnow),
+    history: orNull(input.gettingStarted),
     website_url: orNull(input.websiteUrl),
+    links: input.links,
     contact_name: orNull(input.contactName),
     contact_role: orNull(input.contactRole),
     contact_email: orNull(input.contactEmail),
