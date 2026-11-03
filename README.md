@@ -134,6 +134,23 @@ To remove one: `delete from public.admins where email = 'name@example.com';` (de
 
 The invite and reset-password emails must use the templates in [supabase/templates/](supabase/templates/) (paste each into Supabase → Authentication → Emails → Templates, with the subject from its first comment). They link to `/admin/set-password` with a one-time code that is only used when the form is submitted, so email scanners that open links can't use it up. The links use the Site URL, so they always open the live site.
 
+## Restoring a deleted profile
+
+Deleting a profile in the admin only sets its `deleted_at`, so it disappears from the admin and the public site but stays in the database. Its page address becomes free for another profile. To restore one, in the SQL editor:
+
+```sql
+-- Deleted profiles, most recent first, with the admin who deleted them.
+select p.id, p.name, p.slug, p.status, p.deleted_at, a.email as deleted_by
+from public.profiles p left join public.admins a on a.user_id = p.updated_by
+where p.deleted_at is not null
+order by p.deleted_at desc;
+
+-- Bring it back as a draft, so an admin can check it before publishing it again.
+update public.profiles set deleted_at = null, status = 'draft' where id = '<id>';
+```
+
+If another profile now uses the same address, the update fails on `profiles_slug_key`. Give the restored one a new address in the same statement (`..., slug = 'new-address'`).
+
 ## Deploying
 
 Vercel project `junto-community` auto-deploys from `main` to the live site. Pushes to other branches (such as `dev`) get a preview URL. Set the variables from [.env.example](.env.example) in the Vercel project settings, for both Production and Preview.

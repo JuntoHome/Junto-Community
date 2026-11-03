@@ -23,6 +23,11 @@ export type UpdateProfileResult =
   /** Unknown or deleted. */
   | { status: "not-found" };
 
+export type DeleteProfileResult =
+  | { status: "deleted"; published: boolean }
+  /** Unknown, or already deleted. */
+  | { status: "not-found" };
+
 /** The database errors an admin can cause by what they typed. */
 function knownError(error: PostgrestError): { status: "duplicate-slug" } | { status: "incomplete" } | null {
   if (error.code === UNIQUE_VIOLATION) return { status: "duplicate-slug" };
@@ -90,4 +95,23 @@ export async function updateProfileFields(
   const known = knownError(error);
   if (known) return known;
   throw new Error(`Couldn't save profile ${id}: ${error.message}`);
+}
+
+/**
+ * Marks a profile as deleted. It disappears from the admin and the public site, but the
+ * row is kept so it can be restored (README, "Restoring a deleted profile"), and its page
+ * address is free for another profile. The database records the admin who deleted it as
+ * the last editor.
+ */
+export async function softDeleteProfile(id: string): Promise<DeleteProfileResult> {
+  const db = await createSupabaseServerClient();
+  const { data, error } = await db
+    .from("profiles")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id)
+    .is("deleted_at", null)
+    .select("status")
+    .maybeSingle();
+  if (error) throw new Error(`Couldn't delete profile ${id}: ${error.message}`);
+  return data ? { status: "deleted", published: data.status === "published" } : { status: "not-found" };
 }

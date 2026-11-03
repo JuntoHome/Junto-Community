@@ -132,3 +132,17 @@ export const getProfilePreview = cache(async (id: string): Promise<ProfilePrevie
   const row = data as unknown as DetailRow & ProfileRow;
   return { ...toAdminProfile(row), page: toProfile(row, db) };
 });
+
+/** A deleted profile's name, for the message after deleting it, or null (unknown or not deleted). */
+export async function getDeletedProfileName(id: string): Promise<string | null> {
+  if (!UUID.test(id)) return null;
+  const db = await createSupabaseServerClient();
+  const { data, error } = await db
+    .from("profiles")
+    .select("name")
+    .eq("id", id)
+    .not("deleted_at", "is", null)
+    .maybeSingle();
+  if (error) throw new Error(`Couldn't load profile ${id}: ${error.message}`);
+  return data?.name ?? null;
+}

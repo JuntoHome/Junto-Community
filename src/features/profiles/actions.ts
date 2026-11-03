@@ -5,7 +5,14 @@ import { redirect } from "next/navigation";
 import type { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
 import { PROFILES_TAG } from "./queries";
-import { insertProfile, type SaveProfileResult, type UpdateProfileResult, updateProfileFields } from "./repository";
+import {
+  type DeleteProfileResult,
+  insertProfile,
+  type SaveProfileResult,
+  softDeleteProfile,
+  type UpdateProfileResult,
+  updateProfileFields,
+} from "./repository";
 import {
   missingPublishFields,
   PROFILE_FIELDS,
@@ -19,6 +26,8 @@ import {
 const DUPLICATE_SLUG = "Another profile already uses this address. Please choose a different one.";
 const NOT_SAVED = "The profile couldn't be saved. Please try again in a moment.";
 const GONE = "This profile no longer exists, so the changes couldn't be saved. It may have been deleted.";
+const NOT_DELETED = "The profile couldn't be deleted. Please try again in a moment.";
+const ALREADY_DELETED = "This profile no longer exists. Someone may have deleted it already.";
 const NEEDED_TO_PUBLISH = "Needed to publish.";
 const NEEDED_WHILE_PUBLISHED = "Needed while the profile is published.";
 const NOT_PUBLISHED =
@@ -129,4 +138,26 @@ export async function updateProfile(
   // Visitors see the change on their next visit, not after the usual 30 seconds.
   if (status || result.published) updateTag(PROFILES_TAG);
   redirect(`/admin/profiles/${id}?${intent === "publish" ? "published" : intent === "hide" ? "hidden" : "saved"}=1`);
+}
+
+export type DeleteProfileState = { message?: string };
+
+/**
+ * Deletes a profile, then goes back to the list. The profile is kept in the database, so
+ * it can be restored. Bind the profile's id: `deleteProfile.bind(null, id)`.
+ */
+export async function deleteProfile(id: string): Promise<DeleteProfileState> {
+  await requireAdmin();
+
+  let result: DeleteProfileResult;
+  try {
+    result = await softDeleteProfile(id);
+  } catch (error) {
+    console.error("[profiles] delete failed", error);
+    return { message: NOT_DELETED };
+  }
+  if (result.status === "not-found") return { message: ALREADY_DELETED };
+
+  if (result.published) updateTag(PROFILES_TAG);
+  redirect(`/admin/profiles?deleted=${id}`);
 }

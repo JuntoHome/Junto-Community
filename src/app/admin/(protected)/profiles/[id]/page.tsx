@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 import { AdminPage } from "@/components/admin/admin-page";
 import { FlashNotice } from "@/components/admin/flash-notice";
 import { ButtonLink } from "@/components/ui/button";
-import { updateProfile } from "@/features/profiles/actions";
+import { deleteProfile, updateProfile } from "@/features/profiles/actions";
 import { StatusBadge } from "@/features/profiles/admin-profile-list";
 import { getProfileForAdmin } from "@/features/profiles/admin-queries";
+import { DeleteProfile } from "@/features/profiles/delete-profile";
 import { ProfileForm } from "@/features/profiles/profile-form";
 import { PREVIEW_PATH, PROFILES_PATH } from "@/features/profiles/queries";
 import { requireAdmin } from "@/lib/auth";
@@ -93,7 +94,7 @@ export default async function EditProfilePage({ params, searchParams }: Props) {
         )
       }
     >
-      {/* Keyed by the last save, so the form and message start fresh with the saved values. */}
+      {/* Keyed by the last save, so the form, message and delete section start fresh with the saved values. */}
       {flash && (
         <div key={`flash-${profile.updatedAt}`} className="mb-6 max-w-180">
           <FlashNotice>{flash}</FlashNotice>
@@ -106,6 +107,13 @@ export default async function EditProfilePage({ params, searchParams }: Props) {
         status={profile.status}
         addressPrefix={`${new URL(site.url).host}${PROFILES_PATH}/`}
         cancelHref="/admin/profiles"
+      />
+      <DeleteProfile
+        key={`delete-${profile.updatedAt}`}
+        action={deleteProfile.bind(null, profile.id)}
+        name={profile.name}
+        published={published}
+        className="mt-12"
       />
     </AdminPage>
   );

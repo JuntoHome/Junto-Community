@@ -8,6 +8,8 @@ const variants = {
   gold: "bg-gold text-navy-deep font-bold hover:brightness-95 hover:text-navy-deep",
   green: "bg-green text-white font-bold hover:bg-green-dark hover:text-white",
   outline: "border border-navy bg-white text-navy hover:bg-ivory hover:text-navy",
+  danger: "bg-red-700 text-white font-bold hover:bg-red-800 hover:text-white",
+  dangerOutline: "border border-red-700 bg-white text-red-700 hover:bg-red-50 hover:text-red-800",
 } as const;
 
 const sizes = {
