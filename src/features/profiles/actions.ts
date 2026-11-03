@@ -1,6 +1,6 @@
 "use server";
 
-import { updateTag } from "next/cache";
+import { refresh, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import type { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
@@ -9,6 +9,8 @@ import { PROFILES_TAG } from "./queries";
 import {
   type DeleteProfileResult,
   insertProfile,
+  type MoveProfileResult,
+  moveInOrder,
   type SaveProfileResult,
   softDeleteProfile,
   type UpdateProfileResult,
@@ -30,6 +32,8 @@ const LOGO_NOT_SAVED = "The logo couldn't be uploaded, so nothing was saved. Ple
 const GONE = "This profile no longer exists, so the changes couldn't be saved. It may have been deleted.";
 const NOT_DELETED = "The profile couldn't be deleted. Please try again in a moment.";
 const ALREADY_DELETED = "This profile no longer exists. Someone may have deleted it already.";
+const NOT_MOVED = "The profile couldn't be moved. Please try again in a moment.";
+const MOVED_GONE = "This profile no longer exists, so it couldn't be moved. The list has been refreshed.";
 const NEEDED_TO_PUBLISH = "Needed to publish.";
 const NEEDED_WHILE_PUBLISHED = "Needed while the profile is published.";
 const NOT_PUBLISHED =
@@ -209,4 +213,27 @@ export async function deleteProfile(id: string): Promise<DeleteProfileState> {
 
   if (result.published) updateTag(PROFILES_TAG);
   redirect(`/admin/profiles?deleted=${id}`);
+}
+
+export type MoveProfileState = { position: number; total: number } | { error: string };
+
+/**
+ * Moves a profile one place up or down the list. The public overview shows published
+ * profiles in this order. The list refreshes to show the new order.
+ */
+export async function moveProfile(id: string, direction: "up" | "down"): Promise<MoveProfileState> {
+  await requireAdmin();
+
+  let result: MoveProfileResult;
+  try {
+    result = await moveInOrder(id, direction === "up" ? "up" : "down");
+  } catch (error) {
+    console.error("[profiles] move failed", error);
+    refresh();
+    return { error: NOT_MOVED };
+  }
+  refresh();
+  if (result.status === "not-found") return { error: MOVED_GONE };
+  if (result.status === "moved") updateTag(PROFILES_TAG);
+  return { position: result.position, total: result.total };
 }

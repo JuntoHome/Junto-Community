@@ -130,3 +130,45 @@ export async function softDeleteProfile(id: string): Promise<DeleteProfileResult
   if (error) throw new Error(`Couldn't delete profile ${id}: ${error.message}`);
   return data ? { status: "deleted", published: data.status === "published" } : { status: "not-found" };
 }
+
+export type MoveProfileResult =
+  | { status: "moved"; position: number; total: number }
+  /** Already first (moving up) or last (moving down). */
+  | { status: "unchanged"; position: number; total: number }
+  /** Unknown or deleted. */
+  | { status: "not-found" };
+
+/**
+ * Moves a profile one place up or down the list (display order), by swapping its number
+ * with its neighbour's. Numbers that tie (a move interrupted halfway) are spread out on
+ * the way, so the next move still works. Writes as the logged-in admin.
+ */
+export async function moveInOrder(id: string, direction: "up" | "down"): Promise<MoveProfileResult> {
+  const db = await createSupabaseServerClient();
+  const { data, error } = await db
+    .from("profiles")
+    .select("id, display_order")
+    .is("deleted_at", null)
+    .order("display_order")
+    .order("name");
+  if (error) throw new Error(`Couldn't load the profile order: ${error.message}`);
+
+  const rows = data as { id: string; display_order: number }[];
+  const from = rows.findIndex((row) => row.id === id);
+  if (from === -1) return { status: "not-found" };
+  const to = direction === "up" ? from - 1 : from + 1;
+  if (to < 0 || to >= rows.length) return { status: "unchanged", position: from + 1, total: rows.length };
+
+  const order = rows.slice();
+  [order[from], order[to]] = [order[to], order[from]];
+  // The new order gets the same numbers as before, kept strictly increasing.
+  let previous = -Infinity;
+  for (const [index, row] of order.entries()) {
+    const value = Math.max(rows[index].display_order, previous + 1);
+    previous = value;
+    if (row.display_order === value) continue;
+    const { error } = await db.from("profiles").update({ display_order: value }).eq("id", row.id);
+    if (error) throw new Error(`Couldn't move profile ${row.id}: ${error.message}`);
+  }
+  return { status: "moved", position: to + 1, total: rows.length };
+}

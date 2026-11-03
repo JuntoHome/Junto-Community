@@ -58,6 +58,8 @@ const paths = {
     </>
   ),
   plus: <path d="M12 5v14M5 12h14" />,
+  arrowUp: <path d="M12 19V5M5.5 11.5L12 5l6.5 6.5" />,
+  arrowDown: <path d="M12 5v14M5.5 12.5L12 19l6.5-6.5" />,
   check: <path d="M5 12.5l4.5 4.5L19 7" />,
   globe: (
     <>

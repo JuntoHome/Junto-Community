@@ -4,6 +4,7 @@ import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import type { ProfileStatus, ProfileSummary } from "./admin-queries";
+import { MoveButtons } from "./move-buttons";
 import { PREVIEW_PATH, PROFILES_PATH } from "./queries";
 
 const statusLabels: Record<ProfileStatus, string> = { published: "Published", draft: "Draft" };
@@ -85,13 +86,24 @@ function Actions({ profile, className }: { profile: ProfileSummary; className?: 
   );
 }
 
-/** Every profile with its status and last change. */
+/** Every profile in display order, with its status and last change, and buttons to change the order. */
 export function AdminProfileList({ profiles, adminEmail }: { profiles: ProfileSummary[]; adminEmail: string }) {
+  const move = (profile: ProfileSummary, index: number, className?: string) => (
+    <MoveButtons
+      id={profile.id}
+      name={profile.name}
+      position={index + 1}
+      total={profiles.length}
+      className={className}
+    />
+  );
+  const reorderable = profiles.length > 1;
+
   return (
     <div className="rounded-[18px] border border-sand bg-white px-5 md:px-6">
       {/* Phones: one block per profile. */}
       <ul className="divide-y divide-sand md:hidden">
-        {profiles.map((profile) => (
+        {profiles.map((profile, index) => (
           <li key={profile.id} className="flex flex-col gap-1.5 py-4">
             <div className="flex items-start justify-between gap-3">
               <NameLink profile={profile} />
@@ -101,7 +113,10 @@ export function AdminProfileList({ profiles, adminEmail }: { profiles: ProfileSu
             <p className="text-[15px] text-slate">
               Updated <Updated profile={profile} adminEmail={adminEmail} />
             </p>
-            <Actions profile={profile} className="pt-1" />
+            <div className="flex items-center justify-between gap-4 pt-1">
+              <Actions profile={profile} />
+              {move(profile, index)}
+            </div>
           </li>
         ))}
       </ul>
@@ -111,6 +126,11 @@ export function AdminProfileList({ profiles, adminEmail }: { profiles: ProfileSu
         <caption className="sr-only">Profiles</caption>
         <thead className="border-b border-sand text-sm font-bold tracking-[0.08em] text-slate uppercase">
           <tr>
+            {reorderable && (
+              <th scope="col" className="py-4 pr-4">
+                Order
+              </th>
+            )}
             <th scope="col" className="py-4 pr-4">
               Name
             </th>
@@ -126,8 +146,9 @@ export function AdminProfileList({ profiles, adminEmail }: { profiles: ProfileSu
           </tr>
         </thead>
         <tbody className="divide-y divide-sand">
-          {profiles.map((profile) => (
+          {profiles.map((profile, index) => (
             <tr key={profile.id} className="align-top">
+              {reorderable && <td className="py-3 pr-4">{move(profile, index)}</td>}
               <th scope="row" className="py-4 pr-4 font-normal">
                 <NameLink profile={profile} />
                 <Address slug={profile.slug} />

@@ -32,7 +32,7 @@ export default async function ProfilesPage({ searchParams }: Props) {
           <Link href={PROFILES_PATH} className="font-semibold">
             {page.heading}
           </Link>{" "}
-          page. Drafts are only visible here.
+          page in the order below. Use the arrows to move one up or down. Drafts are only visible here.
         </>
       }
       actions={
