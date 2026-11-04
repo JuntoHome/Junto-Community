@@ -560,7 +560,7 @@ export function ProfileForm({
           </Field>
         </Section>
 
-        <Section title="Point of contact" description="Optional. Shown at the end of the profile.">
+        <Section title="Point of contact" description="Optional. Shown in the Getting started box.">
           <div className="grid gap-6 md:grid-cols-2">
             <Field field="contactName" error={errors.contactName}>
               {(control) => textInput(control, { maxLength: 200 })}
