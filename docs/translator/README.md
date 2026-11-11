@@ -1,16 +1,18 @@
 # Data Axle Translator
 
-A tool in the JCA admin area that turns a business contact spreadsheet into a ranked, explained shortlist in Excel. Users are business owners looking for customers and job seekers looking for employers.
+The Data Axle Translator is a tool in the JCA admin area that lets a library patron upload a business contacts spreadsheet, describe a target in plain terms (for example "Phoenix fabrication owners"), and download a ranked, explained shortlist as an Excel file. Typical users are business owners looking for customers and job seekers looking for employers. Phase 1 covers upload, preview, a criteria form, deterministic ranking, results and Excel export, with synthetic data only and no AI. Page: `/admin/translator`. Work is tracked in GitHub issues TR-01 to TR-35 (milestone "Data Axle Translator Phase 1").
 
-**Phase 1:** upload, preview, criteria form, deterministic ranking, results, Excel export. Synthetic data only, no AI. Page: `/admin/translator`. Work is tracked in GitHub issues TR-01 to TR-35.
+Staging: `<URL pending>`
+
+> **Database warning:** staging shares the production Supabase project. Logging in to the admin area, editing profiles or using the subscribe form on staging changes live data (a staging signup creates a real subscriber and emails the team). The Translator itself stores nothing, but the rest of the site on staging is live.
 
 ## Files in this folder
 
 | File | What it is |
 |---|---|
-| `JCA_Data_Axle_Translator_Specification.docx` | Full spec: workflow, ranking rules, walkthroughs, edge cases |
-| `JCA_Synthetic_Contacts.xlsx` | 500 fictional records, 9 columns, sheet `Contacts`. Used for the spec walkthroughs. SHA-256: `67a510867ed6c7273cfebabea5c6895e43bd2cae2c98395acd09146ba6ed580b` |
-| `JCA_Reference_Solutions_Exact_Headers_Jeel.xlsx` | Headers only (no records) of a real Reference Solutions export: 396 columns in order, a numbered inventory, and source notes |
+| [JCA_Data_Axle_Translator_Specification.docx](JCA_Data_Axle_Translator_Specification.docx) | Full spec: workflow, ranking rules, walkthroughs, edge cases |
+| [JCA_Synthetic_Contacts.xlsx](JCA_Synthetic_Contacts.xlsx) | 500 fictional records, 9 columns, sheet `Contacts`. Used for the spec walkthroughs. SHA-256: `67a510867ed6c7273cfebabea5c6895e43bd2cae2c98395acd09146ba6ed580b` |
+| [JCA_Reference_Solutions_Exact_Headers_Jeel.xlsx](JCA_Reference_Solutions_Exact_Headers_Jeel.xlsx) | Headers only (no records) of a real Reference Solutions export: 396 columns in order, a numbered inventory, and source notes |
 | `JCA_Synthetic_RS_Layout.xlsx` | Added in TR-35: fictional records in the real 396-column layout |
 
 ## Two input layouts, one set of fields
@@ -53,8 +55,12 @@ A tool in the JCA admin area that turns a business contact spreadsheet into a ra
 | Required title Operations Manager | Rows with unknown title fail that filter |
 | Altered copy of the workbook | Rejected by the file gate |
 
-## Rules
+## Phase 1 rules
 
-- Synthetic data only. Never commit or upload real Data Axle records.
-- All processing in the browser. Nothing stored on the server or logged.
-- The form fills a `SearchBrief`; the Phase 2 AI will fill the same object.
+- **Synthetic data only.** No Data Axle connection. Never upload, copy, paste or commit real Data Axle or Reference Solutions records, not even one row.
+- **Browser only.** Parsing, cleaning, ranking and export all run in the browser. Rows are never sent to the server, stored (Supabase, localStorage, cookies) or logged.
+- **Independent modules.** Code lives in `src/features/translator/`: `import/`, `normalize/`, `criteria/`, `ranking/`, `export/` (no React) and `ui/`.
+- **Two input layouts, one set of fields.** The 9-column synthetic workbook and the 396-column Reference Solutions export are read through mapping configs (see the table above).
+- **One row per business.** Record ID is the IUSA Number, or `ROW-0001` style when blank. Industry is the Primary SIC Description. Real exports have no email; phone and website are the contact fallbacks.
+- **One criteria object.** The form fills a `SearchBrief`; the Phase 2 AI will fill the same object.
+- **Deterministic ranking, no AI.** The same file and the same brief always give the same order and reasons.

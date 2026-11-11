@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Junto Community Alliance (JCA) website: juntocommunity.org. Read `README.md` for the overall architecture.
+Junto Community Alliance (JCA) website: juntocommunity.org. Documentation lives in `docs/`: start with `docs/README.md` (the index) and `docs/ARCHITECTURE.md` for the overall architecture.
 
 ## Stack and commands
 
