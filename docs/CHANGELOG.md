@@ -9,6 +9,7 @@ Add an entry when work is merged into `translator` (under **Unreleased**) and mo
 ### Added
 - Translator spec, synthetic test workbooks and `CLAUDE.md` (`87b40eb`, Nov 10).
 - TR-01: Translator docs README with Phase 1 rules and staging warning (PR #36, open).
+- TR-02: `/admin/translator` page for admins only, with the synthetic-data banner, a 5-step indicator (Upload, Preview, Criteria, Results, Export; placeholders for now) and a "Data Axle Translator" sidebar link.
 
 ### Changed
 - Documentation reorganized into `docs/`: the root README moved to `docs/README.md` as an index, with separate documents for overview, architecture, requirements, features, database, API, authentication, workflow, setup, deployment, tasks, known issues and troubleshooting.

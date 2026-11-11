@@ -6,6 +6,7 @@ import type { IconName } from "@/components/ui/icon";
  */
 export const adminModules: { label: string; href: string; icon: IconName }[] = [
   { label: "Profiles", href: "/admin/profiles", icon: "users" },
+  { label: "Data Axle Translator", href: "/admin/translator", icon: "globe" },
 ];
 
 /** Shown in the sidebar under "Coming later", so the team can see what's planned. */
