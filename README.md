@@ -1,156 +1,21 @@
 # Junto Community Alliance website
 
-Phase 1 of [juntocommunity.org](https://www.juntocommunity.org): homepage, the Business Insights 101 workshop page (`/BI101`) and About, plus the "Join the Junto" subscribe form. The build spec is [docs/BUILD_SPEC.md](docs/BUILD_SPEC.md) and the approved mockups are in [docs/design/](docs/design/).
+The website for Junto Community Alliance (JCA) at [juntocommunity.org](https://www.juntocommunity.org). It has two parts: a public site that helps small-business owners in the Phoenix area find free community resources, and a private admin area where the JCA team publishes "Who Can Help?" organization profiles. The Data Axle Translator, a browser-only tool for ranking business contacts, is being built on the `translator` branch.
 
-**Stack:** Next.js 16 (App Router, TypeScript), Tailwind CSS 4, Supabase (subscribers), Vercel (hosting and analytics).
+**Stack:** Next.js 16 (App Router, TypeScript), React 19, Tailwind CSS 4, Supabase, Vercel.
 
-## Getting started
+## Documentation
+
+All documentation is in [`docs/`](docs/README.md). Start with [docs/README.md](docs/README.md).
 
 ```bash
 npm install
-cp .env.example .env.local   # fill in the Supabase values
+cp .env.example .env.local   # fill in values: see docs/DEVELOPMENT-SETUP.md first
 npm run dev                  # http://localhost:3000
 ```
 
-| Script | What it does |
-|---|---|
-| `npm run dev` | Dev server |
-| `npm run build` | Production build (also type-checks) |
-| `npm run lint` | ESLint |
-| `npm run typecheck` | TypeScript only |
+## Before you change anything
 
-The subscribe form needs `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. Without them the rest of the site works, and the form shows a friendly error. Create the table by running [supabase/migrations/](supabase/migrations/) in the Supabase SQL editor (or with `supabase db push`).
-
-## Architecture
-
-Content, UI and features are kept apart, so a CMS, more workshops or an app can be added without rewriting pages.
-
-```
-src/
-  app/                  Routes only. Each page fetches content and composes components.
-    (site)/             Public pages, inside the site header and footer. The group name is not in the URL.
-    admin/              CMS admin area: its own layout, not indexed.
-      login/            Open to logged-out visitors, with forgot-password/ and
-                        set-password/ (where invite and reset emails lead).
-      (protected)/      Everything else. Its layout checks for an admin; each page and
-                        each admin Server Action must also call requireAdmin() first.
-  content/              Today's content, as typed TypeScript data (site, events, people, pages).
-  lib/content/          The content API that every page uses, plus the source interface.
-    types.ts            The content model: the contract between content and UI.
-    source.ts           `ContentSource` interface.
-    sources/local.ts    Reads from src/content. Add sources/<cms>.ts next to it.
-    index.ts            getSiteSettings, getEvent, listEvents, getPage (cached per request).
-  components/
-    ui/                 Primitives: buttons, icons, rich text, form field styles, placeholders.
-    layout/             Header, mobile menu, footer.
-    admin/              Admin shell: navy sidebar, phone menu, page header, dashboard pieces.
-                        Add a new admin module in modules.ts.
-    event/              Event cards and the full EventPage template.
-    sections/           Page sections (Join the Junto band).
-  features/subscribe/   Subscribe: zod schema, Server Action, Supabase repository, form.
-  features/admin-auth/  Admin login: zod schema, Server Action, form.
-  features/profiles/    "Who Can Help?" profiles from Supabase: cached public queries, card, logo, text formatting;
-                        for the admin, uncached queries and the list (admin-*), and the add/edit form: zod schema,
-                        Server Actions, repository (writes as the admin), slug.ts for page addresses.
-  lib/auth.ts           getAdmin() returns the logged-in admin or null; requireAdmin() redirects to login.
-  lib/rate-limit.ts     Per-IP attempt limit for public forms (subscribe, login).
-  lib/supabase/         Supabase clients:
-    admin.ts            Service role, bypasses row level security. Subscribe form and cron only.
-    server.ts           Acts as the logged-in admin, so row level security applies. Use in /admin.
-    public.ts           Reads as an anonymous visitor (published content only). Use in cached public pages.
-    session.ts          Refreshes the admin login on /admin requests (called from proxy.ts).
-  lib/seo.ts            Page metadata and Event JSON-LD.
-  proxy.ts              Redirects /bi101 (any casing) to /BI101, capitalised profile addresses to lowercase,
-                        and keeps the admin login fresh.
-supabase/migrations/    Database schema.
-```
-
-### How content flows
-
-```
-src/content/*.ts ──> ContentSource (local) ──> lib/content API ──> app/ pages ──> components
-                     ContentSource (CMS)  ──┘   (swap here)
-```
-
-Pages never import from `src/content` directly. They call `getPage("home")`, `getEvent("bi101")` and so on, and components receive typed objects (`Event`, `HomePage`, ...).
-
-### Adding a CMS later
-
-1. Model the content types in the CMS to match [src/lib/content/types.ts](src/lib/content/types.ts).
-2. Add `src/lib/content/sources/<cms>.ts` that implements `ContentSource` and maps CMS documents to those types. Rich text fields use a small Markdown subset (`*em*`, `**strong**`, `[label](href)`, `## Subhead`).
-3. Point `source` in [src/lib/content/index.ts](src/lib/content/index.ts) at the new source.
-4. For instant updates, add revalidation (a CMS webhook calling `revalidateTag` / `revalidatePath`). Pages are static today, so this is what keeps them fast.
-
-Pages and components need no changes.
-
-### Adding a workshop
-
-Add an `Event` to [src/content/events.ts](src/content/events.ts) (or the CMS later) and render it with `<EventPage>`, the same template `/BI101` uses. A generic `/workshops/[slug]` route can be added when there is more than one workshop.
-
-## Editing content now
-
-| What | Where |
-|---|---|
-| Homepage and About copy | [src/content/pages.ts](src/content/pages.ts) |
-| Library Intelligence page (add research notes to the top of `notes`) | [src/content/library-intelligence.ts](src/content/library-intelligence.ts) |
-| Workshop details, Eventbrite link, date/time | [src/content/events.ts](src/content/events.ts) |
-| Presenter bio | [src/content/people.ts](src/content/people.ts) |
-| Nav, footer, contact email | [src/content/site.ts](src/content/site.ts) |
-| Wording around the profiles (page name, intro, "not a sponsored listing" note, section titles) | [src/content/who-can-help.ts](src/content/who-can-help.ts) |
-
-Dates are stored as ISO timestamps; every display string ("Wed, Oct 21", "12:00 to 2:00 PM MST") is derived from them.
-
-### Pending placeholders
-
-Search for `PENDING` in `src/content`:
-
-- Online platform: set `attendance.online.platform` in `events.ts`.
-- "Who Can Help?" page name and wording are drafts: confirm with Paul ([src/content/who-can-help.ts](src/content/who-can-help.ts)). The address `/who-can-help` is `PROFILES_PATH` in [src/features/profiles/queries.ts](src/features/profiles/queries.ts), plus the matcher in `proxy.ts`; the menu label is in [src/content/site.ts](src/content/site.ts).
-
-## Important
-
-- **`/BI101` is printed on flyers as a QR code. Never rename or remove that route.**
-- `SUPABASE_SERVICE_ROLE_KEY` is server-only (`import "server-only"` guards it). Never prefix it with `NEXT_PUBLIC_`.
-- No em-dashes in site copy (client preference).
-
-## Supabase keep-alive
-
-Supabase pauses a free project after 7 days without activity. A Vercel Cron Job ([vercel.json](vercel.json)) calls `/api/cron/keep-alive` every hour, on the hour. Each run writes one row to the `keep_alive` table (created by the SQL in `supabase/migrations/`), so there is a dated record of every run; rows older than 30 days are pruned. It needs `CRON_SECRET` set in Vercel; Vercel sends it with each cron request and the route rejects calls without it. Check runs under Vercel → Project → Settings → Cron Jobs.
-
-## Admin access
-
-Only people in the `admins` table can use `/admin`. Public sign-up is turned off in Supabase (Authentication → Sign In / Providers), and Supabase sends its invite and password emails through Resend (Authentication → Emails → SMTP Settings).
-
-To add an admin:
-
-1. Supabase → Authentication → Users → Add user → Send invitation, with their email.
-2. In the SQL editor:
-   ```sql
-   insert into public.admins (user_id, email)
-   select id, email from auth.users where email = 'name@example.com';
-   ```
-
-To remove one: `delete from public.admins where email = 'name@example.com';` (deleting the user under Authentication → Users also removes them).
-
-The invite and reset-password emails must use the templates in [supabase/templates/](supabase/templates/) (paste each into Supabase → Authentication → Emails → Templates, with the subject from its first comment). They link to `/admin/set-password` with a one-time code that is only used when the form is submitted, so email scanners that open links can't use it up. The links use the Site URL, so they always open the live site.
-
-## Restoring a deleted profile
-
-Deleting a profile in the admin only sets its `deleted_at`, so it disappears from the admin and the public site but stays in the database. Its page address becomes free for another profile. To restore one, in the SQL editor:
-
-```sql
--- Deleted profiles, most recent first, with the admin who deleted them.
-select p.id, p.name, p.slug, p.status, p.deleted_at, a.email as deleted_by
-from public.profiles p left join public.admins a on a.user_id = p.updated_by
-where p.deleted_at is not null
-order by p.deleted_at desc;
-
--- Bring it back as a draft, so an admin can check it before publishing it again.
-update public.profiles set deleted_at = null, status = 'draft' where id = '<id>';
-```
-
-If another profile now uses the same address, the update fails on `profiles_slug_key`. Give the restored one a new address in the same statement (`..., slug = 'new-address'`).
-
-## Deploying
-
-Vercel project `junto-community` auto-deploys from `main` to the live site. Pushes to other branches (such as `dev`) get a preview URL. Set the variables from [.env.example](.env.example) in the Vercel project settings, for both Production and Preview.
+- `main` is the live site. Branch from `translator` and open pull requests against it. See [docs/WAY-OF-WORKING.md](docs/WAY-OF-WORKING.md).
+- There is one Supabase project. Local and preview environments read and write production data.
+- `/BI101` is printed on flyers as a QR code. Never rename or remove that route.
