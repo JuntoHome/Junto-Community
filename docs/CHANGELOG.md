@@ -10,6 +10,7 @@ Add an entry when work is merged into `translator` (under **Unreleased**) and mo
 - Translator spec, synthetic test workbooks and `CLAUDE.md` (`87b40eb`, Nov 10).
 - TR-01: Translator docs README with Phase 1 rules and staging warning (PR #36, open).
 - TR-02: `/admin/translator` page for admins only, with the synthetic-data banner, a 5-step indicator (Upload, Preview, Criteria, Results, Export; placeholders for now) and a "Data Axle Translator" sidebar link.
+- TR-03: shared `SearchBrief` criteria schema in `src/features/translator/criteria/schema.ts` (intent, must-haves, preferences, exclusions, priority order, list size, assumptions), with `SCORING_VERSION` "1.0", the supported fields and operators as constants, plain-language validation messages, and the business owner and job seeker example briefs from the spec in `criteria/examples.ts`.
 
 ### Changed
 - Documentation reorganized into `docs/`: the root README moved to `docs/README.md` as an index, with separate documents for overview, architecture, requirements, features, database, API, authentication, workflow, setup, deployment, tasks, known issues and troubleshooting.
