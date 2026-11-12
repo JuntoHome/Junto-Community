@@ -25,15 +25,21 @@ Staging: `<URL pending>`
 | `title` | Title | Executive Title, else Professional Title |
 | `city` / `state` | City / State | City / State |
 | `industry` | Industry | Primary SIC Description |
-| `employees` | Employees | Location Employee Size Actual (Location Employee Size Range as fallback) |
+| `employees` | Employees | Location Employee Size Actual |
 | `email` | Email | none (real exports have no email column) |
 | `phone` / `website` | none | Phone Number Combined / Website |
+| `address` / `zip` | none | Address / ZIP Code |
 | `otherExecutives` | none | Executive 1 to 50 first, last, title (display only) |
 | `naicsDescription` | none | Primary NAICS Description (display only) |
+| `employeeRange` | none | Location Employee Size Range (display only; the normalize step uses it when `employees` is blank) |
 
+- Fields are grouped as core (`recordId`, `company`, `city`, `state`, `industry`, `employees`, `title`), contact (`name`, `email`, `phone`, `website`, `address`, `zip`) and extra info (`naicsDescription`, `employeeRange`, `otherExecutives`). Code: `src/features/translator/import/` (`fields.ts`, `mappings/`, `map-row.ts`).
+- Mapped values are the raw cell text, or `null` when blank. Cleaning and parsing happen in the normalize step.
 - One shortlist row per business.
 - Required to run: company, city, state, industry.
-- Ignore unknown columns and blank headers (real exports end with an unnamed column). Header names must match exactly; some contain double spaces.
+- Ignore unknown columns and blank headers (real exports end with an unnamed column). Headers are matched after trimming the ends and ignoring case, but inner spacing must match exactly: `Advertising  Expenses` has two spaces.
+- Generated IDs use the 1-based data row position: the first row after the header is `ROW-0001` (wider past 9999, e.g. `ROW-12345`).
+- Executive slots are skipped only when first name, last name and title are all blank. The main contact is kept separate from slot 1, even when slot 1 repeats it.
 
 ## Ranking
 

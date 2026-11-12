@@ -241,13 +241,16 @@ Phase 1 of the Data Axle Translator lives at `/admin/translator` and in `src/fea
 - Parsing, cleaning, ranking and export run **in the browser**. No rows go to a Server Action, Supabase or the logs.
 - `import/`, `normalize/`, `criteria/`, `ranking/` and `export/` are plain TypeScript with no React; `ui/` holds the components.
 - The criteria form produces one `SearchBrief` object (`criteria/schema.ts`), the same shape a Phase 2 AI will produce.
+- `import/` turns each source row into one `TranslatorRecord` (`fields.ts`) with `mapRow()` (`map-row.ts`). Each input layout is plain config in `mappings/`, so a new layout is a new mapping file, not new code. Values leave `import/` as raw text; `normalize/` cleans them.
 
 ```
 workbook ─▶ import/ ─▶ normalize/ ─▶ ranking/ (with criteria/ SearchBrief) ─▶ ui/ results ─▶ export/ Excel
                                      all in the browser
 ```
 
-Rules, field mapping and expected results: [translator/README.md](translator/README.md) and [../CLAUDE.md](../CLAUDE.md). None of this code exists yet.
+Rules, field mapping and expected results: [translator/README.md](translator/README.md) and [../CLAUDE.md](../CLAUDE.md).
+
+Built so far: the page shell in `ui/` (TR-02), `criteria/` (TR-03) and the field mapping in `import/` (TR-04). The workbook parser that calls `mapRow()` (TR-08), `normalize/`, `ranking/` and `export/` do not exist yet. Ticket status: [TASKS.md](TASKS.md).
 
 ## Extending the system
 
