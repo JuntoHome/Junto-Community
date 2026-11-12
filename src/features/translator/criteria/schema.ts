@@ -51,19 +51,45 @@ export const OPERATOR_FIELDS: Record<BriefOperator, readonly BriefField[]> = {
   range: RANGE_FIELDS,
 };
 
-/** Most priorities a user can order; the ranking weights them 4, 3, 2, 1. */
-export const PRIORITY_MAX = 4;
+/**
+ * What the ranking scores: each dimension earns its weight when any of its preferences match.
+ * priorityOrder lists these, not fields. Geography covers both city and state.
+ */
+export const BRIEF_DIMENSIONS = ["industry", "geography", "title", "employees"] as const;
+export type BriefDimension = (typeof BRIEF_DIMENSIONS)[number];
+
+/** The dimension each field belongs to. */
+export const FIELD_DIMENSION: Record<BriefField, BriefDimension> = {
+  city: "geography",
+  state: "geography",
+  industry: "industry",
+  title: "title",
+  employees: "employees",
+};
 
 export const LIST_SIZE_MIN = 1;
 export const LIST_SIZE_MAX = 100;
 export const LIST_SIZE_DEFAULT = 40;
 
 // Messages. They name the problem and say how to fix it.
-const orList = (items: readonly string[]) => `${items.slice(0, -1).join(", ")} or ${items.at(-1)}`;
+const orList = (items: readonly string[]) =>
+  items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} or ${items.at(-1)}`;
 const quoted = (value: unknown) => (typeof value === "string" ? `"${value}"` : String(JSON.stringify(value)));
 const FIELD_LIST = orList(BRIEF_FIELDS);
 const OPERATOR_LIST = orList(BRIEF_OPERATORS);
+const DIMENSION_LIST = orList(BRIEF_DIMENSIONS);
 const isBriefField = (value: unknown): value is BriefField => (BRIEF_FIELDS as readonly unknown[]).includes(value);
+
+/** The fields in a dimension, as words: "city or state" for geography. */
+const dimensionFields = (dimension: BriefDimension) =>
+  orList(BRIEF_FIELDS.filter((field) => FIELD_DIMENSION[field] === dimension));
+
+const dimensionProblem = (input: unknown) => {
+  if (isBriefField(input) && FIELD_DIMENSION[input] !== input) {
+    return `"${input}" is part of ${FIELD_DIMENSION[input]}. Use "${FIELD_DIMENSION[input]}" in priorityOrder.`;
+  }
+  return `Unsupported priority ${quoted(input)}. Use ${DIMENSION_LIST}.`;
+};
 
 const fieldProblem = (input: unknown, wrongOperator: string) => {
   if (input === undefined) return `Choose a field: ${FIELD_LIST}.`;
@@ -175,16 +201,14 @@ export const searchBriefSchema = z
       /** Rows that match any of these are removed first. A missing value is not a match. */
       exclusions: criteria("exclusions"),
       /**
-       * Optional: preference fields from most to least important, e.g. ["industry", "title"].
-       * When given, the ranking uses weights 4, 3, 2, 1 instead of the defaults.
-       * Each field once, at most 4, and each must have a preference.
+       * Optional: preference dimensions from most to least important, e.g. ["industry", "geography"].
+       * When given, the ranking uses weights 4, 3, 2, 1 in this order instead of the defaults.
+       * Each dimension once, and each must have at least one preference.
        */
       priorityOrder: z
-        .array(
-          z.enum(BRIEF_FIELDS, { error: (iss) => `Unsupported field ${quoted(iss.input)}. Use ${FIELD_LIST}.` }),
-          { error: "priorityOrder must be a list of fields." },
-        )
-        .max(PRIORITY_MAX, { error: `priorityOrder can list at most ${PRIORITY_MAX} fields.` })
+        .array(z.enum(BRIEF_DIMENSIONS, { error: (iss) => dimensionProblem(iss.input) }), {
+          error: `priorityOrder must be a list of ${DIMENSION_LIST}.`,
+        })
         .optional(),
       /** How many rows the shortlist holds: 1 to 100, 40 by default. Fewer when fewer rows are eligible. */
       listSize: z
@@ -202,20 +226,24 @@ export const searchBriefSchema = z
     { error: keysError(BRIEF_KEYS, 'A search brief must be an object with an intent, e.g. { intent: "business_owner" }.') },
   )
   .superRefine((brief, ctx) => {
-    const preferred = new Set(brief.preferences.map((criterion) => criterion.field));
-    const seen = new Set<BriefField>();
-    for (const [index, field] of (brief.priorityOrder ?? []).entries()) {
+    const preferred = new Set(brief.preferences.map((criterion) => FIELD_DIMENSION[criterion.field]));
+    const seen = new Set<BriefDimension>();
+    for (const [index, dimension] of (brief.priorityOrder ?? []).entries()) {
       const path = ["priorityOrder", index];
-      if (seen.has(field)) {
-        ctx.addIssue({ code: "custom", path, message: `priorityOrder lists "${field}" more than once. List each field once.` });
-      } else if (!preferred.has(field)) {
+      if (seen.has(dimension)) {
         ctx.addIssue({
           code: "custom",
           path,
-          message: `priorityOrder lists "${field}", but there is no ${field} preference. Add one, or remove "${field}" from priorityOrder.`,
+          message: `priorityOrder lists "${dimension}" more than once. List each one once.`,
+        });
+      } else if (!preferred.has(dimension)) {
+        ctx.addIssue({
+          code: "custom",
+          path,
+          message: `priorityOrder lists "${dimension}", but there is no ${dimensionFields(dimension)} preference. Add one, or remove "${dimension}" from priorityOrder.`,
         });
       }
-      seen.add(field);
+      seen.add(dimension);
     }
   });
 
