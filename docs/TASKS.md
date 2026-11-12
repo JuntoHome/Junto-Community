@@ -59,6 +59,7 @@ These may be done; confirm and move them.
 | ID | Title | Status | Links |
 |---|---|---|---|
 | TR-01 | Staging environment and project docs | Docs PR open; Vercel staging alias and Preview variables pending with the project lead | [#1](https://github.com/JuntoHome/Junto-Community/issues/1), [PR #36](https://github.com/JuntoHome/Junto-Community/pull/36) |
+| TR-02 | Translator page scaffold with private access | Built on branch `tr-02-translator-page`: `/admin/translator` with banner, 5-step indicator and sidebar link; awaiting PR review | [#2](https://github.com/JuntoHome/Junto-Community/issues/2) |
 
 ## Pending
 
@@ -68,7 +69,6 @@ Data Axle Translator Phase 1, all open. Each issue has the steps and acceptance 
 
 | ID | Title | Expected location | Issue |
 |---|---|---|---|
-| TR-02 | Translator page scaffold with private access | `src/app/admin/(protected)/translator/page.tsx`, `modules.ts` | [#2](https://github.com/JuntoHome/Junto-Community/issues/2) |
 | TR-03 | Shared criteria schema (used by the form now and the AI later) | `src/features/translator/criteria/schema.ts` | [#3](https://github.com/JuntoHome/Junto-Community/issues/3) |
 | TR-04 | Field mapping: synthetic and Reference Solutions layouts | `src/features/translator/import/` | [#4](https://github.com/JuntoHome/Junto-Community/issues/4) |
 | TR-35 | Synthetic test file in the real Reference Solutions layout | `docs/translator/` | [#35](https://github.com/JuntoHome/Junto-Community/issues/35) |
