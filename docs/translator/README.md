@@ -17,6 +17,13 @@ Staging: `<URL pending>`
 
 A copy of `JCA_Synthetic_Contacts.xlsx` is served from `public/translator/JCA_Synthetic_Contacts.xlsx` for the "Load sample" button (TR-05). It must stay byte-identical, with the same SHA-256 as above, because TR-07's file gate checks that hash: if one copy changes, replace the other and update the hash here. The copy is reachable without a login, which is acceptable only because the records are fictional. Don't link it from any public page or add it to the sitemap.
 
+## Upload limits
+
+- One `.xlsx` file, up to 2 MB (2,097,152 bytes). Larger, empty, `.xls`, `.csv` and other files are refused with a message that says how to fix it.
+- The file is recognised by its name ending in `.xlsx` (any case) and by its first 4 bytes, the ZIP signature `50 4B 03 04`. The MIME type the browser reports is ignored.
+- These checks don't look inside the workbook: any ZIP named `.xlsx` passes them. The file gate (TR-07) and the parser (TR-08) reject the rest.
+- The bundled samples go through the same checks. Code: `checkWorkbookFile()` in `src/features/translator/import/check-file.ts`.
+
 ## Two input layouts, one set of fields
 
 | Internal field | Synthetic file | Reference Solutions export |

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { checkWorkbookFile, type WorkbookFileInput } from "../import/check-file";
+import { FileUpload } from "./file-upload";
 import { SampleButtons } from "./sample-buttons";
 import { StepIndicator } from "./step-indicator";
 import { isStepAvailable, STEPS, type StepId } from "./steps";
@@ -22,6 +24,10 @@ export function TranslatorWizard() {
   // Later tickets mark each step done as its work is built.
   const [done, setDone] = useState<ReadonlySet<StepId>>(() => new Set());
   const [workbook, setWorkbook] = useState<File | null>(null);
+  // The last workbook check's problem, shown on the Upload step.
+  const [fileError, setFileError] = useState<string | null>(null);
+  // Counts workbook attempts, so a slow check can't override a newer choice.
+  const attempt = useRef(0);
 
   // After a workbook loads, the button that was clicked disappears, so move focus to the new step's heading.
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -33,11 +39,22 @@ export function TranslatorWizard() {
   }, [current]);
 
   /**
-   * The single entry point for a workbook, whether it comes from a sample button or an
-   * upload (TR-06). A new workbook replaces the previous one and resets later steps.
+   * The single entry point for a workbook, whether it comes from a sample button, the file
+   * picker or a drop. It checks the file first; on a problem it stays on Upload and shows
+   * why. A new workbook replaces the previous one and resets later steps.
    */
-  function handleWorkbook(file: File) {
-    // TODO(TR-07, TR-08): check the file (TR-07 file gate) and parse it (TR-08) here, before moving on.
+  async function handleWorkbook(input: WorkbookFileInput) {
+    const thisAttempt = ++attempt.current;
+    // Cleared first so the same message is announced again if the next file has the same problem.
+    setFileError(null);
+    const check = await checkWorkbookFile(input);
+    if (thisAttempt !== attempt.current) return;
+    if (!check.ok) {
+      setFileError(check.message);
+      return;
+    }
+    const file = check.file;
+    // TODO(TR-07, TR-08): run the file gate (TR-07) and parse the workbook (TR-08) here, before moving on.
     setWorkbook(file);
     setDone(new Set<StepId>(["upload"]));
     focusHeading.current = true;
@@ -69,7 +86,11 @@ export function TranslatorWizard() {
         </h2>
         {step.id === "upload" ? (
           <div className="mt-3 flex flex-col gap-5">
-            <p className="text-base text-muted">Try the Translator with a bundled workbook of fictional records.</p>
+            <p className="text-base text-muted">
+              Choose a contacts workbook from your computer.
+            </p>
+            <FileUpload onFiles={handleWorkbook} error={fileError} />
+            <p className="text-base text-muted">Or try the Translator with a bundled workbook of fictional records.</p>
             <SampleButtons onWorkbook={handleWorkbook} />
           </div>
         ) : step.id === "preview" && workbook ? (

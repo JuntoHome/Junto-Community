@@ -62,7 +62,8 @@ These may be done; confirm and move them.
 | TR-02 | Translator page scaffold with private access | Merged into `translator` (PR #37): `/admin/translator` with banner, 5-step indicator and sidebar link | [#2](https://github.com/JuntoHome/Junto-Community/issues/2), [PR #37](https://github.com/JuntoHome/Junto-Community/pull/37) |
 | TR-03 | Shared criteria schema (used by the form now and the AI later) | Merged into `translator` (PR #38): `SearchBrief` schema, `SCORING_VERSION`, field, operator and dimension lists, and the two spec example briefs in `criteria/` | [#3](https://github.com/JuntoHome/Junto-Community/issues/3), [PR #38](https://github.com/JuntoHome/Junto-Community/pull/38) |
 | TR-04 | Field mapping: synthetic and Reference Solutions layouts | Merged into `translator` (PR #39): `TranslatorRecord` fields, mapping configs for both layouts, `mapRow()` and `normalizeHeader()` in `import/`, and a Reference Solutions fixture row for the TR-29 unit test | [#4](https://github.com/JuntoHome/Junto-Community/issues/4), [PR #39](https://github.com/JuntoHome/Junto-Community/pull/39) |
-| TR-05 | Bundled sample workbook and "Load sample" button | In review (PR #40 into `translator`): sample copied to `public/translator/` (same SHA-256), "Load sample (500 fictional records)" button on the Upload step, single `handleWorkbook(file)` entry point that moves to Preview. Validation in it comes with TR-07 and TR-08; the Reference Solutions sample button with TR-35 | [#5](https://github.com/JuntoHome/Junto-Community/issues/5), [PR #40](https://github.com/JuntoHome/Junto-Community/pull/40) |
+| TR-05 | Bundled sample workbook and "Load sample" button | Merged into `translator` (PR #40): sample copied to `public/translator/` (same SHA-256), "Load sample (500 fictional records)" button on the Upload step, single `handleWorkbook(file)` entry point that moves to Preview. Validation in it comes with TR-07 and TR-08; the Reference Solutions sample button with TR-35 | [#5](https://github.com/JuntoHome/Junto-Community/issues/5), [PR #40](https://github.com/JuntoHome/Junto-Community/pull/40) |
+| TR-06 | File upload with type and size checks | In review (PR into `translator`, branch `tr-06-file-upload`): file picker and drop zone on the Upload step; `checkWorkbookFile()` in `import/check-file.ts` checks one file, not empty, at most 2 MB, `.xlsx` name and ZIP signature, and runs first in `handleWorkbook` for uploads and samples | [#6](https://github.com/JuntoHome/Junto-Community/issues/6) |
 
 ## Pending
 
@@ -78,7 +79,6 @@ Data Axle Translator Phase 1, all open. Each issue has the steps and acceptance 
 
 | ID | Title | Expected location | Issue |
 |---|---|---|---|
-| TR-06 | File upload with type and size checks | `import/`, `ui/` | [#6](https://github.com/JuntoHome/Junto-Community/issues/6) |
 | TR-07 | File gate: allow only the approved synthetic workbook | `import/` | [#7](https://github.com/JuntoHome/Junto-Community/issues/7) |
 | TR-08 | Parse the workbook and detect its layout | `import/` | [#8](https://github.com/JuntoHome/Junto-Community/issues/8) |
 | TR-09 | Header validation | `import/` | [#9](https://github.com/JuntoHome/Junto-Community/issues/9) |
