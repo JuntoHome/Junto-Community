@@ -33,6 +33,8 @@ A review as of November 2026. Nothing here has been fixed unless it says so. Ite
 | Orphaned logo files | `actions.ts` | A failure between upload and save leaves a file behind. By design |
 | `subscribers` migration has no grants | `20260926000000_create_subscribers.sql` | May fail on a fresh Supabase project ([DATABASE.md](DATABASE.md#things-to-be-aware-of)) |
 | No error page for the public site | `src/app/(site)/` has no `error.tsx` | A failed profile query on a cache miss shows the framework's default error |
+| The Translator's match key ignores only spacing and case | `matchKey()` in `src/features/translator/normalize/match-key.ts` (TR-10) | By design for Phase 1. Punctuation is kept (`St. Louis` doesn't match `St Louis`), state names aren't mapped to codes (`Arizona` doesn't match `AZ`) and there is no stemming (`Fabricator` doesn't match `Fabrication`), so such rows don't match a criterion |
+| The Translator's employee range formats are guessed | `normalizeEmployees()` in `src/features/translator/normalize/normalize.ts` (TR-10) | **Unverified.** No real Reference Solutions range values have been seen. If the wording differs from "10 to 19", "10-19" or "10,000+", those counts stay unknown and don't match employee criteria |
 
 ## Security
 

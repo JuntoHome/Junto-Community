@@ -3,14 +3,18 @@
 import { useEffect, useRef, useState } from "react";
 import { checkWorkbookFile, type WorkbookFileInput } from "../import/check-file";
 import { checkAllowlist, FILE_GATE_MESSAGES, type GatedWorkbook } from "../import/file-gate";
-import type { ParsedWorkbook, ParseResult } from "../import/parse";
+import type { ParseResult } from "../import/parse";
+import { normalizeWorkbook, type NormalizedWorkbook } from "../normalize/normalize";
 import { FileUpload } from "./file-upload";
 import { SampleButtons } from "./sample-buttons";
 import { StepIndicator } from "./step-indicator";
 import { isStepAvailable, STEPS, type StepId } from "./steps";
 
-/** A workbook that passed every check: the gated file and bytes, plus what the parser read from them. */
-type LoadedWorkbook = GatedWorkbook & { parsed: ParsedWorkbook };
+/**
+ * A workbook that passed every check: the gated file and bytes, plus what the parser read from
+ * them. Each row keeps `sourceRow`, `sourceValues` and `record` as parsed, plus `normalized` (TR-10).
+ */
+type LoadedWorkbook = GatedWorkbook & { parsed: NormalizedWorkbook };
 
 /** Shown when the parser's code can't be downloaded. */
 const PARSER_UNAVAILABLE = "The Translator couldn't finish loading. Check your connection, reload the page and try again.";
@@ -97,7 +101,8 @@ export function TranslatorWizard() {
       setFileError(parsed.hint ? `${parsed.message}\n${parsed.hint}` : parsed.message);
       return;
     }
-    setWorkbook({ file, buffer, entry: gate.entry, parsed: parsed.workbook });
+    // Values are cleaned for matching here; the originals stay on each row for display and export.
+    setWorkbook({ file, buffer, entry: gate.entry, parsed: normalizeWorkbook(parsed.workbook) });
     setDone(new Set<StepId>(["upload"]));
     focusHeading.current = true;
     setCurrent("preview");
