@@ -36,6 +36,26 @@ During Phase 1 the Translator accepts only the workbooks we issued, so real cont
 - Each entry also records a `layout`. It is information only: the parser detects the layout from the headers.
 - The gate runs in the browser, so it is a guardrail, not a security control: someone determined could bypass it. That is acceptable for Phase 1 ([KNOWN-ISSUES.md](../KNOWN-ISSUES.md#security)). Code: `checkAllowlist()` in `src/features/translator/import/file-gate.ts`.
 
+## Reading the workbook
+
+After the file gate, the browser parses the same bytes with ExcelJS (TR-08). Code: `parseWorkbook()` in `src/features/translator/import/parse.ts`.
+
+- **Sheet:** the sheet named `Contacts` (ignoring case and outer spaces) if its row 1 is a known layout; otherwise the first sheet, in workbook order, whose row 1 is. Real exports may not have a `Contacts` sheet.
+- **Layout:** row 1 must contain every detection header of a mapping (matched like all headers: trimmed, ignoring case). Synthetic: `Record ID` and `Company`. Reference Solutions: `Company Name`, `City`, `State` and `Primary SIC Description`. Extra, unknown and blank header cells are ignored. The layout comes from the headers, never from the allowlist entry. The Preview step shows the layout, sheet name and row count.
+- **Rows:** each data row keeps `sourceRow` (its spreadsheet row number; the header is row 1), `sourceValues` (its cells in column order) and `record` (the mapped `TranslatorRecord`). Rows where every cell is blank or only spaces are skipped. A generated ID still follows the spreadsheet row (row 10 is `ROW-0009`), so skipped rows don't shift it.
+- **Cell values:** text, numbers and true/false stay as they are; rich text and links become their text, formulas their last calculated result, errors their code (`#N/A`) and dates ISO text (`2026-01-02`).
+- **Limit:** at most 1,000 data rows (empty rows don't count).
+- **Files from other writers:** some tools (for example the .NET Open XML SDK, which wrote `JCA_Reference_Solutions_Exact_Headers_Jeel.xlsx`) write namespace-prefixed XML and absolute part paths, which ExcelJS can't open on its own. `makeExcelJsCompatible()` in `import/xlsx-compat.ts` rewrites just those two things in the browser first; files saved by Excel are untouched.
+
+| Problem | Message |
+|---|---|
+| Not a workbook, or damaged | This file couldn't be opened as an Excel workbook. It may be damaged. Open it in Excel, save it as .xlsx and try again. |
+| No sheet in a known layout | We couldn't recognize this file. It should be a Data Axle Reference Solutions export. |
+| Known layout, no data rows | This file has no contact rows below the header row. Choose a workbook that contains contacts. |
+| More than 1,000 data rows | This file has more than 1,000 contact rows. Remove rows in Excel (or split the file) so it has 1,000 or fewer, then upload it again. |
+
+During Phase 1 the file gate runs first, so in the app these messages can only appear for an approved file. The parser itself accepts any workbook, ready for when the gate is lifted.
+
 ## Two input layouts, one set of fields
 
 | Internal field | Synthetic file | Reference Solutions export |
@@ -59,7 +79,7 @@ During Phase 1 the Translator accepts only the workbooks we issued, so real cont
 - One shortlist row per business.
 - Required to run: company, city, state, industry.
 - Ignore unknown columns and blank headers (real exports end with an unnamed column). Headers are matched after trimming the ends and ignoring case, but inner spacing must match exactly: `Advertising  Expenses` has two spaces.
-- Generated IDs use the 1-based data row position: the first row after the header is `ROW-0001` (wider past 9999, e.g. `ROW-12345`).
+- Generated IDs use the 1-based data row position: the first row after the header is `ROW-0001` (wider past 9999, e.g. `ROW-12345`). Skipped empty rows still count, so the ID always points at the same spreadsheet row.
 - Executive slots are skipped only when first name, last name and title are all blank. The main contact is kept separate from slot 1, even when slot 1 repeats it.
 
 ## Ranking
