@@ -5,7 +5,9 @@ import type { LayoutMapping } from "./types";
 export const SYNTHETIC_MAPPING: LayoutMapping = {
   id: "synthetic",
   label: "Synthetic",
-  detectHeaders: ["Record ID", "Company"],
+  signatureHeaders: ["Record ID", "Company", "Name", "Title", "Industry", "Email", "Employees"],
+  // Industry is a signature too. If it's missing, the other six still recognise the layout.
+  requiredHeaders: ["Record ID", "Company", "City", "State", "Industry"],
   requiredFields: REQUIRED_FIELDS,
   fields: {
     recordId: { kind: "generatedId", header: "Record ID" },

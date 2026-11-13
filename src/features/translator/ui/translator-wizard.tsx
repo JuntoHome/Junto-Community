@@ -93,7 +93,8 @@ export function TranslatorWizard() {
     }
     if (thisAttempt !== attempt.current) return;
     if (!parsed.ok) {
-      setFileError(parsed.message);
+      // The hint, when there is one, goes on its own line under the message.
+      setFileError(parsed.hint ? `${parsed.message}\n${parsed.hint}` : parsed.message);
       return;
     }
     setWorkbook({ file, buffer, entry: gate.entry, parsed: parsed.workbook });
@@ -135,18 +136,26 @@ export function TranslatorWizard() {
             <SampleButtons onWorkbook={handleWorkbook} />
           </div>
         ) : step.id === "preview" && workbook ? (
-          <dl className="mt-3 grid gap-x-6 gap-y-1 text-base sm:grid-cols-[auto_1fr]">
-            <dt className="font-semibold text-navy">File</dt>
-            <dd className="break-all text-muted">{workbook.file.name}</dd>
-            <dt className="font-semibold text-navy">Size</dt>
-            <dd className="text-muted">{formatFileSize(workbook.file.size)}</dd>
-            <dt className="font-semibold text-navy">Layout</dt>
-            <dd className="text-muted">{workbook.parsed.layout.label}</dd>
-            <dt className="font-semibold text-navy">Sheet</dt>
-            <dd className="break-all text-muted">{workbook.parsed.sheetName}</dd>
-            <dt className="font-semibold text-navy">Rows</dt>
-            <dd className="text-muted">{workbook.parsed.rows.length.toLocaleString("en-US")}</dd>
-          </dl>
+          <div className="mt-3 flex flex-col gap-4">
+            <dl className="grid gap-x-6 gap-y-1 text-base sm:grid-cols-[auto_1fr]">
+              <dt className="font-semibold text-navy">File</dt>
+              <dd className="break-all text-muted">{workbook.file.name}</dd>
+              <dt className="font-semibold text-navy">Size</dt>
+              <dd className="text-muted">{formatFileSize(workbook.file.size)}</dd>
+              <dt className="font-semibold text-navy">Layout</dt>
+              <dd className="text-muted">{workbook.parsed.layout.label}</dd>
+              <dt className="font-semibold text-navy">Sheet</dt>
+              <dd className="break-all text-muted">{workbook.parsed.sheetName}</dd>
+              <dt className="font-semibold text-navy">Rows</dt>
+              <dd className="text-muted">{workbook.parsed.rows.length.toLocaleString("en-US")}</dd>
+            </dl>
+            {/* Placeholder until the full Preview step; the column names come from the mapping, not the file's cells. */}
+            {workbook.parsed.missingOptional.length > 0 && (
+              <p className="text-base text-muted">
+                Not in this file: {workbook.parsed.missingOptional.join(", ")}. These will show as unknown.
+              </p>
+            )}
+          </div>
         ) : (
           <p className="mt-3 text-base text-muted">This step isn’t built yet.</p>
         )}

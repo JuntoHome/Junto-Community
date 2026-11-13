@@ -3,12 +3,14 @@ import type { TranslatorRecord } from "./fields";
 import { mapRow, normalizeHeader, type SourceCell } from "./map-row";
 import { LAYOUT_MAPPINGS } from "./mappings";
 import type { LayoutMapping } from "./mappings/types";
+import { HEADER_MESSAGES, validateHeaders, type HeaderProblem } from "./validate-headers";
 import { makeExcelJsCompatible } from "./xlsx-compat";
 
 /**
  * Reads a workbook that passed the file gate into rows the rest of the Translator works with.
- * It finds the sheet, recognises its layout from the row 1 headers, and maps every data row
- * with `mapRow()`, keeping each row's original row number and raw cells.
+ * It finds the sheet, recognises its layout from the row 1 headers, checks the required columns
+ * are there (`validateHeaders()`), and only then maps every data row with `mapRow()`, keeping
+ * each row's original row number and raw cells.
  *
  * Runs in the browser on the bytes the file gate already read (`GatedWorkbook.buffer`). Nothing
  * is sent, stored or logged. The layout is detected from the headers, never from the allowlist.
@@ -50,13 +52,28 @@ export type ParsedWorkbook = {
   sheetName: string;
   /** Row 1, in column order. Blank header cells are null. */
   headers: SourceCell[];
+  /** Optional mapped columns the file doesn't have, as the mapping names them. Their values are unknown (null). */
+  missingOptional: string[];
   /** Data rows in sheet order, completely empty rows skipped. Between 1 and MAX_DATA_ROWS. */
   rows: ParsedRow[];
 };
 
-export type ParseResult = { ok: true; workbook: ParsedWorkbook } | { ok: false; code: ParseProblem; message: string };
+export type ParseResult =
+  | { ok: true; workbook: ParsedWorkbook }
+  | {
+      ok: false;
+      code: ParseProblem | HeaderProblem;
+      message: string;
+      /** What to do next, shown as its own line under the message. Only some problems have one. */
+      hint?: string;
+      /** For "missingRequired": the missing columns, as the mapping names them. */
+      missing?: string[];
+    };
 
 const fail = (code: ParseProblem): ParseResult => ({ ok: false, code, message: PARSE_MESSAGES[code] });
+
+/** A layout is recognised only when it has at least this many of its signature headers in row 1. */
+const MIN_SIGNATURE_HEADERS = 2;
 
 /** A date cell as text: "2026-11-13", or the full ISO time when it has one. */
 function dateText(date: Date): string {
@@ -97,13 +114,22 @@ function isEmptyRow(cells: readonly SourceCell[]): boolean {
   return cells.every((cell) => cell == null || String(cell).trim() === "");
 }
 
-/** The first layout whose detection headers are all in `headers`, or null. Extra and blank headers don't matter. */
+/**
+ * The layout with the most of its signature headers in `headers`, if it has at least
+ * MIN_SIGNATURE_HEADERS of them. A tie for the most, or too few, is null. Extra and blank
+ * headers don't matter, and required headers don't count: a file missing one is still
+ * recognised, so `validateHeaders()` can say which column is missing.
+ */
 export function detectLayout(headers: readonly SourceCell[]): LayoutMapping | null {
   const present = new Set(headers.map(normalizeHeader).filter((header) => header !== ""));
-  return (
-    LAYOUT_MAPPINGS.find((mapping) => mapping.detectHeaders.every((header) => present.has(normalizeHeader(header)))) ??
-    null
-  );
+  const scored = LAYOUT_MAPPINGS.map((mapping) => ({
+    mapping,
+    score: mapping.signatureHeaders.filter((header) => present.has(normalizeHeader(header))).length,
+  })).sort((a, b) => b.score - a.score);
+  const [best, runnerUp] = scored;
+  if (!best || best.score < MIN_SIGNATURE_HEADERS) return null;
+  if (runnerUp && runnerUp.score === best.score) return null;
+  return best.mapping;
 }
 
 /**
@@ -125,8 +151,8 @@ function findSheet(
 
 /**
  * Parses a workbook's bytes. Never throws: a file that isn't a readable workbook, has no sheet
- * in a known layout, has no data rows or has more than MAX_DATA_ROWS comes back as a problem
- * with a message for the user.
+ * in a known layout, is missing a required column (or has one twice), has no data rows or has
+ * more than MAX_DATA_ROWS comes back as a problem with a message for the user.
  *
  * A data row's generated ID ("ROW-0001" when the layout's ID cell is blank) comes from its
  * position below the header, counting skipped empty rows, so it always points at the same row:
@@ -147,6 +173,15 @@ export async function parseWorkbook(buffer: ArrayBuffer): Promise<ParseResult> {
   if (!found) return fail("unrecognized");
   const { sheet, headers, layout } = found;
 
+  // Checked before any data row is read.
+  const check = validateHeaders(layout, headers);
+  if (!check.ok) {
+    const { code, message, missing } = check;
+    return code === "missingRequired"
+      ? { ok: false, code, message, hint: HEADER_MESSAGES.missingRequiredHint, missing }
+      : { ok: false, code, message };
+  }
+
   const rows: ParsedRow[] = [];
   // rowCount is the last row in use; missing rows in between are skipped by findRow.
   for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber++) {
@@ -157,5 +192,8 @@ export async function parseWorkbook(buffer: ArrayBuffer): Promise<ParseResult> {
   }
   if (rows.length === 0) return fail("noRows");
 
-  return { ok: true, workbook: { layout, sheetName: sheet.name, headers, rows } };
+  return {
+    ok: true,
+    workbook: { layout, sheetName: sheet.name, headers, missingOptional: check.missingOptional, rows },
+  };
 }

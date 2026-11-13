@@ -15,7 +15,7 @@ export function FileUpload({
   error,
 }: {
   onFiles: (files: readonly File[]) => void;
-  /** The last check's problem, shown under the control. */
+  /** The last check's problem, shown under the control. A line break starts a new line. */
   error: string | null;
 }) {
   const id = useId();
@@ -86,7 +86,7 @@ export function FileUpload({
         id={ids.error}
         role="status"
         aria-live="polite"
-        className="text-[15px] font-medium text-red-700 empty:hidden"
+        className="whitespace-pre-line text-[15px] font-medium text-red-700 empty:hidden"
       >
         {error ?? ""}
       </p>
