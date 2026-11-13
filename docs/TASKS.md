@@ -2,7 +2,7 @@
 
 The project's task status in one place. GitHub issues are the source of truth for Translator work; this file summarises them. Update it when a ticket changes state.
 
-**As of:** Nov 12, 2026.
+**As of:** Nov 13, 2026.
 
 **Sources:** GitHub issues #1 to #35 (milestone "Data Axle Translator Phase 1"), [JCA_CMS_Plan.md](JCA_CMS_Plan.md) for CMS tickets, and the commit history for completion evidence.
 
@@ -61,7 +61,8 @@ These may be done; confirm and move them.
 | TR-01 | Staging environment and project docs | Docs merged into `translator` (PR #36); Vercel staging alias and Preview variables pending with the project lead | [#1](https://github.com/JuntoHome/Junto-Community/issues/1), [PR #36](https://github.com/JuntoHome/Junto-Community/pull/36) |
 | TR-02 | Translator page scaffold with private access | Merged into `translator` (PR #37): `/admin/translator` with banner, 5-step indicator and sidebar link | [#2](https://github.com/JuntoHome/Junto-Community/issues/2), [PR #37](https://github.com/JuntoHome/Junto-Community/pull/37) |
 | TR-03 | Shared criteria schema (used by the form now and the AI later) | Merged into `translator` (PR #38): `SearchBrief` schema, `SCORING_VERSION`, field, operator and dimension lists, and the two spec example briefs in `criteria/` | [#3](https://github.com/JuntoHome/Junto-Community/issues/3), [PR #38](https://github.com/JuntoHome/Junto-Community/pull/38) |
-| TR-04 | Field mapping: synthetic and Reference Solutions layouts | In review (PR #39 into `translator`): `TranslatorRecord` fields, mapping configs for both layouts, `mapRow()` and `normalizeHeader()` in `import/`, and a Reference Solutions fixture row for the TR-29 unit test | [#4](https://github.com/JuntoHome/Junto-Community/issues/4), [PR #39](https://github.com/JuntoHome/Junto-Community/pull/39) |
+| TR-04 | Field mapping: synthetic and Reference Solutions layouts | Merged into `translator` (PR #39): `TranslatorRecord` fields, mapping configs for both layouts, `mapRow()` and `normalizeHeader()` in `import/`, and a Reference Solutions fixture row for the TR-29 unit test | [#4](https://github.com/JuntoHome/Junto-Community/issues/4), [PR #39](https://github.com/JuntoHome/Junto-Community/pull/39) |
+| TR-05 | Bundled sample workbook and "Load sample" button | In review (PR #40 into `translator`): sample copied to `public/translator/` (same SHA-256), "Load sample (500 fictional records)" button on the Upload step, single `handleWorkbook(file)` entry point that moves to Preview. Validation in it comes with TR-07 and TR-08; the Reference Solutions sample button with TR-35 | [#5](https://github.com/JuntoHome/Junto-Community/issues/5), [PR #40](https://github.com/JuntoHome/Junto-Community/pull/40) |
 
 ## Pending
 
@@ -77,7 +78,6 @@ Data Axle Translator Phase 1, all open. Each issue has the steps and acceptance 
 
 | ID | Title | Expected location | Issue |
 |---|---|---|---|
-| TR-05 | Bundled sample workbook and "Load sample" button | `import/`, `ui/` | [#5](https://github.com/JuntoHome/Junto-Community/issues/5) |
 | TR-06 | File upload with type and size checks | `import/`, `ui/` | [#6](https://github.com/JuntoHome/Junto-Community/issues/6) |
 | TR-07 | File gate: allow only the approved synthetic workbook | `import/` | [#7](https://github.com/JuntoHome/Junto-Community/issues/7) |
 | TR-08 | Parse the workbook and detect its layout | `import/` | [#8](https://github.com/JuntoHome/Junto-Community/issues/8) |

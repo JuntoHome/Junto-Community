@@ -250,7 +250,9 @@ workbook ─▶ import/ ─▶ normalize/ ─▶ ranking/ (with criteria/ Search
 
 Rules, field mapping and expected results: [translator/README.md](translator/README.md) and [../CLAUDE.md](../CLAUDE.md).
 
-Built so far: the page shell in `ui/` (TR-02), `criteria/` (TR-03) and the field mapping in `import/` (TR-04). The workbook parser that calls `mapRow()` (TR-08), `normalize/`, `ranking/` and `export/` do not exist yet. Ticket status: [TASKS.md](TASKS.md).
+- Every workbook enters through one function, `handleWorkbook(file: File)` in `ui/translator-wizard.tsx`. The sample buttons (`ui/sample-buttons.tsx`, configured in `ui/samples.ts`) fetch a bundled file from `public/translator/` and turn it into a `File`; the upload (TR-06) will pass the user's `File`. Both take the same path, so there is no sample-only shortcut. File checks (TR-07) and parsing (TR-08) go inside `handleWorkbook`.
+
+Built so far: the page shell in `ui/` (TR-02), `criteria/` (TR-03), the field mapping in `import/` (TR-04) and the sample button with the `handleWorkbook` entry point (TR-05). The workbook parser that calls `mapRow()` (TR-08), `normalize/`, `ranking/` and `export/` do not exist yet. Ticket status: [TASKS.md](TASKS.md).
 
 ## Extending the system
 
