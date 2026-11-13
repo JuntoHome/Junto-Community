@@ -63,7 +63,8 @@ These may be done; confirm and move them.
 | TR-03 | Shared criteria schema (used by the form now and the AI later) | Merged into `translator` (PR #38): `SearchBrief` schema, `SCORING_VERSION`, field, operator and dimension lists, and the two spec example briefs in `criteria/` | [#3](https://github.com/JuntoHome/Junto-Community/issues/3), [PR #38](https://github.com/JuntoHome/Junto-Community/pull/38) |
 | TR-04 | Field mapping: synthetic and Reference Solutions layouts | Merged into `translator` (PR #39): `TranslatorRecord` fields, mapping configs for both layouts, `mapRow()` and `normalizeHeader()` in `import/`, and a Reference Solutions fixture row for the TR-29 unit test | [#4](https://github.com/JuntoHome/Junto-Community/issues/4), [PR #39](https://github.com/JuntoHome/Junto-Community/pull/39) |
 | TR-05 | Bundled sample workbook and "Load sample" button | Merged into `translator` (PR #40): sample copied to `public/translator/` (same SHA-256), "Load sample (500 fictional records)" button on the Upload step, single `handleWorkbook(file)` entry point that moves to Preview. Validation in it comes with TR-07 and TR-08; the Reference Solutions sample button with TR-35 | [#5](https://github.com/JuntoHome/Junto-Community/issues/5), [PR #40](https://github.com/JuntoHome/Junto-Community/pull/40) |
-| TR-06 | File upload with type and size checks | In review (PR into `translator`, branch `tr-06-file-upload`): file picker and drop zone on the Upload step; `checkWorkbookFile()` in `import/check-file.ts` checks one file, not empty, at most 2 MB, `.xlsx` name and ZIP signature, and runs first in `handleWorkbook` for uploads and samples | [#6](https://github.com/JuntoHome/Junto-Community/issues/6) |
+| TR-06 | File upload with type and size checks | Merged into `translator` (PR #41): file picker and drop zone on the Upload step; `checkWorkbookFile()` in `import/check-file.ts` checks one file, not empty, at most 2 MB, `.xlsx` name and ZIP signature, and runs first in `handleWorkbook` for uploads and samples | [#6](https://github.com/JuntoHome/Junto-Community/issues/6) |
+| TR-07 | File gate: allow only the approved synthetic workbook | In review (PR into `translator`, branch `tr-07-file-gate`, PR link to be added): `checkAllowlist()` in `import/file-gate.ts` hashes the workbook (SHA-256, in the browser) and accepts only hashes listed in `import/allowlist.ts` (one entry for now, `JCA_Synthetic_Contacts.xlsx`; TR-35 adds the Reference Solutions file). Runs in `handleWorkbook` after `checkWorkbookFile()`; the bytes read for it are kept for the parser (TR-08). Fails closed without a secure context. Also restores `docs/translator/JCA_Synthetic_Contacts.xlsx`, which had been replaced by a different file in `188675f` | [#7](https://github.com/JuntoHome/Junto-Community/issues/7) |
 
 ## Pending
 
@@ -79,7 +80,6 @@ Data Axle Translator Phase 1, all open. Each issue has the steps and acceptance 
 
 | ID | Title | Expected location | Issue |
 |---|---|---|---|
-| TR-07 | File gate: allow only the approved synthetic workbook | `import/` | [#7](https://github.com/JuntoHome/Junto-Community/issues/7) |
 | TR-08 | Parse the workbook and detect its layout | `import/` | [#8](https://github.com/JuntoHome/Junto-Community/issues/8) |
 | TR-09 | Header validation | `import/` | [#9](https://github.com/JuntoHome/Junto-Community/issues/9) |
 | TR-10 | Normalize values | `normalize/` | [#10](https://github.com/JuntoHome/Junto-Community/issues/10) |

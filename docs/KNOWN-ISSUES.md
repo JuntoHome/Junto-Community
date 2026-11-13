@@ -49,6 +49,7 @@ A review as of November 2026. Nothing here has been fixed unless it says so. Ite
 | 9 | No audit trail | Only the last editor of a profile is recorded; logins and deletions are not logged |
 | 10 | Subscriber form has no captcha | Honeypot and the best-effort rate limit only |
 | 11 | Security-relevant settings live only in dashboards | Sign-up disabled, password rules, SMTP, Site URL. Even with sign-up enabled, a new account would not be an admin |
+| 12 | The Translator's file gate is client-side only | By design for Phase 1 (TR-07). The SHA-256 allowlist check runs in the browser, so someone determined could bypass it (for example by editing the page's code in dev tools). It is a guardrail against using real data by accident, not a security control. The page is also behind the admin login |
 
 ## Performance
 
