@@ -5,7 +5,7 @@ import type { LayoutMapping } from "./types";
 export const SYNTHETIC_MAPPING: LayoutMapping = {
   id: "synthetic",
   label: "Synthetic",
-  detectHeaders: ["Record ID", "Company", "Name", "Title", "City", "State", "Industry", "Email", "Employees"],
+  detectHeaders: ["Record ID", "Company"],
   requiredFields: REQUIRED_FIELDS,
   fields: {
     recordId: { kind: "generatedId", header: "Record ID" },

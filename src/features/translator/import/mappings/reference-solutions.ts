@@ -6,18 +6,12 @@ import type { LayoutMapping } from "./types";
  * (headers in docs/translator/JCA_Reference_Solutions_Exact_Headers_Jeel.xlsx). Every column not
  * named here is ignored, including the unnamed last column and the Executive Gender columns.
  *
- * Exports vary, so detection needs only a few distinctive headers, not all 396.
+ * Exports vary, so detection needs only the headers a file can't be ranked without, not all 396.
  */
 export const REFERENCE_SOLUTIONS_MAPPING: LayoutMapping = {
   id: "reference-solutions",
   label: "Reference Solutions",
-  detectHeaders: [
-    "Company Name",
-    "IUSA Number",
-    "Primary SIC Description",
-    "Location Employee Size Actual",
-    "Phone Number Combined",
-  ],
+  detectHeaders: ["Company Name", "City", "State", "Primary SIC Description"],
   requiredFields: REQUIRED_FIELDS,
   fields: {
     recordId: { kind: "generatedId", header: "IUSA Number" },

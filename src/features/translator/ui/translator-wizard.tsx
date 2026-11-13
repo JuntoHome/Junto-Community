@@ -3,10 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import { checkWorkbookFile, type WorkbookFileInput } from "../import/check-file";
 import { checkAllowlist, FILE_GATE_MESSAGES, type GatedWorkbook } from "../import/file-gate";
+import type { ParsedWorkbook, ParseResult } from "../import/parse";
 import { FileUpload } from "./file-upload";
 import { SampleButtons } from "./sample-buttons";
 import { StepIndicator } from "./step-indicator";
 import { isStepAvailable, STEPS, type StepId } from "./steps";
+
+/** A workbook that passed every check: the gated file and bytes, plus what the parser read from them. */
+type LoadedWorkbook = GatedWorkbook & { parsed: ParsedWorkbook };
+
+/** Shown when the parser's code can't be downloaded. */
+const PARSER_UNAVAILABLE = "The Translator couldn't finish loading. Check your connection, reload the page and try again.";
 
 /** "27,412 bytes (26.8 KB)": exact bytes plus a rounded size people can read at a glance. */
 function formatFileSize(bytes: number): string {
@@ -24,8 +31,8 @@ export function TranslatorWizard() {
   const [current, setCurrent] = useState<StepId>("upload");
   // Later tickets mark each step done as its work is built.
   const [done, setDone] = useState<ReadonlySet<StepId>>(() => new Set());
-  // The accepted workbook: the file, its bytes (read once, for the gate and the parser) and its allowlist entry.
-  const [workbook, setWorkbook] = useState<GatedWorkbook | null>(null);
+  // The accepted workbook: the file, its bytes (read once, for the gate and the parser), its allowlist entry and its parsed rows.
+  const [workbook, setWorkbook] = useState<LoadedWorkbook | null>(null);
   // The last workbook check's problem, shown on the Upload step.
   const [fileError, setFileError] = useState<string | null>(null);
   // Counts workbook attempts, so a slow check can't override a newer choice.
@@ -42,9 +49,9 @@ export function TranslatorWizard() {
 
   /**
    * The single entry point for a workbook, whether it comes from a sample button, the file
-   * picker or a drop. It checks the size and type first, then reads the file once and runs
-   * the file gate on those bytes; on a problem it stays on Upload and shows why. A new
-   * workbook replaces the previous one and resets later steps.
+   * picker or a drop. It checks the size and type first, then reads the file once, runs the
+   * file gate on those bytes and parses them; on a problem it stays on Upload and shows why.
+   * A new workbook replaces the previous one and resets later steps.
    */
   async function handleWorkbook(input: WorkbookFileInput) {
     const thisAttempt = ++attempt.current;
@@ -73,8 +80,23 @@ export function TranslatorWizard() {
       setFileError(gate.message);
       return;
     }
-    // TODO(TR-08): parse `buffer` here (detect the layout from the headers, not from gate.entry.layout), before moving on.
-    setWorkbook({ file, buffer, entry: gate.entry });
+    // The layout comes from the headers, never from gate.entry.layout.
+    let parsed: ParseResult;
+    try {
+      // Loaded on first use, so the workbook library isn't part of the page's initial download.
+      const { parseWorkbook } = await import("../import/parse");
+      parsed = await parseWorkbook(buffer);
+    } catch {
+      // parseWorkbook never throws, so only the download of its code can fail here.
+      if (thisAttempt === attempt.current) setFileError(PARSER_UNAVAILABLE);
+      return;
+    }
+    if (thisAttempt !== attempt.current) return;
+    if (!parsed.ok) {
+      setFileError(parsed.message);
+      return;
+    }
+    setWorkbook({ file, buffer, entry: gate.entry, parsed: parsed.workbook });
     setDone(new Set<StepId>(["upload"]));
     focusHeading.current = true;
     setCurrent("preview");
@@ -118,6 +140,12 @@ export function TranslatorWizard() {
             <dd className="break-all text-muted">{workbook.file.name}</dd>
             <dt className="font-semibold text-navy">Size</dt>
             <dd className="text-muted">{formatFileSize(workbook.file.size)}</dd>
+            <dt className="font-semibold text-navy">Layout</dt>
+            <dd className="text-muted">{workbook.parsed.layout.label}</dd>
+            <dt className="font-semibold text-navy">Sheet</dt>
+            <dd className="break-all text-muted">{workbook.parsed.sheetName}</dd>
+            <dt className="font-semibold text-navy">Rows</dt>
+            <dd className="text-muted">{workbook.parsed.rows.length.toLocaleString("en-US")}</dd>
           </dl>
         ) : (
           <p className="mt-3 text-base text-muted">This step isn’t built yet.</p>

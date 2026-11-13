@@ -37,6 +37,8 @@ Versions from [package.json](../package.json).
 | `zod` | ^4.6 | Validation and error messages | Each feature's `schema.ts` |
 | `server-only` | ^0.0.1 | Fails the build if server code reaches the browser | Top of every server module |
 | `@vercel/analytics` | ^2.0 | Page views on public pages | `site-shell.tsx` |
+| `exceljs` | ^4.4 | Reads Translator workbooks in the browser (and will write the export); loaded only when a workbook is parsed | `features/translator/import/parse.ts` |
+| `jszip` | ^3.10 | Opens the .xlsx ZIP to fix files ExcelJS can't read as written (already an ExcelJS dependency) | `features/translator/import/xlsx-compat.ts` |
 | `tailwindcss` | 4 | Styling; design tokens in the `@theme` block of `globals.css` | Class names |
 | `typescript`, `eslint` | 5, 9 | Type checking and linting | `tsconfig.json`, `eslint.config.mjs` |
 
@@ -253,9 +255,11 @@ Rules, field mapping and expected results: [translator/README.md](translator/REA
 - Every workbook enters through one function, `handleWorkbook(input)` in `ui/translator-wizard.tsx`. The sample buttons (`ui/sample-buttons.tsx`, configured in `ui/samples.ts`) fetch a bundled file from `public/translator/` and turn it into a `File`; the file picker and drop zone (`ui/file-upload.tsx`, TR-06) pass what the user chose. All take the same path, so there is no sample-only shortcut. `handleWorkbook` runs three steps in order, and on a problem it stays on Upload and shows the message:
   1. Check: `checkWorkbookFile()` (`import/check-file.ts`: one file, not empty, at most 2 MB, `.xlsx` name, ZIP signature).
   2. Hash gate: reads the file once with `file.arrayBuffer()` and runs `checkAllowlist()` (`import/file-gate.ts`), which compares its SHA-256 with `import/allowlist.ts` (TR-07). On success the wizard keeps `{ file, buffer, entry }` in its state.
-  3. Parse: TR-08 parses that same `buffer`, so the file is never read twice.
+  3. Parse: `parseWorkbook()` (`import/parse.ts`, TR-08) reads that same `buffer`, so the file is never read twice. It is loaded with a dynamic `import()`, so ExcelJS is downloaded only when a workbook is parsed. It finds the sheet, detects the layout from row 1 against `LAYOUT_MAPPINGS` (`import/mappings/index.ts`) and maps each data row with `mapRow()`. On success the wizard adds the result as `parsed` (layout, sheet name, headers, rows with `sourceRow`, `sourceValues` and `record`).
 
-Built so far: the page shell in `ui/` (TR-02), `criteria/` (TR-03), the field mapping in `import/` (TR-04), the sample button with the `handleWorkbook` entry point (TR-05), the upload with its file checks (TR-06) and the file gate (TR-07). The workbook parser that calls `mapRow()` (TR-08), `normalize/`, `ranking/` and `export/` do not exist yet. Ticket status: [TASKS.md](TASKS.md).
+  Before ExcelJS loads the bytes, `makeExcelJsCompatible()` (`import/xlsx-compat.ts`) fixes two things some non-Excel writers do that ExcelJS can't read: namespace-prefixed XML (`<x:workbook>`) and absolute part paths. Files without them are passed through untouched.
+
+Built so far: the page shell in `ui/` (TR-02), `criteria/` (TR-03), the field mapping in `import/` (TR-04), the sample button with the `handleWorkbook` entry point (TR-05), the upload with its file checks (TR-06), the file gate (TR-07) and the workbook parser (TR-08). `normalize/`, `ranking/` and `export/` do not exist yet. Ticket status: [TASKS.md](TASKS.md).
 
 ## Extending the system
 
