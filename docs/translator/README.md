@@ -89,15 +89,45 @@ Each mapping in `src/features/translator/import/mappings/` has two header lists 
 | `address` / `zip` | none | Address / ZIP Code |
 | `otherExecutives` | none | Executive 1 to 50 first, last, title (display only) |
 | `naicsDescription` | none | Primary NAICS Description (display only) |
-| `employeeRange` | none | Location Employee Size Range (display only; the normalize step uses it when `employees` is blank) |
+| `employeeRange` | none | Location Employee Size Range (display; also the employee count when `employees` is unknown, see [Cleaning values](#cleaning-values)) |
 
 - Fields are grouped as core (`recordId`, `company`, `city`, `state`, `industry`, `employees`, `title`), contact (`name`, `email`, `phone`, `website`, `address`, `zip`) and extra info (`naicsDescription`, `employeeRange`, `otherExecutives`). Code: `src/features/translator/import/` (`fields.ts`, `mappings/`, `map-row.ts`).
-- Mapped values are the raw cell text, or `null` when blank. Cleaning and parsing happen in the normalize step.
+- Mapped values are the raw cell text, or `null` when blank. Cleaning and parsing happen afterwards ([Cleaning values](#cleaning-values)).
 - One shortlist row per business.
 - Required to run: company, city, state, industry. The columns behind them, per layout, are in [Signature and required headers](#signature-and-required-headers).
 - Ignore unknown columns and blank headers (real exports end with an unnamed column). Headers are matched after trimming the ends and ignoring case, but inner spacing must match exactly: `Advertising  Expenses` has two spaces.
 - Generated IDs use the 1-based data row position: the first row after the header is `ROW-0001` (wider past 9999, e.g. `ROW-12345`). Skipped empty rows still count, so the ID always points at the same spreadsheet row.
 - Executive slots are skipped only when first name, last name and title are all blank. The main contact is kept separate from slot 1, even when slot 1 repeats it.
+
+## Cleaning values
+
+Right after a workbook is parsed, every row's record is normalized in the browser (TR-10). Code: `normalizeRecord()` in `src/features/translator/normalize/normalize.ts`, shapes in `normalize/types.ts`. Each row then holds `sourceRow`, `sourceValues` and `record` exactly as parsed, plus `normalized`.
+
+**Three versions of each value:**
+
+| Version | What it is | Used for |
+|---|---|---|
+| `original` | The mapped value, untouched | Export (TR-25) |
+| `value` | Trimmed, inner whitespace (including non-breaking spaces) collapsed to one space | Display |
+| `key` | `matchKey(value)`; only city, state, industry and title have one | Matching. Never shown |
+
+`matchKey()` (`normalize/match-key.ts`) applies Unicode NFKC, trims, collapses inner whitespace and lower-cases (not locale-based). So `" phoenix "` and `"Phoenix"` both have the key `phoenix`. SearchBrief values must go through the same function when they are compared (TR-17). The key is deliberately conservative: punctuation is kept (`St. Louis` and `St Louis` differ), abbreviations aren't expanded (`Arizona` is not `AZ`) and words aren't stemmed ([KNOWN-ISSUES.md](../KNOWN-ISSUES.md#correctness-risks)).
+
+**Unknown values.** A value that is `null`, empty or only spaces is unknown: `{ known: false, reason: "blank", original }`, never `null` or `""`. The original (`null`, or the spaces) is kept for export. A blank cell already reaches this step as `null`, because the parser maps blank and space-only cells to `null`. An employee count that can't be read is unknown with reason `invalid`, so TR-11 can flag it without reading the cells again. Ranking treats unknown as described below: a missing value is not a match, fails a must-have and scores 0.
+
+**Other fields.** `recordId` is trimmed and never unknown. Other executives have their name and title trimmed; an executive with neither is dropped.
+
+**Employees:**
+
+1. The `employees` value with commas and spaces removed must be digits only. `"25"`, `"1,200"` and `" 40 "` give 25, 1200 and 40 (`source: "actual"`). `"25.5"`, `"-3"`, `"about 20"` and `"N/A"` are unknown (`invalid`); blank is unknown (`blank`).
+2. Only when that is unknown and `employeeRange` has a value, the range is read instead (`source: "range"`, with `min` and `max`). Accepted: `"10 to 19"`, `"10-19"`, `"10 - 19"`, `"1,000 to 4,999"`, and open ranges `"10,000+"` and `"10,000 or more"` (`max` is infinity). Anything else (for example `"Unknown"`, or a min above the max) leaves the count unknown with the reason from step 1. **Unverified:** these formats are a guess. The Reference Solutions headers workbook has no data rows, so the exact range wording in real exports hasn't been seen.
+3. A range that is read replaces an `invalid` actual count, and the `invalid` reason is not kept.
+
+`employeeRange` is also kept as its own text field for display.
+
+**Range fit rule** (applied by ranking, TR-17 and TR-18, not by this step): a range-sourced count matches a user range only when the whole range fits inside it (`min >= userMin` and `max <= userMax`). An open range only matches an open user range. So `10 to 19` matches 10 to 99, but `10 to 199` doesn't.
+
+**In the synthetic workbook** all 500 rows have known company, city, state and industry. Title is blank in 125 rows, email in 125 and employees in 124; those values are unknown (`blank`). No row has an invalid employee count, and the file has no range column.
 
 ## Ranking
 
