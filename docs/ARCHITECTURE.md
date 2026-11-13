@@ -250,9 +250,12 @@ workbook ─▶ import/ ─▶ normalize/ ─▶ ranking/ (with criteria/ Search
 
 Rules, field mapping and expected results: [translator/README.md](translator/README.md) and [../CLAUDE.md](../CLAUDE.md).
 
-- Every workbook enters through one function, `handleWorkbook(file: File)` in `ui/translator-wizard.tsx`. The sample buttons (`ui/sample-buttons.tsx`, configured in `ui/samples.ts`) fetch a bundled file from `public/translator/` and turn it into a `File`; the file picker and drop zone (`ui/file-upload.tsx`, TR-06) pass what the user chose. All take the same path, so there is no sample-only shortcut. `handleWorkbook` first runs `checkWorkbookFile()` (`import/check-file.ts`: one file, not empty, at most 2 MB, `.xlsx` name, ZIP signature); on a problem it stays on Upload and shows the message. The file gate (TR-07) and parsing (TR-08) go after that check.
+- Every workbook enters through one function, `handleWorkbook(input)` in `ui/translator-wizard.tsx`. The sample buttons (`ui/sample-buttons.tsx`, configured in `ui/samples.ts`) fetch a bundled file from `public/translator/` and turn it into a `File`; the file picker and drop zone (`ui/file-upload.tsx`, TR-06) pass what the user chose. All take the same path, so there is no sample-only shortcut. `handleWorkbook` runs three steps in order, and on a problem it stays on Upload and shows the message:
+  1. Check: `checkWorkbookFile()` (`import/check-file.ts`: one file, not empty, at most 2 MB, `.xlsx` name, ZIP signature).
+  2. Hash gate: reads the file once with `file.arrayBuffer()` and runs `checkAllowlist()` (`import/file-gate.ts`), which compares its SHA-256 with `import/allowlist.ts` (TR-07). On success the wizard keeps `{ file, buffer, entry }` in its state.
+  3. Parse: TR-08 parses that same `buffer`, so the file is never read twice.
 
-Built so far: the page shell in `ui/` (TR-02), `criteria/` (TR-03), the field mapping in `import/` (TR-04) the sample button with the `handleWorkbook` entry point (TR-05) and the upload with its file checks (TR-06). The workbook parser that calls `mapRow()` (TR-08), `normalize/`, `ranking/` and `export/` do not exist yet. Ticket status: [TASKS.md](TASKS.md).
+Built so far: the page shell in `ui/` (TR-02), `criteria/` (TR-03), the field mapping in `import/` (TR-04), the sample button with the `handleWorkbook` entry point (TR-05), the upload with its file checks (TR-06) and the file gate (TR-07). The workbook parser that calls `mapRow()` (TR-08), `normalize/`, `ranking/` and `export/` do not exist yet. Ticket status: [TASKS.md](TASKS.md).
 
 ## Extending the system
 

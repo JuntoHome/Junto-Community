@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { checkWorkbookFile, type WorkbookFileInput } from "../import/check-file";
+import { checkAllowlist, FILE_GATE_MESSAGES, type GatedWorkbook } from "../import/file-gate";
 import { FileUpload } from "./file-upload";
 import { SampleButtons } from "./sample-buttons";
 import { StepIndicator } from "./step-indicator";
@@ -23,7 +24,8 @@ export function TranslatorWizard() {
   const [current, setCurrent] = useState<StepId>("upload");
   // Later tickets mark each step done as its work is built.
   const [done, setDone] = useState<ReadonlySet<StepId>>(() => new Set());
-  const [workbook, setWorkbook] = useState<File | null>(null);
+  // The accepted workbook: the file, its bytes (read once, for the gate and the parser) and its allowlist entry.
+  const [workbook, setWorkbook] = useState<GatedWorkbook | null>(null);
   // The last workbook check's problem, shown on the Upload step.
   const [fileError, setFileError] = useState<string | null>(null);
   // Counts workbook attempts, so a slow check can't override a newer choice.
@@ -40,8 +42,9 @@ export function TranslatorWizard() {
 
   /**
    * The single entry point for a workbook, whether it comes from a sample button, the file
-   * picker or a drop. It checks the file first; on a problem it stays on Upload and shows
-   * why. A new workbook replaces the previous one and resets later steps.
+   * picker or a drop. It checks the size and type first, then reads the file once and runs
+   * the file gate on those bytes; on a problem it stays on Upload and shows why. A new
+   * workbook replaces the previous one and resets later steps.
    */
   async function handleWorkbook(input: WorkbookFileInput) {
     const thisAttempt = ++attempt.current;
@@ -54,8 +57,24 @@ export function TranslatorWizard() {
       return;
     }
     const file = check.file;
-    // TODO(TR-07, TR-08): run the file gate (TR-07) and parse the workbook (TR-08) here, before moving on.
-    setWorkbook(file);
+    // The only full read of the file. The size check above caps it at 2 MB.
+    let buffer: ArrayBuffer;
+    try {
+      buffer = await file.arrayBuffer();
+    } catch {
+      // The browser couldn't read it (for example, the file changed on disk after it was chosen).
+      if (thisAttempt === attempt.current) setFileError(FILE_GATE_MESSAGES.unreadable);
+      return;
+    }
+    if (thisAttempt !== attempt.current) return;
+    const gate = await checkAllowlist(buffer);
+    if (thisAttempt !== attempt.current) return;
+    if (!gate.ok) {
+      setFileError(gate.message);
+      return;
+    }
+    // TODO(TR-08): parse `buffer` here (detect the layout from the headers, not from gate.entry.layout), before moving on.
+    setWorkbook({ file, buffer, entry: gate.entry });
     setDone(new Set<StepId>(["upload"]));
     focusHeading.current = true;
     setCurrent("preview");
@@ -96,9 +115,9 @@ export function TranslatorWizard() {
         ) : step.id === "preview" && workbook ? (
           <dl className="mt-3 grid gap-x-6 gap-y-1 text-base sm:grid-cols-[auto_1fr]">
             <dt className="font-semibold text-navy">File</dt>
-            <dd className="break-all text-muted">{workbook.name}</dd>
+            <dd className="break-all text-muted">{workbook.file.name}</dd>
             <dt className="font-semibold text-navy">Size</dt>
-            <dd className="text-muted">{formatFileSize(workbook.size)}</dd>
+            <dd className="text-muted">{formatFileSize(workbook.file.size)}</dd>
           </dl>
         ) : (
           <p className="mt-3 text-base text-muted">This step isn’t built yet.</p>
