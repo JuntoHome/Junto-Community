@@ -49,8 +49,16 @@ export type LayoutMapping = {
   id: MappingId;
   /** Shown to the user, e.g. on the Preview step. */
   label: string;
-  /** Source headers that identify this layout. A file is this layout when row 1 has all of them (TR-08). */
-  detectHeaders: readonly string[];
+  /**
+   * Source headers that recognise this layout, and nothing else. Each must be a header the other
+   * layouts don't have. The layout with the most of them in row 1 wins, if it has at least 2 (TR-09).
+   */
+  signatureHeaders: readonly string[];
+  /**
+   * Source headers a file in this layout can't be used without, in the order they are listed in
+   * the "Missing required columns" message (TR-09). They feed `requiredFields`.
+   */
+  requiredHeaders: readonly string[];
   /** Internal fields a file must provide to be ranked. */
   requiredFields: readonly RequiredField[];
   fields: FieldRules;

@@ -41,7 +41,8 @@ During Phase 1 the Translator accepts only the workbooks we issued, so real cont
 After the file gate, the browser parses the same bytes with ExcelJS (TR-08). Code: `parseWorkbook()` in `src/features/translator/import/parse.ts`.
 
 - **Sheet:** the sheet named `Contacts` (ignoring case and outer spaces) if its row 1 is a known layout; otherwise the first sheet, in workbook order, whose row 1 is. Real exports may not have a `Contacts` sheet.
-- **Layout:** row 1 must contain every detection header of a mapping (matched like all headers: trimmed, ignoring case). Synthetic: `Record ID` and `Company`. Reference Solutions: `Company Name`, `City`, `State` and `Primary SIC Description`. Extra, unknown and blank header cells are ignored. The layout comes from the headers, never from the allowlist entry. The Preview step shows the layout, sheet name and row count.
+- **Layout:** recognised from the mapping's signature headers (matched like all headers: trimmed, ignoring case). The layout with the most signatures in row 1 wins, if it has at least 2. A tie, or fewer than 2, is "couldn't recognize". Extra, unknown and blank header cells are ignored. The layout comes from the headers, never from the allowlist entry. The Preview step shows the layout, sheet name and row count.
+- **Header check:** right after the layout is recognised, and before any data row is read, the required headers are checked (TR-09, below).
 - **Rows:** each data row keeps `sourceRow` (its spreadsheet row number; the header is row 1), `sourceValues` (its cells in column order) and `record` (the mapped `TranslatorRecord`). Rows where every cell is blank or only spaces are skipped. A generated ID still follows the spreadsheet row (row 10 is `ROW-0009`), so skipped rows don't shift it.
 - **Cell values:** text, numbers and true/false stay as they are; rich text and links become their text, formulas their last calculated result, errors their code (`#N/A`) and dates ISO text (`2026-01-02`).
 - **Limit:** at most 1,000 data rows (empty rows don't count).
@@ -51,10 +52,26 @@ After the file gate, the browser parses the same bytes with ExcelJS (TR-08). Cod
 |---|---|
 | Not a workbook, or damaged | This file couldn't be opened as an Excel workbook. It may be damaged. Open it in Excel, save it as .xlsx and try again. |
 | No sheet in a known layout | We couldn't recognize this file. It should be a Data Axle Reference Solutions export. |
+| Required column missing | Missing required columns: City, State (then, on its own line: Add these columns to the file and upload again.) |
+| Required column appears twice | The column City appears more than once. Keep one and upload again. |
 | Known layout, no data rows | This file has no contact rows below the header row. Choose a workbook that contains contacts. |
 | More than 1,000 data rows | This file has more than 1,000 contact rows. Remove rows in Excel (or split the file) so it has 1,000 or fewer, then upload it again. |
 
 During Phase 1 the file gate runs first, so in the app these messages can only appear for an approved file. The parser itself accepts any workbook, ready for when the gate is lifted.
+
+### Signature and required headers
+
+Each mapping in `src/features/translator/import/mappings/` has two header lists (TR-09). Code: `validateHeaders()` in `import/validate-headers.ts`, called by `parseWorkbook()`.
+
+| Layout | Signature headers (recognise the layout) | Required headers (must be present, once) |
+|---|---|---|
+| Synthetic | Record ID, Company, Name, Title, Industry, Email, Employees | Record ID, Company, City, State, Industry |
+| Reference Solutions | Company Name, IUSA Number, Primary SIC Description, Primary NAICS Description, Location Employee Size Actual, Location Employee Size Range, Phone Number Combined, Executive First Name, Executive Last Name, Executive Title | Company Name, City, State, Primary SIC Description |
+
+- **Signatures** only recognise the layout. Each is a header the other layout doesn't have (checked against `JCA_Reference_Solutions_Exact_Headers_Jeel.xlsx`), so a file missing a required column is still recognised and gets the "Missing required columns" message instead of "couldn't recognize". `City` and `State` are in both layouts, so they are never signatures. `Industry` is both a signature and required for Synthetic: without it the other six still recognise the layout.
+- **Required** headers feed company, city, state and industry (and the Synthetic `Record ID`). Missing ones are listed in the order above, by their real column names. A required header that appears twice stops the import.
+- **Optional** mapped headers may be missing. Their values are unknown (`null`): a missing half of a joined name gives just the other half, a missing `Executive Title` falls back to `Professional Title`, absent executive slots are skipped, and without `IUSA Number` every row gets a generated `ROW-0001` style ID. Missing optional headers are listed on the Preview step: "Not in this file: Email. These will show as unknown." Numbered executive slot headers are not listed.
+- An optional or unmapped header that appears twice is allowed; the first one is used.
 
 ## Two input layouts, one set of fields
 
@@ -77,7 +94,7 @@ During Phase 1 the file gate runs first, so in the app these messages can only a
 - Fields are grouped as core (`recordId`, `company`, `city`, `state`, `industry`, `employees`, `title`), contact (`name`, `email`, `phone`, `website`, `address`, `zip`) and extra info (`naicsDescription`, `employeeRange`, `otherExecutives`). Code: `src/features/translator/import/` (`fields.ts`, `mappings/`, `map-row.ts`).
 - Mapped values are the raw cell text, or `null` when blank. Cleaning and parsing happen in the normalize step.
 - One shortlist row per business.
-- Required to run: company, city, state, industry.
+- Required to run: company, city, state, industry. The columns behind them, per layout, are in [Signature and required headers](#signature-and-required-headers).
 - Ignore unknown columns and blank headers (real exports end with an unnamed column). Headers are matched after trimming the ends and ignoring case, but inner spacing must match exactly: `Advertising  Expenses` has two spaces.
 - Generated IDs use the 1-based data row position: the first row after the header is `ROW-0001` (wider past 9999, e.g. `ROW-12345`). Skipped empty rows still count, so the ID always points at the same spreadsheet row.
 - Executive slots are skipped only when first name, last name and title are all blank. The main contact is kept separate from slot 1, even when slot 1 repeats it.

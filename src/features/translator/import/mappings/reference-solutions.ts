@@ -6,12 +6,26 @@ import type { LayoutMapping } from "./types";
  * (headers in docs/translator/JCA_Reference_Solutions_Exact_Headers_Jeel.xlsx). Every column not
  * named here is ignored, including the unnamed last column and the Executive Gender columns.
  *
- * Exports vary, so detection needs only the headers a file can't be ranked without, not all 396.
+ * Exports vary, so the layout is recognised from a few distinctive headers, not all 396, and only
+ * the four that feed company, city, state and industry are required. IUSA Number is optional
+ * because an ID can be generated.
  */
 export const REFERENCE_SOLUTIONS_MAPPING: LayoutMapping = {
   id: "reference-solutions",
   label: "Reference Solutions",
-  detectHeaders: ["Company Name", "City", "State", "Primary SIC Description"],
+  signatureHeaders: [
+    "Company Name",
+    "IUSA Number",
+    "Primary SIC Description",
+    "Primary NAICS Description",
+    "Location Employee Size Actual",
+    "Location Employee Size Range",
+    "Phone Number Combined",
+    "Executive First Name",
+    "Executive Last Name",
+    "Executive Title",
+  ],
+  requiredHeaders: ["Company Name", "City", "State", "Primary SIC Description"],
   requiredFields: REQUIRED_FIELDS,
   fields: {
     recordId: { kind: "generatedId", header: "IUSA Number" },
