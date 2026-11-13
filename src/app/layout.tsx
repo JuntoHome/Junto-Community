@@ -11,9 +11,10 @@ const fraunces = Fraunces({
   display: "swap",
 });
 
+// Variable font too. Listing static weights makes Google return "/l/font?kit=...&skey=..." URLs,
+// which the Next 16.3.6 Turbopack font loader cannot resolve, so the build fails.
 const publicSans = Public_Sans({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
   variable: "--font-public-sans",
   display: "swap",
 });
