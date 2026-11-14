@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { type CriteriaForm, EMPTY_CRITERIA_FORM } from "../criteria/from-form";
+import type { SearchBrief } from "../criteria/schema";
 import { checkWorkbookFile, type WorkbookFileInput } from "../import/check-file";
 import { checkAllowlist, FILE_GATE_MESSAGES, type GatedWorkbook } from "../import/file-gate";
 import type { ParseResult } from "../import/parse";
@@ -8,6 +10,7 @@ import { groupDuplicates } from "../normalize/duplicates";
 import { normalizeWorkbook } from "../normalize/normalize";
 import type { ImportState } from "../normalize/summary";
 import { compareIssues, validateRows } from "../normalize/validate-rows";
+import { CriteriaStep } from "./criteria-step";
 import { FileUpload } from "./file-upload";
 import { PreviewStep } from "./preview-step";
 import { SampleButtons } from "./sample-buttons";
@@ -39,6 +42,10 @@ export function TranslatorWizard() {
   const [workbook, setWorkbook] = useState<LoadedWorkbook | null>(null);
   // The last workbook check's problem, shown on the Upload step.
   const [fileError, setFileError] = useState<string | null>(null);
+  // What the Criteria step's form holds, kept here so going back to Criteria shows the same choices.
+  const [criteriaForm, setCriteriaForm] = useState<CriteriaForm>(EMPTY_CRITERIA_FORM);
+  // The SearchBrief from the last Continue on Criteria. Ranking (TR-17) reads it.
+  const [, setBrief] = useState<SearchBrief | null>(null);
   // Counts workbook attempts, so a slow check can't override a newer choice.
   const attempt = useRef(0);
 
@@ -109,6 +116,9 @@ export function TranslatorWizard() {
     const { records, duplicateCount, issues: duplicateIssues } = groupDuplicates(validation.kept);
     const issues = [...validation.issues, ...duplicateIssues].sort(compareIssues);
     setWorkbook({ file, buffer, entry: gate.entry, parsed: normalized, validation, records, duplicateCount, issues });
+    // A new workbook has its own values, so earlier criteria no longer apply.
+    setCriteriaForm(EMPTY_CRITERIA_FORM);
+    setBrief(null);
     setDone(new Set<StepId>(["upload"]));
     focusHeading.current = true;
     setCurrent("preview");
@@ -153,6 +163,19 @@ export function TranslatorWizard() {
               setDone(new Set<StepId>(["upload", "preview"]));
               focusHeading.current = true;
               setCurrent("criteria");
+            }}
+          />
+        ) : step.id === "criteria" && workbook ? (
+          <CriteriaStep
+            records={workbook.records}
+            form={criteriaForm}
+            onFormChange={setCriteriaForm}
+            onContinue={(next) => {
+              setBrief(next);
+              setDone(new Set<StepId>(["upload", "preview", "criteria"]));
+              focusHeading.current = true;
+              // TODO(TR-15): preferences join this step first. Results (TR-22) replaces the placeholder it opens today.
+              setCurrent("results");
             }}
           />
         ) : (
