@@ -241,7 +241,7 @@ The Results step opens with "Your criteria" (TR-16): the brief in plain language
 - **Change** opens an inline editor under the line for just that item, with the Criteria step's controls (`ui/criteria-controls.tsx`). The Preferences line has one button per part: Change industry, Change title, Change company size and, when ordered, Change order. Goal, location, each must-have, each exclusion and list size have one Change each. Assumptions have none (the form has no input for them).
 - **Edits apply only on Save.** The editor works on a draft copy of the form that produced the brief; typing there changes nothing. Save runs `toBrief()` on the draft. If it is invalid, the error shows inline (a clash with another criterion, such as "You can't require and leave out Tempe.", is listed in the editor) and nothing changes. If it is valid, the form and the pending brief are updated, and so is the confirmed brief when results are showing, which re-ranks. Cancel discards the draft. Opening another editor cancels the open one.
 - **A Save changes only that item.** Every other key in the brief stays the same. One exception follows from the schema: with an importance order on, setting a preference to No preference also removes it from `priorityOrder`.
-- **Confirm and rank** (shown until results show) ranks the pending brief. Until the results table (TR-22) and counts summary (TR-23), the results are one line of [filter](#filtering) counts: "100 match. 0 left out by your exclusions. 399 didn't meet a must-have (0 only because of missing data)."
+- **Confirm and rank** (shown until results show) ranks the pending brief. Until the results table (TR-22) and counts summary (TR-23), the results are placeholder lines: the [filter](#filtering) counts ("100 match. 0 left out by your exclusions. 399 didn't meet a must-have (0 only because of missing data)."), the first 5 shortlist rows as `1. SYN-0001 (100)` (Record ID and rounded score), and "Showing 40 of 100 matches." (shortlist rows of eligible rows).
 - **The summary always shows the brief behind the results**: `results.brief`, the brief `rank()` got, once confirmed, and the pending brief before. It is never rebuilt from form state.
 - **Going back to Criteria** shows the same values as the summary, because a Save writes to the same form state. A Save starts from the form that produced the current brief, so changes made on Criteria without pressing Continue are replaced by it.
 - **Accessibility:** Change moves focus to the editor's heading. After Save or Cancel, focus returns to that item's Change button (or the "Your criteria" heading if the item is gone), and a live region says "Updated." or, once results show, "Updated. Results refreshed." After a failed Save, focus goes to the first problem. After Confirm and rank, focus moves to the results.
@@ -250,12 +250,12 @@ The Results step opens with "Your criteria" (TR-16): the brief in plain language
 
 ## Ranking
 
-`rank(records, brief)` (`ranking/index.ts`) returns `{ brief, rows, filter, weights, scoringVersion }`, where `brief` is the brief it ranked against, `filter` is `{ counts, byCriterion, statusById }` from [filtering](#filtering), `weights` and each row's score come from [scoring](#scoring), and `scoringVersion` is `SCORING_VERSION` ("1.0"). Each row is `{ record, score, displayScore, breakdown }`. Until TR-19, `rows` is every eligible record, scored, in input order.
+`rank(records, brief)` (`ranking/index.ts`) returns `{ brief, scoringVersion, weights, filter, ranked, shortlist }`, where `brief` is the brief it ranked against, `scoringVersion` is `SCORING_VERSION` ("1.0"), `weights` and each row's score come from [scoring](#scoring), and `filter` is `{ counts, byCriterion, statusById }` from [filtering](#filtering). `ranked` is every eligible row, sorted, and `shortlist` is its first `listSize` rows, each with a `rank` ([Sorting and list size](#sorting-and-list-size)). Each row is `{ record, score, displayScore, breakdown }`, plus `rank` in `shortlist`.
 
 1. Apply exclusions (a missing value is not a match).
 2. Apply must-haves (a missing value fails). Count rows that failed because of missing data.
 3. Score 0 to 100 from preferences. Default weights: industry 35, geography 30, title 25, employees 10. Full weight for a match in a dimension, 0 if missing. Only active dimensions count, scaled to 100. No preferences = 0. If the user orders preferences, use weights 4, 3, 2, 1. Details: [Scoring](#scoring).
-4. Sort by unrounded score descending, then Record ID ascending. Default list size 40 (1 to 100).
+4. Sort by unrounded score descending, then Record ID ascending. Default list size 40 (1 to 100). Details: [Sorting and list size](#sorting-and-list-size).
 5. Pinned rows first (labelled, keep their score). Omitted rows removed. Excluded rows cannot be pinned.
 6. Every result lists its reasons from its own values.
 
@@ -329,15 +329,32 @@ Step 3 (TR-18). Code: `scoreRecords(eligible, brief)` in `ranking/score.ts`, wit
 | Business owner, prefer only Fabrication and 10 to 99 | industry 35, employees 10 (45) | 100 (8), 77.78 (14, industry only), 22.22 (19, employees only), 0 (59) |
 | Business owner, ordered title, industry, employees | title 4, industry 3, employees 2 (9) | A title-only match scores 44.44 |
 
-Ties at the top are why "SYN-0006 first" and "SYN-0002 first" depend on TR-19's tiebreak (Record ID ascending).
+Ties at the top are why "SYN-0006 first" and "SYN-0002 first" depend on the Record ID tiebreak ([Sorting and list size](#sorting-and-list-size)).
+
+### Sorting and list size
+
+Step 4 and the list size (TR-19). Code: `sortScored(rows)` in `ranking/sort.ts`, `compareRecordIds(a, b)` in `ranking/compare-ids.ts` and `takeShortlist(sorted, listSize)` in `ranking/limit.ts`. `sortScored()` and `takeShortlist()` return new arrays and never change their input.
+
+**Sort.** By unrounded `score`, highest first, then Record ID ascending. Two scores are tied only when they are exactly equal (`===`); there is no tolerance. Equal matches go through the same arithmetic with the same weights, so they give identical numbers, and a tolerance would make the order depend on a tuning value. The order depends only on score and Record ID, never on input order, so shuffling the records gives the same list. Record IDs are unique after the [row checks](#row-checks), so no two rows tie on both.
+
+**How Record IDs compare.** `compareRecordIds()` never uses `localeCompare()` or `Intl.Collator`, because their results can differ between browsers.
+
+1. IDs made only of digits (IUSA Numbers) come before every other ID. Between two of them the shorter comes first, then text order (UTF-16 code units). That is numeric order without turning the ID into a number, so long IDs lose no digits: `9001` comes before `123456789`. With leading zeros the longer one is still later: `12` before `0012`.
+2. Any other two IDs: text order of the upper-cased IDs, then of the IDs as written. `ROW-0002` comes before `SYN-0001`.
+
+Digit IDs go first as a group, not compared as text with the others, so the order has no loops (see [KNOWN-ISSUES.md](../KNOWN-ISSUES.md)). For `ROW-0001` and `SYN-0001` style IDs this is the same as text order.
+
+**List size.** `shortlist` is the first `listSize` rows of `ranked`, or all of them when fewer are eligible: 40 of 100 gives 40, 40 of 12 gives 12. Each gets `rank` 1 to N in order; tied scores still get different, sequential ranks. `ranked` keeps every eligible row so pin and omit (TR-21) can change it before the cut, and an omitted row lets the next one move up into the shortlist.
 
 ## Expected results
 
 | Scenario | Expected |
 |---|---|
 | Phoenix, AZ must-have; prefer Fabrication, Owner, 10 to 99; 40 rows | 500 in, 1 duplicate (SYN-0500 under SYN-0001), 499 unique, 100 eligible, 40 out, SYN-0001 first at 100. SYN-0001 is the only 100. Scores of the 100 eligible: 100 (1), 85.71 (4), 64.29 (7), 50 (10), 35.71 (20), 14.29 (19), 0 (39) |
-| Same, title Owner changed to Operations Manager | SYN-0006 first at 100, tied with SYN-0026, 0126, 0226, 0326 and 0426 (first by Record ID). SYN-0001 64.29 |
+| Same, title Owner changed to Operations Manager | SYN-0006 first at 100. The first 6, all at 100, in order: SYN-0006, SYN-0026, SYN-0126, SYN-0226, SYN-0326, SYN-0426 (tied, so ordered by Record ID). SYN-0001 64.29, 7th |
 | Tempe, AZ; prefer Logistics, Operations Manager, 10 to 99; 30 rows | 100 eligible, 30 out, SYN-0002 first at 100, tied with 6 others (first by Record ID) |
+| Business owner, list size 1 / 100 | 1 row (SYN-0001) / all 100 eligible rows |
+| Same brief twice, or the records shuffled first | Identical `shortlist` |
 | Phoenix, AZ; prefer only Fabrication and 10 to 99 | Active weight total 45. Both match 100, industry only 77.78, employees only 22.22 |
 | No preferences | Every score 0, empty breakdown |
 | Prefer city Phoenix and state AZ; a Mesa, AZ row | Geography no match, 0 points |
