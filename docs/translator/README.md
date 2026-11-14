@@ -198,6 +198,21 @@ After a workbook loads, the Preview step shows what was found before the user se
 
 For the Reference Solutions mapping against the full 396-column header row, every field is Found except Email (Not in this layout). Without `IUSA Number` and `Website`, those two are Missing.
 
+## Criteria step
+
+After Preview, the Criteria step asks what the user is trying to do and what every row must have (TR-14). It fills the one `SearchBrief`. Code: `ui/criteria-step.tsx` and `ui/value-picker.tsx`, with two pure helpers, `fieldOptions()` (`normalize/field-options.ts`) and `toBrief()` (`criteria/from-form.ts`). Nothing is posted: it is a plain form handled in the browser.
+
+- **Goal (required):** "Find prospective customers or partners" (`business_owner`) or "Find potential employers" (`job_seeker`). Neither is chosen at first. It is the only required input.
+- **Must-haves (all optional):** City and State, then Industry and Title under "More must-haves (optional)". Above them: "Only rows that match every must-have are kept. Rows with a blank value for a must-have are left out." A field with nothing selected is no filter, so no geography means no geography filter.
+- **Each picker** has a "Type to filter" box, a scrolling list of checkboxes such as "Phoenix (100)", "N selected" and Clear. Filtering only hides values; ticked ones stay ticked.
+- **Options come from the data, never a hard-coded list.** `fieldOptions(records, field)` reads the grouped `records` (after [duplicate grouping](#duplicate-grouping)), so the counts are what ranking sees. Values are grouped by match key, so " phoenix " and "Phoenix" are one option. Unknown (blank) values aren't listed. The label is the most common spelling for that key (a tie goes to the earliest row), the count is the number of records, and options are sorted by label (`localeCompare(…, "en")`).
+- **From form to brief:** on Continue, `toBrief()` writes the choices as a candidate brief and checks it with `searchBriefSchema`. One value picked gives `equals`; two or more give `in`, with the values in option order. The brief gets the option labels. Must-haves are listed city, state, industry, title. `preferences` and `exclusions` are `[]` and `listSize` is the default 40 until TR-15.
+- **Errors:** with no goal the step stays put, shows "Choose what you're trying to do." under Goal and a summary at the top with a link to it, and moves focus to the summary. An error clears once its field is changed.
+- **Continue** stores the brief in the wizard and opens the next step. Until TR-15 adds preferences to this step, that is the Results placeholder. The form's choices are kept in the wizard, so going back to Criteria shows them; loading a new workbook clears them.
+- **City and state are separate filters.** "Springfield" with "IL" and "MO" means city in [Springfield] and state in [IL, MO], which also keeps a Springfield in a state where it isn't the one meant. Fine for Phase 1 ([KNOWN-ISSUES.md](../KNOWN-ISSUES.md#correctness-risks)).
+
+**The synthetic sample offers:** City Glendale 100, Mesa 100, Phoenix 100, Scottsdale 99, Tempe 100; State AZ 499; Industry Business Services 100, Fabrication 100, Logistics 100, Retail 99, Technology 100; Title General Manager 124, Operations Manager 126, Owner 124 (blank titles not listed). Business owner with Phoenix and AZ gives `mustHaves` `[{ field: "city", operator: "equals", value: "Phoenix" }, { field: "state", operator: "equals", value: "AZ" }]`.
+
 ## Ranking
 
 1. Apply exclusions (a missing value is not a match).
