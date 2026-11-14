@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { matchKey } from "../normalize/match-key";
 
 /**
  * The Translator's criteria: what the user is looking for. The Phase 1 form fills a
@@ -22,7 +23,8 @@ import { z } from "zod";
  *     assumptions: [],
  *   }
  *
- * Values are only trimmed here. Matching case and spelling is the normalize step's job (TR-10).
+ * Values are only trimmed here. Matching case and spelling is the normalize step's job (TR-10);
+ * the cross-field checks below use the same `matchKey()` only to compare values, never to change them.
  * This module is pure (no React, no I/O) so it runs in the browser and on the server.
  */
 
@@ -189,6 +191,26 @@ const criteria = (name: string) => z.array(criterionSchema, { error: `${name} mu
 
 const BRIEF_KEYS = "A search brief has only intent, mustHaves, preferences, exclusions, priorityOrder, listSize and assumptions.";
 
+/** The text values a criterion tests, each with the path to it inside the criterion. Ranges have none. */
+function textValues(criterion: BriefCriterion): { value: string; path: (string | number)[] }[] {
+  if (criterion.operator === "equals") return [{ value: criterion.value, path: ["value"] }];
+  if (criterion.operator === "in") return criterion.value.map((value, index) => ({ value, path: ["value", index] }));
+  return [];
+}
+
+/** The match keys of every text value in `criteria`, by field. */
+function keysByField(criteria: readonly BriefCriterion[]): Map<BriefField, Set<string>> {
+  const keys = new Map<BriefField, Set<string>>();
+  for (const criterion of criteria) {
+    for (const { value } of textValues(criterion)) {
+      const set = keys.get(criterion.field) ?? new Set<string>();
+      set.add(matchKey(value));
+      keys.set(criterion.field, set);
+    }
+  }
+  return keys;
+}
+
 export const searchBriefSchema = z
   .strictObject(
     {
@@ -198,7 +220,10 @@ export const searchBriefSchema = z
       mustHaves: criteria("mustHaves"),
       /** Matches add to a row's score. A missing value scores 0. E.g. title equals Owner. */
       preferences: criteria("preferences"),
-      /** Rows that match any of these are removed first. A missing value is not a match. */
+      /**
+       * Rows that match any of these are removed first. A missing value is not a match.
+       * A value can't be both left out and required or preferred on the same field.
+       */
       exclusions: criteria("exclusions"),
       /**
        * Optional: preference dimensions from most to least important, e.g. ["industry", "geography"].
@@ -244,6 +269,24 @@ export const searchBriefSchema = z
         });
       }
       seen.add(dimension);
+    }
+
+    // An exclusion can't also be a must-have or a preference for the same value on the same field:
+    // the row would be required (or wanted) and removed at once. Values are compared by match key,
+    // so " phoenix " and "Phoenix" are the same value. Only text values are compared, not ranges.
+    const required = keysByField(brief.mustHaves);
+    const preferredKeys = keysByField(brief.preferences);
+    for (const [index, exclusion] of brief.exclusions.entries()) {
+      for (const { value, path } of textValues(exclusion)) {
+        const key = matchKey(value);
+        const issuePath = ["exclusions", index, ...path];
+        if (required.get(exclusion.field)?.has(key)) {
+          ctx.addIssue({ code: "custom", path: issuePath, message: `You can't require and leave out ${value}.` });
+        }
+        if (preferredKeys.get(exclusion.field)?.has(key)) {
+          ctx.addIssue({ code: "custom", path: issuePath, message: `You can't prefer and leave out ${value}.` });
+        }
+      }
     }
   });
 

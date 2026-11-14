@@ -174,7 +174,7 @@ export function TranslatorWizard() {
               setBrief(next);
               setDone(new Set<StepId>(["upload", "preview", "criteria"]));
               focusHeading.current = true;
-              // TODO(TR-15): preferences join this step first. Results (TR-22) replaces the placeholder it opens today.
+              // Results (TR-22) replaces the placeholder this opens today.
               setCurrent("results");
             }}
           />
