@@ -4,58 +4,28 @@ import { useEffect, useRef, useState } from "react";
 import { checkWorkbookFile, type WorkbookFileInput } from "../import/check-file";
 import { checkAllowlist, FILE_GATE_MESSAGES, type GatedWorkbook } from "../import/file-gate";
 import type { ParseResult } from "../import/parse";
-import { groupDuplicates, type GroupedRecord } from "../normalize/duplicates";
-import { normalizeWorkbook, type NormalizedWorkbook } from "../normalize/normalize";
-import { compareIssues, validateRows, type RowIssue, type RowValidation } from "../normalize/validate-rows";
+import { groupDuplicates } from "../normalize/duplicates";
+import { normalizeWorkbook } from "../normalize/normalize";
+import type { ImportState } from "../normalize/summary";
+import { compareIssues, validateRows } from "../normalize/validate-rows";
 import { FileUpload } from "./file-upload";
+import { PreviewStep } from "./preview-step";
 import { SampleButtons } from "./sample-buttons";
 import { StepIndicator } from "./step-indicator";
 import { isStepAvailable, STEPS, type StepId } from "./steps";
 
 /**
- * A workbook that passed every check: the gated file and bytes, plus what the parser read from
- * them. Each row keeps `sourceRow`, `sourceValues` and `record` as parsed, plus `normalized` (TR-10).
- * `validation` splits those rows into `kept` and `excluded` (TR-11). `records` is `kept` with exact
- * duplicates folded into the earliest row, `duplicateCount` the rows folded (TR-12). Later steps,
- * ranking (TR-17) first, use only `records`. `issues` is every issue from both steps, sorted by
- * row then code.
+ * A workbook that passed every check: the gated file and bytes, plus what the import made of
+ * them (`ImportState`). Each row keeps `sourceRow`, `sourceValues` and `record` as parsed, plus
+ * `normalized` (TR-10). `validation` splits those rows into `kept` and `excluded` (TR-11).
+ * `records` is `kept` with exact duplicates folded into the earliest row, `duplicateCount` the
+ * rows folded (TR-12). Later steps, ranking (TR-17) first, use only `records`. `issues` is every
+ * issue from both steps, sorted by row then code.
  */
-type LoadedWorkbook = GatedWorkbook & {
-  parsed: NormalizedWorkbook;
-  validation: RowValidation;
-  records: GroupedRecord[];
-  duplicateCount: number;
-  issues: RowIssue[];
-};
+type LoadedWorkbook = GatedWorkbook & ImportState;
 
 /** Shown when the parser's code can't be downloaded. */
 const PARSER_UNAVAILABLE = "The Translator couldn't finish loading. Check your connection, reload the page and try again.";
-
-/** Most row issues listed on the Preview step until the full Preview table (TR-13). */
-const MAX_LISTED_ISSUES = 20;
-
-/** "Row 17: <reason>", or "All rows: <reason>" for an issue about the whole file. */
-function issueLine(issue: RowIssue): string {
-  return `${issue.sourceRow === null ? "All rows" : `Row ${issue.sourceRow}`}: ${issue.reason}`;
-}
-
-/** "500 rows, 1 duplicate grouped, 499 unique records". */
-function recordCounts(rows: number, duplicates: number, records: number): string {
-  const count = (n: number, one: string, many: string) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
-  return [
-    count(rows, "row", "rows"),
-    `${count(duplicates, "duplicate", "duplicates")} grouped`,
-    count(records, "unique record", "unique records"),
-  ].join(", ");
-}
-
-/** "27,412 bytes (26.8 KB)": exact bytes plus a rounded size people can read at a glance. */
-function formatFileSize(bytes: number): string {
-  const exact = `${bytes.toLocaleString("en-US")} bytes`;
-  if (bytes < 1024) return exact;
-  const rounded = bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${exact} (${rounded})`;
-}
 
 /**
  * The Translator's steps and the panel for the current one. Everything happens in the
@@ -177,61 +147,18 @@ export function TranslatorWizard() {
             <SampleButtons onWorkbook={handleWorkbook} />
           </div>
         ) : step.id === "preview" && workbook ? (
-          <div className="mt-3 flex flex-col gap-4">
-            <dl className="grid gap-x-6 gap-y-1 text-base sm:grid-cols-[auto_1fr]">
-              <dt className="font-semibold text-navy">File</dt>
-              <dd className="break-all text-muted">{workbook.file.name}</dd>
-              <dt className="font-semibold text-navy">Size</dt>
-              <dd className="text-muted">{formatFileSize(workbook.file.size)}</dd>
-              <dt className="font-semibold text-navy">Layout</dt>
-              <dd className="text-muted">{workbook.parsed.layout.label}</dd>
-              <dt className="font-semibold text-navy">Sheet</dt>
-              <dd className="break-all text-muted">{workbook.parsed.sheetName}</dd>
-              <dt className="font-semibold text-navy">Rows</dt>
-              <dd className="text-muted">{workbook.parsed.rows.length.toLocaleString("en-US")}</dd>
-            </dl>
-            {/* Placeholder until the full Preview step; the column names come from the mapping, not the file's cells. */}
-            {workbook.parsed.missingOptional.length > 0 && (
-              <p className="text-base text-muted">
-                Not in this file: {workbook.parsed.missingOptional.join(", ")}. These will show as unknown.
-              </p>
-            )}
-            {/* Placeholder until the full Preview step (TR-13). */}
-            <p className="text-base text-muted">
-              {recordCounts(workbook.parsed.rows.length, workbook.duplicateCount, workbook.records.length)}
-            </p>
-            {/* Placeholder until the full Preview table (TR-13). Reasons may quote cells: shown here, never logged. */}
-            {workbook.issues.length > 0 && <RowIssues issues={workbook.issues} />}
-          </div>
+          <PreviewStep
+            workbook={workbook}
+            onContinue={() => {
+              setDone(new Set<StepId>(["upload", "preview"]));
+              focusHeading.current = true;
+              setCurrent("criteria");
+            }}
+          />
         ) : (
           <p className="mt-3 text-base text-muted">This step isn’t built yet.</p>
         )}
       </section>
-    </div>
-  );
-}
-
-/**
- * Placeholder for the Preview step's issue list until the full Preview table (TR-13):
- * "N rows need attention", then the first MAX_LISTED_ISSUES issues and "and N more".
- */
-function RowIssues({ issues }: { issues: readonly RowIssue[] }) {
-  const rowCount = new Set(issues.flatMap((issue) => (issue.sourceRow === null ? [] : [issue.sourceRow]))).size;
-  const listed = issues.slice(0, MAX_LISTED_ISSUES);
-  const more = issues.length - listed.length;
-  return (
-    <div className="flex flex-col gap-2 text-base">
-      {rowCount > 0 && (
-        <p className="font-semibold text-navy">
-          {rowCount.toLocaleString("en-US")} {rowCount === 1 ? "row needs" : "rows need"} attention
-        </p>
-      )}
-      <ul className="flex list-disc flex-col gap-1 pl-5 text-muted">
-        {listed.map((issue) => (
-          <li key={`${issue.sourceRow ?? "file"}-${issue.code}`}>{issueLine(issue)}</li>
-        ))}
-      </ul>
-      {more > 0 && <p className="text-muted">and {more.toLocaleString("en-US")} more</p>}
     </div>
   );
 }
