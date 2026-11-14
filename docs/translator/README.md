@@ -151,11 +151,34 @@ Cell values quoted in a reason are trimmed and cut to 40 characters. They are sh
 
 **"Invalid rows"** in the counts summary (TR-23) means `excluded.length`. Warnings are shown but don't reduce the count. These excluded rows are not the same as rows removed by an exclusion criterion during ranking.
 
-**Not checked here:** the same business under two different IDs (SYN-0500 repeats SYN-0001). That is duplicate grouping (TR-12).
+**Not checked here:** the same business under two different IDs (SYN-0500 repeats SYN-0001). That is [duplicate grouping](#duplicate-grouping) (TR-12).
 
 **Preview** (placeholder until the full Preview step, TR-13): when there are issues it shows "N rows need attention" and lists up to 20 as "Row 17: reason" (a whole-file issue as "All rows: reason"), then "and N more".
 
 **The synthetic sample has 0 issues:** 500 kept, 0 excluded. Its 124 blank employee counts are not flagged, and its Record IDs are all filled and unique.
+
+## Duplicate grouping
+
+After the row checks, the same business listed more than once is folded into one record (TR-12). Code: `groupDuplicates()` in `src/features/translator/normalize/duplicates.ts`. It runs on `kept` only, so every Record ID it sees is unique. It returns `records` (one per business, in row order), `duplicateCount` and `issues`. Ranking (TR-17) and every later step use `records`.
+
+**Exact duplicates are grouped.** Two rows are exact duplicates when every field except the Record ID is equal after [cleaning](#cleaning-values):
+
+- Text and category fields are compared by `matchKey()`, so `" Phoenix "` and `"phoenix"` are the same.
+- An unknown value only equals an unknown value with the same reason. A blank never equals an invalid value or a real one, so a blank employee count and `N/A` don't group.
+- Employees are compared by the count, or by min and max for a range.
+- Other executives are compared in order, by the match keys of each name and title.
+
+The row with the lowest row number is kept. The others are folded into it: their Record IDs go into its `duplicateIds` and their row numbers into `duplicateRows`, both in row order. Grouped rows are not issues: they are counted in `duplicateCount` and shown as where the record came from.
+
+**Possible duplicates are flagged, never merged.** Among the records left, rows with the same company, city and state (compared by `matchKey()`), and the same address when both rows have one, look like the same business. Company alone isn't enough, because a chain with several locations would match. Both rows are kept. Every row except the earliest gets a `possible-duplicate` warning naming the earliest row it matches and the fields that differ, by their display names (`FIELD_LABELS` in `import/fields.ts`) in field order:
+
+> Looks like the same business as row 2 (SYN-0001), but Title and Email differ. Both are kept, so check them before using the list.
+
+A row with an unknown company, city or state is never flagged. These warnings join the [row check](#row-checks) issues in one list, sorted by row number, then code.
+
+**Preview** (placeholder until TR-13) shows the counts: "500 rows, 1 duplicate grouped, 499 unique records".
+
+**In the synthetic sample:** SYN-0500 (row 501) is an exact duplicate of SYN-0001 (row 2), so SYN-0001 has `duplicateIds` `["SYN-0500"]` and `duplicateRows` `[501]`. That gives 499 records, `duplicateCount` 1 and 0 possible duplicates.
 
 ## Ranking
 

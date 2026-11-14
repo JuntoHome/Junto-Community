@@ -10,8 +10,8 @@ import { normalizeEmployees, type NormalizedRow } from "./normalize";
  * Pure and deterministic: no React, no I/O, no logging. The same rows always give the same result.
  */
 
-/** What kind of problem a row has. */
-export type RowIssueCode = "invalid-employees" | "duplicate-id" | "generated-id";
+/** What kind of problem a row has. `possible-duplicate` comes from duplicate grouping (TR-12, duplicates.ts). */
+export type RowIssueCode = "invalid-employees" | "duplicate-id" | "generated-id" | "possible-duplicate";
 
 /** "warning": the row is kept and ranked. "excluded": the row is left out of everything after this step. */
 export type RowIssueSeverity = "warning" | "excluded";
@@ -40,7 +40,7 @@ export type RowValidation = {
 const MAX_QUOTED = 40;
 
 /** Trimmed, inner whitespace collapsed, and cut to MAX_QUOTED characters ("..." when cut). */
-function quote(text: string): string {
+export function quote(text: string): string {
   const characters = Array.from(text.trim().replace(/\s+/g, " "));
   return characters.length > MAX_QUOTED ? `${characters.slice(0, MAX_QUOTED).join("")}...` : characters.join("");
 }
@@ -87,7 +87,7 @@ function employeesIssue(row: NormalizedRow): RowIssue | null {
 }
 
 /** Whole-file issues (sourceRow null) first, then by row number, then by code. */
-function compareIssues(a: RowIssue, b: RowIssue): number {
+export function compareIssues(a: RowIssue, b: RowIssue): number {
   const rowA = a.sourceRow ?? 0;
   const rowB = b.sourceRow ?? 0;
   if (rowA !== rowB) return rowA - rowB;

@@ -24,6 +24,29 @@ export type ExtraField = (typeof EXTRA_FIELDS)[number];
 export const RECORD_FIELDS = [...CORE_FIELDS, ...CONTACT_FIELDS, ...EXTRA_FIELDS] as const;
 export type RecordField = (typeof RECORD_FIELDS)[number];
 
+/**
+ * What each field is called on screen, whichever layout the file uses. User messages name
+ * fields with these (for example the possible-duplicate warning, TR-12).
+ */
+export const FIELD_LABELS: Record<RecordField, string> = {
+  recordId: "Record ID",
+  company: "Company",
+  city: "City",
+  state: "State",
+  industry: "Industry",
+  employees: "Employees",
+  title: "Title",
+  name: "Name",
+  email: "Email",
+  phone: "Phone",
+  website: "Website",
+  address: "Address",
+  zip: "ZIP Code",
+  naicsDescription: "NAICS Description",
+  employeeRange: "Employee Size Range",
+  otherExecutives: "Other Executives",
+};
+
 /** The fields that hold one piece of text: everything except recordId (always set) and otherExecutives (a list). */
 export type TextField = Exclude<RecordField, "recordId" | "otherExecutives">;
 export const TEXT_FIELDS = RECORD_FIELDS.filter(

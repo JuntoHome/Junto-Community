@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { checkWorkbookFile, type WorkbookFileInput } from "../import/check-file";
 import { checkAllowlist, FILE_GATE_MESSAGES, type GatedWorkbook } from "../import/file-gate";
 import type { ParseResult } from "../import/parse";
+import { groupDuplicates, type GroupedRecord } from "../normalize/duplicates";
 import { normalizeWorkbook, type NormalizedWorkbook } from "../normalize/normalize";
-import { validateRows, type RowIssue, type RowValidation } from "../normalize/validate-rows";
+import { compareIssues, validateRows, type RowIssue, type RowValidation } from "../normalize/validate-rows";
 import { FileUpload } from "./file-upload";
 import { SampleButtons } from "./sample-buttons";
 import { StepIndicator } from "./step-indicator";
@@ -14,10 +15,18 @@ import { isStepAvailable, STEPS, type StepId } from "./steps";
 /**
  * A workbook that passed every check: the gated file and bytes, plus what the parser read from
  * them. Each row keeps `sourceRow`, `sourceValues` and `record` as parsed, plus `normalized` (TR-10).
- * `validation` splits those rows into `kept` and `excluded` with the issues found (TR-11). Later
- * steps use only `validation.kept`.
+ * `validation` splits those rows into `kept` and `excluded` (TR-11). `records` is `kept` with exact
+ * duplicates folded into the earliest row, `duplicateCount` the rows folded (TR-12). Later steps,
+ * ranking (TR-17) first, use only `records`. `issues` is every issue from both steps, sorted by
+ * row then code.
  */
-type LoadedWorkbook = GatedWorkbook & { parsed: NormalizedWorkbook; validation: RowValidation };
+type LoadedWorkbook = GatedWorkbook & {
+  parsed: NormalizedWorkbook;
+  validation: RowValidation;
+  records: GroupedRecord[];
+  duplicateCount: number;
+  issues: RowIssue[];
+};
 
 /** Shown when the parser's code can't be downloaded. */
 const PARSER_UNAVAILABLE = "The Translator couldn't finish loading. Check your connection, reload the page and try again.";
@@ -28,6 +37,16 @@ const MAX_LISTED_ISSUES = 20;
 /** "Row 17: <reason>", or "All rows: <reason>" for an issue about the whole file. */
 function issueLine(issue: RowIssue): string {
   return `${issue.sourceRow === null ? "All rows" : `Row ${issue.sourceRow}`}: ${issue.reason}`;
+}
+
+/** "500 rows, 1 duplicate grouped, 499 unique records". */
+function recordCounts(rows: number, duplicates: number, records: number): string {
+  const count = (n: number, one: string, many: string) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
+  return [
+    count(rows, "row", "rows"),
+    `${count(duplicates, "duplicate", "duplicates")} grouped`,
+    count(records, "unique record", "unique records"),
+  ].join(", ");
 }
 
 /** "27,412 bytes (26.8 KB)": exact bytes plus a rounded size people can read at a glance. */
@@ -116,7 +135,10 @@ export function TranslatorWizard() {
     const normalized = normalizeWorkbook(parsed.workbook);
     // Then rows with problems are flagged; duplicate Record IDs are left out of `kept`.
     const validation = validateRows(normalized.rows, normalized.layout);
-    setWorkbook({ file, buffer, entry: gate.entry, parsed: normalized, validation });
+    // Then exact duplicates among the kept rows are folded into the earliest one; look-alikes are flagged.
+    const { records, duplicateCount, issues: duplicateIssues } = groupDuplicates(validation.kept);
+    const issues = [...validation.issues, ...duplicateIssues].sort(compareIssues);
+    setWorkbook({ file, buffer, entry: gate.entry, parsed: normalized, validation, records, duplicateCount, issues });
     setDone(new Set<StepId>(["upload"]));
     focusHeading.current = true;
     setCurrent("preview");
@@ -174,8 +196,12 @@ export function TranslatorWizard() {
                 Not in this file: {workbook.parsed.missingOptional.join(", ")}. These will show as unknown.
               </p>
             )}
+            {/* Placeholder until the full Preview step (TR-13). */}
+            <p className="text-base text-muted">
+              {recordCounts(workbook.parsed.rows.length, workbook.duplicateCount, workbook.records.length)}
+            </p>
             {/* Placeholder until the full Preview table (TR-13). Reasons may quote cells: shown here, never logged. */}
-            {workbook.validation.issues.length > 0 && <RowIssues issues={workbook.validation.issues} />}
+            {workbook.issues.length > 0 && <RowIssues issues={workbook.issues} />}
           </div>
         ) : (
           <p className="mt-3 text-base text-muted">This step isn’t built yet.</p>
