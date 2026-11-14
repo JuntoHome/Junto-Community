@@ -250,11 +250,11 @@ The Results step opens with "Your criteria" (TR-16): the brief in plain language
 
 ## Ranking
 
-`rank(records, brief)` (`ranking/index.ts`) returns `{ brief, rows, filter }`, where `brief` is the brief it ranked against and `filter` is `{ counts, byCriterion, statusById }` from [filtering](#filtering). Until TR-18 and TR-19, `rows` is every eligible record, unscored, in input order.
+`rank(records, brief)` (`ranking/index.ts`) returns `{ brief, rows, filter, weights, scoringVersion }`, where `brief` is the brief it ranked against, `filter` is `{ counts, byCriterion, statusById }` from [filtering](#filtering), `weights` and each row's score come from [scoring](#scoring), and `scoringVersion` is `SCORING_VERSION` ("1.0"). Each row is `{ record, score, displayScore, breakdown }`. Until TR-19, `rows` is every eligible record, scored, in input order.
 
 1. Apply exclusions (a missing value is not a match).
 2. Apply must-haves (a missing value fails). Count rows that failed because of missing data.
-3. Score 0 to 100 from preferences. Default weights: industry 35, geography 30, title 25, employees 10. Full weight for a match in a dimension, 0 if missing. Only active dimensions count, scaled to 100. No preferences = 0. If the user orders preferences, use weights 4, 3, 2, 1.
+3. Score 0 to 100 from preferences. Default weights: industry 35, geography 30, title 25, employees 10. Full weight for a match in a dimension, 0 if missing. Only active dimensions count, scaled to 100. No preferences = 0. If the user orders preferences, use weights 4, 3, 2, 1. Details: [Scoring](#scoring).
 4. Sort by unrounded score descending, then Record ID ascending. Default list size 40 (1 to 100).
 5. Pinned rows first (labelled, keep their score). Omitted rows removed. Excluded rows cannot be pinned.
 6. Every result lists its reasons from its own values.
@@ -298,13 +298,49 @@ Every criterion in a stage is tested, so a record counts under each one it faile
 
 With Phoenix, AZ and title Operations Manager, `byCriterion` gives city removed 399, state removed 0, and title removed 373 with `removedMissing` 125 (every blank title in the file, inside Phoenix or not). Leaving out Retail excludes all 99 Retail records in the file, not only the 20 in Phoenix, because exclusions run first on every record.
 
+### Scoring
+
+Step 3 (TR-18). Code: `scoreRecords(eligible, brief)` in `ranking/score.ts`, with the constants in `ranking/weights.ts`. It runs on the eligible records only, keeps their input order and uses `matchCriterion()` for every preference.
+
+**Dimensions and weights.** The four dimensions are industry, geography (city and state), title and employees, in that default order. A dimension is active when the brief has at least one preference on it; only active dimensions count. `weightsFor(brief)` gives each active dimension its weight:
+
+- No `priorityOrder`: the default weights, industry 35, geography 30, title 25, employees 10.
+- With `priorityOrder`: the listed dimensions first, in that order, then any active dimension it leaves out, in default order. They get 4, 3, 2, 1 by position. The form always lists every active preference. A brief from the Phase 2 AI may list only some; an unlisted preference still counts, but less than every listed one. With title, industry and employees active and only title listed, the weights are title 4, industry 3, employees 2.
+- `priorityOrder` holds dimensions, not fields, so city and state share the one geography weight. An empty `priorityOrder` counts as none (the form never sends one).
+
+**One result per dimension**: `"match"`, `"no-match"` or `"unknown"`.
+
+- Several preferences on one field (or an `in` list): a match if any value matches.
+- **Geography with both a city and a state preference: a match only if the city and the state each match.** A Phoenix, AZ preference means Phoenix in Arizona, so Mesa, AZ is a no match and earns no geography points.
+- Otherwise a real mismatch on any of the dimension's fields gives `"no-match"`, and a missing value (with no mismatch) gives `"unknown"`. A row with a blank title and a title preference is `"unknown"`. So is Phoenix with a blank state, because the state might have matched.
+- The dimension earns its full weight on `"match"` and 0 on `"no-match"` or `"unknown"`.
+
+**The score.** `score = earned total / active weight total * 100`, kept **unrounded**: in the business owner walkthrough, a record matching industry and title scores 60 / 70 * 100 = 85.71428571428571, not 86. Sorting (TR-19) and the export (TR-25) use `score`. `displayScore = Math.round(score)` is only for the screen. Weights are whole numbers, so the totals are exact and the one division comes last, in a fixed dimension order: the same records and brief give the same scores to the last bit. With no preferences every record scores 0, with no weights and an empty breakdown.
+
+**Breakdown.** Each row has one `breakdown` entry per active dimension, in default order: `{ dimension, weight, earned, result, criteria }`. `criteria` lists each preference in that dimension as `{ index, field, result }`, where `index` is its position in `brief.preferences`. Reasons (TR-20) are built from it.
+
+**With the synthetic sample** (scores to 2 decimal places, with the count of the 100 eligible records at each):
+
+| Brief | Weights (total) | Scores |
+|---|---|---|
+| Business owner (`BUSINESS_OWNER_BRIEF`) | industry 35, title 25, employees 10 (70) | 100 (1, SYN-0001), 85.71 (4), 64.29 (7), 50 (10), 35.71 (20), 14.29 (19), 0 (39) |
+| Same, title Operations Manager | same | 100 (6: SYN-0006, 0026, 0126, 0226, 0326, 0426), 64.29 (2, including SYN-0001), 50 (33), 0 (59) |
+| Job seeker (`JOB_SEEKER_BRIEF`) | same | 100 (7: SYN-0002, 0007, 0027, 0127, 0227, 0327, 0427), 64.29 (1), 50 (33), 0 (59) |
+| Business owner, prefer only Fabrication and 10 to 99 | industry 35, employees 10 (45) | 100 (8), 77.78 (14, industry only), 22.22 (19, employees only), 0 (59) |
+| Business owner, ordered title, industry, employees | title 4, industry 3, employees 2 (9) | A title-only match scores 44.44 |
+
+Ties at the top are why "SYN-0006 first" and "SYN-0002 first" depend on TR-19's tiebreak (Record ID ascending).
+
 ## Expected results
 
 | Scenario | Expected |
 |---|---|
-| Phoenix, AZ must-have; prefer Fabrication, Owner, 10 to 99; 40 rows | 500 in, 1 duplicate (SYN-0500 under SYN-0001), 499 unique, 100 eligible, 40 out, SYN-0001 first at 100 |
-| Same, title Owner changed to Operations Manager | SYN-0006 first at 100 |
-| Tempe, AZ; prefer Logistics, Operations Manager, 10 to 99; 30 rows | 100 eligible, 30 out, SYN-0002 first at 100 |
+| Phoenix, AZ must-have; prefer Fabrication, Owner, 10 to 99; 40 rows | 500 in, 1 duplicate (SYN-0500 under SYN-0001), 499 unique, 100 eligible, 40 out, SYN-0001 first at 100. SYN-0001 is the only 100. Scores of the 100 eligible: 100 (1), 85.71 (4), 64.29 (7), 50 (10), 35.71 (20), 14.29 (19), 0 (39) |
+| Same, title Owner changed to Operations Manager | SYN-0006 first at 100, tied with SYN-0026, 0126, 0226, 0326 and 0426 (first by Record ID). SYN-0001 64.29 |
+| Tempe, AZ; prefer Logistics, Operations Manager, 10 to 99; 30 rows | 100 eligible, 30 out, SYN-0002 first at 100, tied with 6 others (first by Record ID) |
+| Phoenix, AZ; prefer only Fabrication and 10 to 99 | Active weight total 45. Both match 100, industry only 77.78, employees only 22.22 |
+| No preferences | Every score 0, empty breakdown |
+| Prefer city Phoenix and state AZ; a Mesa, AZ row | Geography no match, 0 points |
 | City not in the workbook | 0 eligible; empty list with a filter-specific explanation |
 | Required title Operations Manager | Rows with unknown title fail that filter. With Phoenix, AZ: 25 eligible, 474 failed a must-have, 25 only because of missing data |
 | Altered copy of the workbook | Rejected by the file gate |
