@@ -70,7 +70,7 @@ Each mapping in `src/features/translator/import/mappings/` has two header lists 
 
 - **Signatures** only recognise the layout. Each is a header the other layout doesn't have (checked against `JCA_Reference_Solutions_Exact_Headers_Jeel.xlsx`), so a file missing a required column is still recognised and gets the "Missing required columns" message instead of "couldn't recognize". `City` and `State` are in both layouts, so they are never signatures. `Industry` is both a signature and required for Synthetic: without it the other six still recognise the layout.
 - **Required** headers feed company, city, state and industry (and the Synthetic `Record ID`). Missing ones are listed in the order above, by their real column names. A required header that appears twice stops the import.
-- **Optional** mapped headers may be missing. Their values are unknown (`null`): a missing half of a joined name gives just the other half, a missing `Executive Title` falls back to `Professional Title`, absent executive slots are skipped, and without `IUSA Number` every row gets a generated `ROW-0001` style ID. Missing optional headers are listed on the Preview step: "Not in this file: Email. These will show as unknown." Numbered executive slot headers are not listed.
+- **Optional** mapped headers may be missing. Their values are unknown (`null`): a missing half of a joined name gives just the other half, a missing `Executive Title` falls back to `Professional Title`, absent executive slots are skipped, and without `IUSA Number` every row gets a generated `ROW-0001` style ID. On the [Preview step](#preview-step) their fields show as "Missing (shown as unknown)" in the column mapping. Numbered executive slots are checked by slot 1 only: Other Executives is Missing when no slot 1 column (`Executive First Name 1` and so on) is there.
 - An optional or unmapped header that appears twice is allowed; the first one is used.
 
 ## Two input layouts, one set of fields
@@ -149,11 +149,11 @@ Cell values quoted in a reason are trimmed and cut to 40 characters. They are sh
 - **Duplicate Record ID: the first row (lowest row number) is kept; every later one is excluded.** Pin, omit, the Record ID tiebreak in sorting and export all identify a row by its Record ID ([Ranking](#ranking) rules 4 and 5), so two rows with one ID would break all four. After this step every Record ID in `kept` is unique, ignoring case and spacing.
 - **Generated ID: kept, with a warning.** For the Reference Solutions layout, when no row has an IUSA Number (the column is optional), there is one summary issue for the whole file instead of one per row. It has no row number (`sourceRow` and `recordId` are null) and reads: No row has an IUSA Number, so every row was given an ID from its row number (row 2 is ROW-0001).
 
-**"Invalid rows"** in the counts summary (TR-23) means `excluded.length`. Warnings are shown but don't reduce the count. These excluded rows are not the same as rows removed by an exclusion criterion during ranking.
+**"Invalid rows"** in the counts summary (TR-23) means `excluded.length`; the Preview step calls it "Rows left out". Warnings are shown but don't reduce the count. These excluded rows are not the same as rows removed by an exclusion criterion during ranking.
 
 **Not checked here:** the same business under two different IDs (SYN-0500 repeats SYN-0001). That is [duplicate grouping](#duplicate-grouping) (TR-12).
 
-**Preview** (placeholder until the full Preview step, TR-13): when there are issues it shows "N rows need attention" and lists up to 20 as "Row 17: reason" (a whole-file issue as "All rows: reason"), then "and N more".
+The [Preview step](#preview-step) lists every issue in a table.
 
 **The synthetic sample has 0 issues:** 500 kept, 0 excluded. Its 124 blank employee counts are not flagged, and its Record IDs are all filled and unique.
 
@@ -176,9 +176,27 @@ The row with the lowest row number is kept. The others are folded into it: their
 
 A row with an unknown company, city or state is never flagged. These warnings join the [row check](#row-checks) issues in one list, sorted by row number, then code.
 
-**Preview** (placeholder until TR-13) shows the counts: "500 rows, 1 duplicate grouped, 499 unique records".
+The [Preview step](#preview-step) shows the count and each group.
 
 **In the synthetic sample:** SYN-0500 (row 501) is an exact duplicate of SYN-0001 (row 2), so SYN-0001 has `duplicateIds` `["SYN-0500"]` and `duplicateRows` `[501]`. That gives 499 records, `duplicateCount` 1 and 0 possible duplicates.
+
+## Preview step
+
+After a workbook loads, the Preview step shows what was found before the user sets criteria (TR-13). It shows no row data: the shortlist shows rows later. Code: `ui/preview-step.tsx`, with two pure helpers, `summarizeImport()` (`normalize/summary.ts`) and `describeMapping()` (`import/describe-mapping.ts`).
+
+- **File:** file name, layout label and sheet name.
+- **Counts:** Rows read, Duplicates grouped, Unique records, Rows left out and Rows with warnings. "Empty rows skipped" appears only when it is more than 0. Rows read = Rows left out + Duplicates grouped + Unique records.
+  - *Empty rows skipped* counts the gaps in the row numbers between the header and the last data row. Blank rows after the last data row aren't counted.
+  - *Rows with warnings* counts rows that are not left out and have at least one warning. A warning about the whole file (no IUSA Number anywhere) counts every such row.
+- **Duplicate groups:** one line per group, for example "SYN-0001 also appears as SYN-0500 (row 501)". More than 5 groups are inside a closed "Show all N duplicate groups".
+- **Column mapping:** a table of Field, Spreadsheet column and Status, one row per field the layout has, in field order. Status is "Found" when the file has at least one of the columns the field reads, otherwise "Missing (shown as unknown)". Fields the layout never has are listed under the table: "Not in this layout: Phone, Website, ...".
+- **Issues:** a table of Row, Record ID, What happened (the issue's reason) and Result ("Left out" or "Kept"). A whole-file issue shows "All rows". More than 10 issues are inside a closed "Show all N issues". With none: "No problems found."
+- **Continue to criteria** moves to the Criteria step. Warnings never block it. It is disabled only when there are 0 unique records, with "No usable rows were found in this file. Choose a different file."
+- Focus moves to the step heading when Preview opens, and to the Criteria heading after Continue. Wide tables scroll inside their own box, so the page doesn't scroll sideways at phone width.
+
+**The synthetic sample shows:** file `JCA_Synthetic_Contacts.xlsx`, layout Synthetic, sheet Contacts; Rows read 500, Duplicates grouped 1, Unique records 499, Rows left out 0, Rows with warnings 0; one group, "SYN-0001 also appears as SYN-0500 (row 501)"; 9 mapping rows, all Found, and "Not in this layout" for the other 7 fields; "No problems found."
+
+For the Reference Solutions mapping against the full 396-column header row, every field is Found except Email (Not in this layout). Without `IUSA Number` and `Website`, those two are Missing.
 
 ## Ranking
 

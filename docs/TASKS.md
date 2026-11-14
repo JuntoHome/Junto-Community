@@ -69,7 +69,8 @@ These may be done; confirm and move them.
 | TR-09 | Header validation | Merged into `translator` (PR #44): mappings now have `signatureHeaders` (recognise the layout) and `requiredHeaders` (must be present once) instead of `detectHeaders`. `validateHeaders()` in `import/validate-headers.ts` runs in `parseWorkbook()` before any row is read: "Missing required columns: City" for missing ones, a stop for a required column that appears twice, and missing optional columns become unknown and are listed on Preview | [#9](https://github.com/JuntoHome/Junto-Community/issues/9), [PR #44](https://github.com/JuntoHome/Junto-Community/pull/44) |
 | TR-10 | Normalize values | Merged into `translator` (PR #45): `normalizeRecord()` in `normalize/normalize.ts` gives every value an `original`, a tidy `value` and, for city, state, industry and title, a match `key` from `matchKey()` (`normalize/match-key.ts`); blanks become a tagged unknown; employees are parsed as a whole number, or from the employee range when that is unknown. The wizard normalizes every row after parsing and keeps the originals | [#10](https://github.com/JuntoHome/Junto-Community/issues/10), [PR #45](https://github.com/JuntoHome/Junto-Community/pull/45) |
 | TR-11 | Row validation: invalid employee counts and duplicate IDs | Merged into `translator` (PR #46): `validateRows()` in `normalize/validate-rows.ts` returns `kept`, `excluded` and `issues` (`{ sourceRow, recordId, code, severity, reason }`). Invalid employee counts and blank Record IDs are warnings (row kept); a repeated Record ID keeps the first row and excludes the rest, so every Record ID in `kept` is unique. The wizard runs it after normalizing; later steps use only `kept`. Preview lists the issues (placeholder until TR-13) | [#11](https://github.com/JuntoHome/Junto-Community/issues/11), [PR #46](https://github.com/JuntoHome/Junto-Community/pull/46) |
-| TR-12 | Duplicate grouping | In review (PR into `translator`, branch `tr-12-duplicate-grouping`): `groupDuplicates()` in `normalize/duplicates.ts` runs on `kept` and folds rows equal on every field except the Record ID (after normalizing) into the earliest one, with `duplicateIds` and `duplicateRows`. Rows with the same company, city and state (and address, when both have one) are kept and flagged as `possible-duplicate` warnings. The wizard keeps `records` and `duplicateCount`; ranking (TR-17) will use `records`. Sample: SYN-0500 under SYN-0001, 499 records | [#12](https://github.com/JuntoHome/Junto-Community/issues/12), PR pending |
+| TR-12 | Duplicate grouping | Merged into `translator` (PR #47): `groupDuplicates()` in `normalize/duplicates.ts` runs on `kept` and folds rows equal on every field except the Record ID (after normalizing) into the earliest one, with `duplicateIds` and `duplicateRows`. Rows with the same company, city and state (and address, when both have one) are kept and flagged as `possible-duplicate` warnings. The wizard keeps `records` and `duplicateCount`; ranking (TR-17) will use `records`. Sample: SYN-0500 under SYN-0001, 499 records | [#12](https://github.com/JuntoHome/Junto-Community/issues/12), [PR #47](https://github.com/JuntoHome/Junto-Community/pull/47) |
+| TR-13 | Preview step | In review (PR into `translator`, branch `tr-13-preview-step`): `ui/preview-step.tsx` shows the file, the counts from `summarizeImport()` (`normalize/summary.ts`), duplicate groups, the column mapping from `describeMapping()` (`import/describe-mapping.ts`) and every row issue, then "Continue to criteria". Sample: 500 read, 1 duplicate grouped, 499 unique, 0 left out, 0 with warnings | [#13](https://github.com/JuntoHome/Junto-Community/issues/13), PR pending |
 
 ## Pending
 
@@ -80,12 +81,6 @@ Data Axle Translator Phase 1, all open. Each issue has the steps and acceptance 
 | ID | Title | Expected location | Issue |
 |---|---|---|---|
 | TR-35 | Synthetic test file in the real Reference Solutions layout | `docs/translator/` | [#35](https://github.com/JuntoHome/Junto-Community/issues/35) |
-
-### Import and cleaning
-
-| ID | Title | Expected location | Issue |
-|---|---|---|---|
-| TR-13 | Preview step | `ui/` | [#13](https://github.com/JuntoHome/Junto-Community/issues/13) |
 
 ### Criteria
 
