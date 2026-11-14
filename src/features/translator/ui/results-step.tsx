@@ -26,8 +26,8 @@ const PREVIEW_ROWS = 5;
 /**
  * The Results step: the criteria summary (TR-16), then, once confirmed, the results. The
  * results table is TR-22 and the counts summary TR-23; until then placeholder lines give the
- * filter counts (TR-17), the first rows of the shortlist (TR-19) and how many of the matches it
- * shows.
+ * filter counts (TR-17), the first rows of the shortlist (TR-19) with their reasons (TR-20) and
+ * how many of the matches it shows.
  *
  * The summary describes `results.brief` once there are results, the exact brief `rank()` got,
  * and the pending brief before that. It is never rebuilt from form state.
@@ -77,7 +77,10 @@ export function ResultsStep({
           {results.shortlist.length > 0 && (
             <ol className="mt-2 text-base text-muted">
               {results.shortlist.slice(0, PREVIEW_ROWS).map((row) => (
-                <li key={row.record.normalized.recordId}>{TEXT.shortlistRow(row)}</li>
+                <li key={row.record.normalized.recordId}>
+                  {TEXT.shortlistRow(row)}
+                  <p className="text-sm">{row.reasonText}</p>
+                </li>
               ))}
             </ol>
           )}

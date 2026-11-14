@@ -241,7 +241,7 @@ The Results step opens with "Your criteria" (TR-16): the brief in plain language
 - **Change** opens an inline editor under the line for just that item, with the Criteria step's controls (`ui/criteria-controls.tsx`). The Preferences line has one button per part: Change industry, Change title, Change company size and, when ordered, Change order. Goal, location, each must-have, each exclusion and list size have one Change each. Assumptions have none (the form has no input for them).
 - **Edits apply only on Save.** The editor works on a draft copy of the form that produced the brief; typing there changes nothing. Save runs `toBrief()` on the draft. If it is invalid, the error shows inline (a clash with another criterion, such as "You can't require and leave out Tempe.", is listed in the editor) and nothing changes. If it is valid, the form and the pending brief are updated, and so is the confirmed brief when results are showing, which re-ranks. Cancel discards the draft. Opening another editor cancels the open one.
 - **A Save changes only that item.** Every other key in the brief stays the same. One exception follows from the schema: with an importance order on, setting a preference to No preference also removes it from `priorityOrder`.
-- **Confirm and rank** (shown until results show) ranks the pending brief. Until the results table (TR-22) and counts summary (TR-23), the results are placeholder lines: the [filter](#filtering) counts ("100 match. 0 left out by your exclusions. 399 didn't meet a must-have (0 only because of missing data)."), the first 5 shortlist rows as `1. SYN-0001 (100)` (Record ID and rounded score), and "Showing 40 of 100 matches." (shortlist rows of eligible rows).
+- **Confirm and rank** (shown until results show) ranks the pending brief. Until the results table (TR-22) and counts summary (TR-23), the results are placeholder lines: the [filter](#filtering) counts ("100 match. 0 left out by your exclusions. 399 didn't meet a must-have (0 only because of missing data)."), the first 5 shortlist rows as `1. SYN-0001 (100)` (Record ID and rounded score), each with its [`reasonText`](#match-reasons) on the line under it, and "Showing 40 of 100 matches." (shortlist rows of eligible rows).
 - **The summary always shows the brief behind the results**: `results.brief`, the brief `rank()` got, once confirmed, and the pending brief before. It is never rebuilt from form state.
 - **Going back to Criteria** shows the same values as the summary, because a Save writes to the same form state. A Save starts from the form that produced the current brief, so changes made on Criteria without pressing Continue are replaced by it.
 - **Accessibility:** Change moves focus to the editor's heading. After Save or Cancel, focus returns to that item's Change button (or the "Your criteria" heading if the item is gone), and a live region says "Updated." or, once results show, "Updated. Results refreshed." After a failed Save, focus goes to the first problem. After Confirm and rank, focus moves to the results.
@@ -250,14 +250,14 @@ The Results step opens with "Your criteria" (TR-16): the brief in plain language
 
 ## Ranking
 
-`rank(records, brief)` (`ranking/index.ts`) returns `{ brief, scoringVersion, weights, filter, ranked, shortlist }`, where `brief` is the brief it ranked against, `scoringVersion` is `SCORING_VERSION` ("1.0"), `weights` and each row's score come from [scoring](#scoring), and `filter` is `{ counts, byCriterion, statusById }` from [filtering](#filtering). `ranked` is every eligible row, sorted, and `shortlist` is its first `listSize` rows, each with a `rank` ([Sorting and list size](#sorting-and-list-size)). Each row is `{ record, score, displayScore, breakdown }`, plus `rank` in `shortlist`.
+`rank(records, brief)` (`ranking/index.ts`) returns `{ brief, scoringVersion, weights, filter, ranked, shortlist }`, where `brief` is the brief it ranked against, `scoringVersion` is `SCORING_VERSION` ("1.0"), `weights` and each row's score come from [scoring](#scoring), and `filter` is `{ counts, byCriterion, statusById }` from [filtering](#filtering). `ranked` is every eligible row, sorted, and `shortlist` is its first `listSize` rows, each with a `rank` ([Sorting and list size](#sorting-and-list-size)). Each row is `{ record, score, displayScore, breakdown, reasons, reasonText }`, plus `rank` in `shortlist`.
 
 1. Apply exclusions (a missing value is not a match).
 2. Apply must-haves (a missing value fails). Count rows that failed because of missing data.
 3. Score 0 to 100 from preferences. Default weights: industry 35, geography 30, title 25, employees 10. Full weight for a match in a dimension, 0 if missing. Only active dimensions count, scaled to 100. No preferences = 0. If the user orders preferences, use weights 4, 3, 2, 1. Details: [Scoring](#scoring).
 4. Sort by unrounded score descending, then Record ID ascending. Default list size 40 (1 to 100). Details: [Sorting and list size](#sorting-and-list-size).
 5. Pinned rows first (labelled, keep their score). Omitted rows removed. Excluded rows cannot be pinned.
-6. Every result lists its reasons from its own values.
+6. Every result lists its reasons from its own values. Details: [Match reasons](#match-reasons).
 
 ### Filtering
 Steps 1 and 2 (TR-17). Code: `filterRecords(records, brief)` in `ranking/filter.ts`, on the grouped `records` from [duplicate grouping](#duplicate-grouping) (499 for the sample, not the 500 source rows).
@@ -317,7 +317,7 @@ Step 3 (TR-18). Code: `scoreRecords(eligible, brief)` in `ranking/score.ts`, wit
 
 **The score.** `score = earned total / active weight total * 100`, kept **unrounded**: in the business owner walkthrough, a record matching industry and title scores 60 / 70 * 100 = 85.71428571428571, not 86. Sorting (TR-19) and the export (TR-25) use `score`. `displayScore = Math.round(score)` is only for the screen. Weights are whole numbers, so the totals are exact and the one division comes last, in a fixed dimension order: the same records and brief give the same scores to the last bit. With no preferences every record scores 0, with no weights and an empty breakdown.
 
-**Breakdown.** Each row has one `breakdown` entry per active dimension, in default order: `{ dimension, weight, earned, result, criteria }`. `criteria` lists each preference in that dimension as `{ index, field, result }`, where `index` is its position in `brief.preferences`. Reasons (TR-20) are built from it.
+**Breakdown.** Each row has one `breakdown` entry per active dimension, in default order: `{ dimension, weight, earned, result, criteria }`. `criteria` lists each preference in that dimension as `{ index, field, result }`, where `index` is its position in `brief.preferences`. [Match reasons](#match-reasons) (TR-20) are built from it.
 
 **With the synthetic sample** (scores to 2 decimal places, with the count of the 100 eligible records at each):
 
@@ -346,15 +346,70 @@ Digit IDs go first as a group, not compared as text with the others, so the orde
 
 **List size.** `shortlist` is the first `listSize` rows of `ranked`, or all of them when fewer are eligible: 40 of 100 gives 40, 40 of 12 gives 12. Each gets `rank` 1 to N in order; tied scores still get different, sequential ranks. `ranked` keeps every eligible row so pin and omit (TR-21) can change it before the cut, and an omitted row lets the next one move up into the shortlist.
 
+### Match reasons
+
+Step 6 (TR-20). Code: `explain(row, brief)` in `ranking/reasons.ts`. `rank()` calls it on every row of `ranked`, not only the shortlist, because pins (TR-21) come from `ranked`. It returns `{ reasons, reasonText }`:
+
+- `reasons`: a list of `{ kind, dimension, text }`. `kind` is `"required"`, `"preferred"`, `"not-preferred"`, `"unknown"` or `"info"`. `dimension` is the scoring dimension the line is about (`"geography"` for a Location, City or State line), or `null` for `info`.
+- `reasonText`: every `text` joined with `"; "`. The export (TR-25) uses exactly this string.
+
+**One source of text.** The reasons are written once, here. The results table (TR-22) and the export (TR-25) show `reasons` and `reasonText` as they are and never rebuild the wording. `explain()` doesn't compare anything again: preference lines come from the row's `breakdown`, and required lines from the row having passed every must-have.
+
+**Wording.** The value shown is always the **record's** own tidy `value` (TR-10), never the brief's: a record with city " phoenix " shows `City: phoenix`.
+
+| Case | Text |
+|---|---|
+| Must-have met, city and state | `Location: Phoenix, AZ (required)` |
+| Must-have met, only city or only state | `City: Phoenix (required)` / `State: AZ (required)` |
+| Must-have met, other field | `Industry: Fabrication (required)` |
+| Preference matched | `Industry: Fabrication (preferred)`, `Title: Operations Manager (preferred)` |
+| Geography preference matched | `Location: Phoenix, AZ (preferred)`; only a city or only a state preference: `City: Phoenix (preferred)` / `State: AZ (preferred)` |
+| Employees matched | `Company size: 25 employees (preferred)`; range-sourced: `Company size: 10 to 19 employees (preferred)` |
+| Preference not matched | `Title: General Manager (not preferred)`, `Company size: 8 employees (not preferred)`, `Location: Mesa, AZ (not preferred)` |
+| Preference value unknown | `Title unknown`, `Company size unknown`; geography names only the missing part: `State unknown` for Phoenix with a blank state, `Location unknown` when both are blank |
+| Geography not matched, one part blank | Only the part the record has: `City: Mesa (not preferred)` |
+| No must-haves and no preferences | `Matches your criteria. No preferences were set.` (`info`) |
+| Must-haves but no preferences | The required lines, then `No preferences were set, so all matches score 0.` (`info`) |
+
+- **Labels** come from `FIELD_LABELS` (`import/fields.ts`), so the title is "Title". Two names come from the criteria summary's `DIMENSION_NAMES` (`criteria/describe.ts`) instead: "Location" for city and state together, and "Company size" for employees (`FIELD_LABELS` calls it "Employees").
+- **Employee counts** are written from the parsed number, with commas from plain code (not `toLocaleString()`), so every browser gives the same text: `1 employee`, `1,200 employees`, a range `10 to 19 employees` (whether the cell said "10-19" or "10 to 19"), an open range `10,000 or more employees`.
+- **Long values** are cut to 60 characters, the last one being `…`. Reasons are plain text.
+- **Exclusions aren't listed.** Every eligible row passed them, so "not Retail" would only add noise.
+- **Pins** (TR-21) will add their own `info` line.
+
+**Order** (the same every time):
+
+1. Required lines, in the order the brief first names each must-have dimension. City and state share one Location line.
+2. Preference lines, one per active dimension, by weight, highest first. Equal weights stay in default dimension order (industry, geography, title, employees). The default weights (35, 30, 25, 10) give that same order; with `priorityOrder` it is the user's order, then any dimension it leaves out.
+3. The `info` line, when the brief has no preferences.
+
+Every row has at least one reason: a brief with preferences gives one line per active dimension, and one without gives the `info` line.
+
+**With the synthetic sample** (Phoenix, AZ must-haves):
+
+| Brief, record | `reasonText` |
+|---|---|
+| Business owner, SYN-0001 | `Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title: Owner (preferred); Company size: 25 employees (preferred)` |
+| Title Operations Manager, SYN-0006 | `Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title: Operations Manager (preferred); Company size: 25 employees (preferred)` |
+| Title Operations Manager, SYN-0011 | `Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title unknown; Company size: 25 employees (preferred)` |
+| Business owner, SYN-0016 | `Location: Phoenix, AZ (required); Industry: Retail (not preferred); Title: General Manager (not preferred); Company size unknown` |
+| Business owner, SYN-0021 | `Location: Phoenix, AZ (required); Industry: Technology (not preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)` |
+| Business owner, ordered title, industry, employees, SYN-0001 | `Location: Phoenix, AZ (required); Title: Owner (preferred); Industry: Fabrication (preferred); Company size: 25 employees (preferred)` |
+| Phoenix, AZ only, no preferences | `Location: Phoenix, AZ (required); No preferences were set, so all matches score 0.` |
+| No criteria at all | `Matches your criteria. No preferences were set.` |
+
+The "not preferred" lines show why scores differ. With the business owner brief SYN-0001 has 100 and SYN-0006 has 64, and SYN-0006's reasons say why: `Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title: Operations Manager (not preferred); Company size: 25 employees (preferred)`.
+
 ## Expected results
 
 | Scenario | Expected |
 |---|---|
 | Phoenix, AZ must-have; prefer Fabrication, Owner, 10 to 99; 40 rows | 500 in, 1 duplicate (SYN-0500 under SYN-0001), 499 unique, 100 eligible, 40 out, SYN-0001 first at 100. SYN-0001 is the only 100. Scores of the 100 eligible: 100 (1), 85.71 (4), 64.29 (7), 50 (10), 35.71 (20), 14.29 (19), 0 (39) |
-| Same, title Owner changed to Operations Manager | SYN-0006 first at 100. The first 6, all at 100, in order: SYN-0006, SYN-0026, SYN-0126, SYN-0226, SYN-0326, SYN-0426 (tied, so ordered by Record ID). SYN-0001 64.29, 7th |
+| Same, title Owner changed to Operations Manager | SYN-0006 first at 100, with `Title: Operations Manager (preferred)` in its reasons ([Match reasons](#match-reasons)). The first 6, all at 100, in order: SYN-0006, SYN-0026, SYN-0126, SYN-0226, SYN-0326, SYN-0426 (tied, so ordered by Record ID). SYN-0001 64.29, 7th |
 | Tempe, AZ; prefer Logistics, Operations Manager, 10 to 99; 30 rows | 100 eligible, 30 out, SYN-0002 first at 100, tied with 6 others (first by Record ID) |
 | Business owner, list size 1 / 100 | 1 row (SYN-0001) / all 100 eligible rows |
-| Same brief twice, or the records shuffled first | Identical `shortlist` |
+| Same brief twice, or the records shuffled first | Identical `shortlist`, reasons included |
+| Any brief, every row in `ranked` | At least one reason, none empty, no em-dashes |
 | Phoenix, AZ; prefer only Fabrication and 10 to 99 | Active weight total 45. Both match 100, industry only 77.78, employees only 22.22 |
 | No preferences | Every score 0, empty breakdown |
 | Prefer city Phoenix and state AZ; a Mesa, AZ row | Geography no match, 0 points |
