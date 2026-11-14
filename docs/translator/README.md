@@ -219,12 +219,38 @@ After Preview, the Criteria step asks what the user is trying to do and what eve
   - List size blank, 0, 101 or 40.5: "Choose a whole number from 1 to 100."
   - The same value as a must-have and an exclusion on one field: "You can't require and leave out Phoenix." As a preference and an exclusion: "You can't prefer and leave out Retail." Both show on the Leave out picker.
 - **Cross-field checks live in the schema**, not the form, so a brief from the Phase 2 AI gets them too. Values are compared with `matchKey()`, so " phoenix " and "Phoenix" conflict. Only text values (`equals`, `in`) are compared, not employee ranges. The issue's path points at the exclusion's value (`exclusions.0.value`, or `exclusions.0.value.1` inside an `in` list).
-- **Continue** stores the brief in the wizard and opens Results (a placeholder until TR-22). The form's choices are kept in the wizard, so going back to Criteria shows them; loading a new workbook clears them. Changing one section never resets another.
+- **Continue** stores the brief in the wizard as the pending brief and opens Results, which starts with the [criteria summary](#criteria-summary). It replaces any earlier pending brief and clears the confirmed one, so a new brief is always confirmed before it is ranked. The form's choices are kept in the wizard, so going back to Criteria shows them; loading a new workbook clears them. Changing one section never resets another.
 - **City and state are separate filters.** "Springfield" with "IL" and "MO" means city in [Springfield] and state in [IL, MO], which also keeps a Springfield in a state where it isn't the one meant. Fine for Phase 1 ([KNOWN-ISSUES.md](../KNOWN-ISSUES.md#correctness-risks)).
 
 **The synthetic sample offers:** City Glendale 100, Mesa 100, Phoenix 100, Scottsdale 99, Tempe 100; State AZ 499; Industry Business Services 100, Fabrication 100, Logistics 100, Retail 99, Technology 100; Title General Manager 124, Operations Manager 126, Owner 124 (blank titles not listed). Business owner with Phoenix and AZ gives `mustHaves` `[{ field: "city", operator: "equals", value: "Phoenix" }, { field: "state", operator: "equals", value: "AZ" }]`. Adding Prefer Fabrication, Owner and 10 to 99 with list size 40 gives exactly `BUSINESS_OWNER_BRIEF` (`criteria/examples.ts`); job seeker with Tempe and AZ, Logistics, Operations Manager, 10 to 99 and 30 gives `JOB_SEEKER_BRIEF`.
 
+## Criteria summary
+
+The Results step opens with "Your criteria" (TR-16): the brief in plain language, to confirm or change one item at a time before ranking. Code: `ui/criteria-summary.tsx` (inside `ui/results-step.tsx`), with the pure `describeBrief()` and `describeLines()` in `criteria/describe.ts`. The export's Criteria sheet (TR-26) will reuse them.
+
+- **One line per item, in a fixed order**, each value passed through as plain text, never HTML:
+  - Goal: "Goal: find prospective customers or partners." or "Goal: find potential employers."
+  - Location: city and state together, "Must be in Phoenix, AZ." Several values: "Must be in Phoenix or Tempe, AZ." Only one of them set: "Must be in AZ."
+  - Other must-haves: "Industry must be Fabrication.", "Title must be Owner or General Manager."
+  - Preferences, one sentence: "Prefer Fabrication, Owner, 10 to 99 employees." With an importance order: "Prefer, most important first: 1. Owner, 2. Fabrication, 3. 10 to 99 employees."
+  - Exclusions, one line per field: "Leave out Retail."
+  - List size: "Show 40."
+  - Assumptions: one line each, or "No assumptions."
+  - Lines with nothing set are left out, except list size and assumptions.
+- **Items and ids.** `describeBrief()` returns `{ id, section, text }` items with stable ids: `goal`, `must-geo`, `must-industry`, `must-title`, `pref-industry`, `pref-title`, `pref-employees`, `priority`, `exclude-industry`, `exclude-title`, `exclude-city`, `list-size`, `assumptions`. A preference item's text is its part of the sentence ("Owner"); `priority` is "Most important first: Title, Industry, Company size." `describeLines()` joins the preference items into the one Preferences sentence. A brief the form can't produce (Phase 2) can also have `pref-geo`, `must-employees`, `exclude-state` and `exclude-employees`, so the summary still shows all of it; those have no Change button.
+- **Change** opens an inline editor under the line for just that item, with the Criteria step's controls (`ui/criteria-controls.tsx`). The Preferences line has one button per part: Change industry, Change title, Change company size and, when ordered, Change order. Goal, location, each must-have, each exclusion and list size have one Change each. Assumptions have none (the form has no input for them).
+- **Edits apply only on Save.** The editor works on a draft copy of the form that produced the brief; typing there changes nothing. Save runs `toBrief()` on the draft. If it is invalid, the error shows inline (a clash with another criterion, such as "You can't require and leave out Tempe.", is listed in the editor) and nothing changes. If it is valid, the form and the pending brief are updated, and so is the confirmed brief when results are showing, which re-ranks. Cancel discards the draft. Opening another editor cancels the open one.
+- **A Save changes only that item.** Every other key in the brief stays the same. One exception follows from the schema: with an importance order on, setting a preference to No preference also removes it from `priorityOrder`.
+- **Confirm and rank** (shown until results show) ranks the pending brief. Results are a placeholder until TR-22: "Ranked against the criteria above. Results table comes in TR-22."
+- **The summary always shows the brief behind the results**: `results.brief`, the brief `rank()` got, once confirmed, and the pending brief before. It is never rebuilt from form state.
+- **Going back to Criteria** shows the same values as the summary, because a Save writes to the same form state. A Save starts from the form that produced the current brief, so changes made on Criteria without pressing Continue are replaced by it.
+- **Accessibility:** Change moves focus to the editor's heading. After Save or Cancel, focus returns to that item's Change button (or the "Your criteria" heading if the item is gone), and a live region says "Updated." or, once results show, "Updated. Results refreshed." After a failed Save, focus goes to the first problem. After Confirm and rank, focus moves to the results.
+
+**With the synthetic sample**, the business owner walkthrough shows "Goal: find prospective customers or partners.", "Must be in Phoenix, AZ.", "Prefer Fabrication, Owner, 10 to 99 employees.", "Show 40." and "No assumptions." Changing the title preference to Operations Manager changes only the Preferences line and `preferences[1]` of the brief.
+
 ## Ranking
+
+`rank(records, brief)` (`ranking/index.ts`) returns `{ brief, rows }`, where `brief` is the brief it ranked against. Until TR-17 to TR-19 it is a stub that returns no rows.
 
 1. Apply exclusions (a missing value is not a match).
 2. Apply must-haves (a missing value fails). Count rows that failed because of missing data.
