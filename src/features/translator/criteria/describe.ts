@@ -50,8 +50,8 @@ const GOALS: Record<SearchBrief["intent"], string> = {
   job_seeker: "Goal: find potential employers.",
 };
 
-/** What each dimension is called in the importance order. */
-const DIMENSION_NAMES: Record<BriefDimension, string> = {
+/** What each dimension is called in the importance order. Match reasons (TR-20) use the same names. */
+export const DIMENSION_NAMES: Record<BriefDimension, string> = {
   industry: "Industry",
   geography: "Location",
   title: "Title",

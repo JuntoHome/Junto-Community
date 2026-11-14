@@ -2,6 +2,7 @@ import { SCORING_VERSION, type SearchBrief } from "../criteria/schema";
 import type { GroupedRecord } from "../normalize/duplicates";
 import { filterRecords, type FilterResult } from "./filter";
 import { takeShortlist, type WithRank } from "./limit";
+import { explain, type RowReasons } from "./reasons";
 import { scoreRecords, type DimensionWeight, type ScoredRecord } from "./score";
 import { sortScored } from "./sort";
 
@@ -11,17 +12,19 @@ import { sortScored } from "./sort";
  * same order.
  *
  * Steps: filter by exclusions and must-haves (TR-17, `filter.ts`), score the preferences (TR-18,
- * `score.ts`), sort by score then Record ID (TR-19, `sort.ts`) and cut to the list size (TR-19,
- * `limit.ts`). Every comparison goes through `matchCriterion()` (`match.ts`).
+ * `score.ts`), sort by score then Record ID (TR-19, `sort.ts`), explain each row (TR-20,
+ * `reasons.ts`) and cut to the list size (TR-19, `limit.ts`). Every comparison goes through
+ * `matchCriterion()` (`match.ts`).
  *
  * Pure: no React, no I/O, no logging.
  */
 
 /**
- * One eligible row: the record, its unrounded `score` (0 to 100), the rounded `displayScore`
- * and the per-dimension `breakdown`. TR-20 adds its reasons.
+ * One eligible row: the record, its unrounded `score` (0 to 100), the rounded `displayScore`,
+ * the per-dimension `breakdown`, and its `reasons` and `reasonText` (TR-20). The results table
+ * (TR-22) and the export (TR-25) show the reasons as they are.
  */
-export type RankedRow = ScoredRecord;
+export type RankedRow = ScoredRecord & RowReasons;
 
 /** A row in the shortlist: a `RankedRow` with its `rank`, 1 for the first. */
 export type ShortlistRow = WithRank<RankedRow>;
@@ -54,7 +57,8 @@ export type RankResult = {
 export function rank(records: readonly GroupedRecord[], brief: SearchBrief): RankResult {
   const { eligible, counts, byCriterion, statusById } = filterRecords(records, brief);
   const { weights, rows } = scoreRecords(eligible, brief);
-  const ranked = sortScored(rows);
+  // Every ranked row gets its reasons, not only the shortlist, because pins (TR-21) come from `ranked`.
+  const ranked: RankedRow[] = sortScored(rows).map((row) => ({ ...row, ...explain(row, brief) }));
   // TODO(TR-21): apply omit and pin to ranked before takeShortlist
   const shortlist = takeShortlist(ranked, brief.listSize);
   return {
