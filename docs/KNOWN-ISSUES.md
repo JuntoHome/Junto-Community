@@ -35,6 +35,8 @@ A review as of November 2026. Nothing here has been fixed unless it says so. Ite
 | No error page for the public site | `src/app/(site)/` has no `error.tsx` | A failed profile query on a cache miss shows the framework's default error |
 | The Translator's match key ignores only spacing and case | `matchKey()` in `src/features/translator/normalize/match-key.ts` (TR-10) | By design for Phase 1. Punctuation is kept (`St. Louis` doesn't match `St Louis`), state names aren't mapped to codes (`Arizona` doesn't match `AZ`) and there is no stemming (`Fabricator` doesn't match `Fabrication`), so such rows don't match a criterion |
 | The Translator's employee range formats are guessed | `normalizeEmployees()` in `src/features/translator/normalize/normalize.ts` (TR-10) | **Unverified.** No real Reference Solutions range values have been seen. If the wording differs from "10 to 19", "10-19" or "10,000+", those counts stay unknown and don't match employee criteria |
+| The Translator keeps the first row of a repeated Record ID, not the most complete one | `validateRows()` in `src/features/translator/normalize/validate-rows.ts` (TR-11) | By design for Phase 1. The row with the lowest row number is kept and the later ones are excluded, even when a later row has more filled-in values. The Preview step names both rows so the user can fix the file |
+| A real ID that looks generated is reported as blank | `hasGeneratedId()` in `validate-rows.ts` (TR-11) | A generated ID is recognised by matching the one the parser would give that row (row 17 is `ROW-0016`). If the file's own ID cell on row 17 holds exactly `ROW-0016`, the row gets a "Record ID is blank" warning it doesn't need. The row is still kept. Unlikely with real IUSA Numbers, which are digits |
 
 ## Security
 

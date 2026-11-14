@@ -5,6 +5,7 @@ import { checkWorkbookFile, type WorkbookFileInput } from "../import/check-file"
 import { checkAllowlist, FILE_GATE_MESSAGES, type GatedWorkbook } from "../import/file-gate";
 import type { ParseResult } from "../import/parse";
 import { normalizeWorkbook, type NormalizedWorkbook } from "../normalize/normalize";
+import { validateRows, type RowIssue, type RowValidation } from "../normalize/validate-rows";
 import { FileUpload } from "./file-upload";
 import { SampleButtons } from "./sample-buttons";
 import { StepIndicator } from "./step-indicator";
@@ -13,11 +14,21 @@ import { isStepAvailable, STEPS, type StepId } from "./steps";
 /**
  * A workbook that passed every check: the gated file and bytes, plus what the parser read from
  * them. Each row keeps `sourceRow`, `sourceValues` and `record` as parsed, plus `normalized` (TR-10).
+ * `validation` splits those rows into `kept` and `excluded` with the issues found (TR-11). Later
+ * steps use only `validation.kept`.
  */
-type LoadedWorkbook = GatedWorkbook & { parsed: NormalizedWorkbook };
+type LoadedWorkbook = GatedWorkbook & { parsed: NormalizedWorkbook; validation: RowValidation };
 
 /** Shown when the parser's code can't be downloaded. */
 const PARSER_UNAVAILABLE = "The Translator couldn't finish loading. Check your connection, reload the page and try again.";
+
+/** Most row issues listed on the Preview step until the full Preview table (TR-13). */
+const MAX_LISTED_ISSUES = 20;
+
+/** "Row 17: <reason>", or "All rows: <reason>" for an issue about the whole file. */
+function issueLine(issue: RowIssue): string {
+  return `${issue.sourceRow === null ? "All rows" : `Row ${issue.sourceRow}`}: ${issue.reason}`;
+}
 
 /** "27,412 bytes (26.8 KB)": exact bytes plus a rounded size people can read at a glance. */
 function formatFileSize(bytes: number): string {
@@ -102,7 +113,10 @@ export function TranslatorWizard() {
       return;
     }
     // Values are cleaned for matching here; the originals stay on each row for display and export.
-    setWorkbook({ file, buffer, entry: gate.entry, parsed: normalizeWorkbook(parsed.workbook) });
+    const normalized = normalizeWorkbook(parsed.workbook);
+    // Then rows with problems are flagged; duplicate Record IDs are left out of `kept`.
+    const validation = validateRows(normalized.rows, normalized.layout);
+    setWorkbook({ file, buffer, entry: gate.entry, parsed: normalized, validation });
     setDone(new Set<StepId>(["upload"]));
     focusHeading.current = true;
     setCurrent("preview");
@@ -160,11 +174,38 @@ export function TranslatorWizard() {
                 Not in this file: {workbook.parsed.missingOptional.join(", ")}. These will show as unknown.
               </p>
             )}
+            {/* Placeholder until the full Preview table (TR-13). Reasons may quote cells: shown here, never logged. */}
+            {workbook.validation.issues.length > 0 && <RowIssues issues={workbook.validation.issues} />}
           </div>
         ) : (
           <p className="mt-3 text-base text-muted">This step isn’t built yet.</p>
         )}
       </section>
+    </div>
+  );
+}
+
+/**
+ * Placeholder for the Preview step's issue list until the full Preview table (TR-13):
+ * "N rows need attention", then the first MAX_LISTED_ISSUES issues and "and N more".
+ */
+function RowIssues({ issues }: { issues: readonly RowIssue[] }) {
+  const rowCount = new Set(issues.flatMap((issue) => (issue.sourceRow === null ? [] : [issue.sourceRow]))).size;
+  const listed = issues.slice(0, MAX_LISTED_ISSUES);
+  const more = issues.length - listed.length;
+  return (
+    <div className="flex flex-col gap-2 text-base">
+      {rowCount > 0 && (
+        <p className="font-semibold text-navy">
+          {rowCount.toLocaleString("en-US")} {rowCount === 1 ? "row needs" : "rows need"} attention
+        </p>
+      )}
+      <ul className="flex list-disc flex-col gap-1 pl-5 text-muted">
+        {listed.map((issue) => (
+          <li key={`${issue.sourceRow ?? "file"}-${issue.code}`}>{issueLine(issue)}</li>
+        ))}
+      </ul>
+      {more > 0 && <p className="text-muted">and {more.toLocaleString("en-US")} more</p>}
     </div>
   );
 }

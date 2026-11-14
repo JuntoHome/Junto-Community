@@ -2,7 +2,7 @@
 
 The project's task status in one place. GitHub issues are the source of truth for Translator work; this file summarises them. Update it when a ticket changes state.
 
-**As of:** Nov 13, 2026.
+**As of:** Nov 14, 2026.
 
 **Sources:** GitHub issues #1 to #35 (milestone "Data Axle Translator Phase 1"), [JCA_CMS_Plan.md](JCA_CMS_Plan.md) for CMS tickets, and the commit history for completion evidence.
 
@@ -67,7 +67,8 @@ These may be done; confirm and move them.
 | TR-07 | File gate: allow only the approved synthetic workbook | Merged into `translator` (PR #42): `checkAllowlist()` in `import/file-gate.ts` hashes the workbook (SHA-256, in the browser) and accepts only hashes listed in `import/allowlist.ts` (one entry for now, `JCA_Synthetic_Contacts.xlsx`; TR-35 adds the Reference Solutions file). Runs in `handleWorkbook` after `checkWorkbookFile()`; the bytes read for it are kept for the parser (TR-08). Fails closed without a secure context. Also restores `docs/translator/JCA_Synthetic_Contacts.xlsx`, which had been replaced by a different file in `188675f` | [#7](https://github.com/JuntoHome/Junto-Community/issues/7), [PR #42](https://github.com/JuntoHome/Junto-Community/pull/42) |
 | TR-08 | Parse the workbook and detect its layout | Merged into `translator` (PR #43): `parseWorkbook()` in `import/parse.ts` reads the gated bytes with ExcelJS, picks the `Contacts` sheet or the first sheet in a known layout, detects Synthetic or Reference Solutions from row 1, and maps each data row (keeping `sourceRow` and `sourceValues`). Skips empty rows, stops above 1,000 rows, and returns plain-language problems. `import/xlsx-compat.ts` makes files written by non-Excel tools (namespace-prefixed XML, absolute paths) readable. Preview shows layout, sheet and row count | [#8](https://github.com/JuntoHome/Junto-Community/issues/8), [PR #43](https://github.com/JuntoHome/Junto-Community/pull/43) |
 | TR-09 | Header validation | Merged into `translator` (PR #44): mappings now have `signatureHeaders` (recognise the layout) and `requiredHeaders` (must be present once) instead of `detectHeaders`. `validateHeaders()` in `import/validate-headers.ts` runs in `parseWorkbook()` before any row is read: "Missing required columns: City" for missing ones, a stop for a required column that appears twice, and missing optional columns become unknown and are listed on Preview | [#9](https://github.com/JuntoHome/Junto-Community/issues/9), [PR #44](https://github.com/JuntoHome/Junto-Community/pull/44) |
-| TR-10 | Normalize values | In review (PR into `translator`, branch `tr-10-normalize-values`): `normalizeRecord()` in `normalize/normalize.ts` gives every value an `original`, a tidy `value` and, for city, state, industry and title, a match `key` from `matchKey()` (`normalize/match-key.ts`); blanks become a tagged unknown; employees are parsed as a whole number, or from the employee range when that is unknown. The wizard normalizes every row after parsing and keeps the originals | [#10](https://github.com/JuntoHome/Junto-Community/issues/10), [PR #45](https://github.com/JuntoHome/Junto-Community/pull/45) |
+| TR-10 | Normalize values | Merged into `translator` (PR #45): `normalizeRecord()` in `normalize/normalize.ts` gives every value an `original`, a tidy `value` and, for city, state, industry and title, a match `key` from `matchKey()` (`normalize/match-key.ts`); blanks become a tagged unknown; employees are parsed as a whole number, or from the employee range when that is unknown. The wizard normalizes every row after parsing and keeps the originals | [#10](https://github.com/JuntoHome/Junto-Community/issues/10), [PR #45](https://github.com/JuntoHome/Junto-Community/pull/45) |
+| TR-11 | Row validation: invalid employee counts and duplicate IDs | In review (PR into `translator`, branch `tr-11-row-validation`): `validateRows()` in `normalize/validate-rows.ts` returns `kept`, `excluded` and `issues` (`{ sourceRow, recordId, code, severity, reason }`). Invalid employee counts and blank Record IDs are warnings (row kept); a repeated Record ID keeps the first row and excludes the rest, so every Record ID in `kept` is unique. The wizard runs it after normalizing; later steps use only `kept`. Preview lists the issues (placeholder until TR-13) | [#11](https://github.com/JuntoHome/Junto-Community/issues/11), [PR #46](https://github.com/JuntoHome/Junto-Community/pull/46) |
 
 ## Pending
 
@@ -83,7 +84,6 @@ Data Axle Translator Phase 1, all open. Each issue has the steps and acceptance 
 
 | ID | Title | Expected location | Issue |
 |---|---|---|---|
-| TR-11 | Row validation: invalid employee counts and duplicate IDs | `normalize/` | [#11](https://github.com/JuntoHome/Junto-Community/issues/11) |
 | TR-12 | Duplicate grouping | `normalize/` | [#12](https://github.com/JuntoHome/Junto-Community/issues/12) |
 | TR-13 | Preview step | `ui/` | [#13](https://github.com/JuntoHome/Junto-Community/issues/13) |
 
