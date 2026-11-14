@@ -35,9 +35,10 @@ export type Category = { known: true; original: string; value: string; key: stri
  * - Unknown: `original` is the raw employees value; `reason` is "invalid" when it wasn't a whole
  *   number and no range could be read, otherwise "blank".
  *
- * Range fit rule, applied by ranking (TR-17, TR-18), not here: a range-sourced count matches a
- * user range only when the whole range fits inside it (`min >= userMin && max <= userMax`). An
- * open range (`max` is Infinity) only matches an open user range.
+ * Range fit rule, applied by ranking (`matchCriterion()` in ranking/match.ts), not here: a
+ * range-sourced count matches a user range only when the whole range fits inside it
+ * (`min >= userMin && max <= userMax`). An open range (`max` is Infinity) never matches, because
+ * a user range always has a whole-number max.
  */
 export type Employees =
   | { known: true; original: string; count: number; source: "actual" }

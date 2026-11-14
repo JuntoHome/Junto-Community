@@ -125,7 +125,7 @@ Right after a workbook is parsed, every row's record is normalized in the browse
 
 `employeeRange` is also kept as its own text field for display.
 
-**Range fit rule** (applied by ranking, TR-17 and TR-18, not by this step): a range-sourced count matches a user range only when the whole range fits inside it (`min >= userMin` and `max <= userMax`). An open range only matches an open user range. So `10 to 19` matches 10 to 99, but `10 to 199` doesn't.
+**Range fit rule** (applied by ranking in `matchCriterion()`, see [Filtering](#filtering), not by this step): a range-sourced count matches a user range only when the whole range fits inside it (`min >= userMin` and `max <= userMax`). An open range such as `10,000+` never matches, because a user range always has a whole-number max. So `10 to 19` matches 10 to 99, but `10 to 199` doesn't.
 
 **In the synthetic workbook** all 500 rows have known company, city, state and industry. Title is blank in 125 rows, email in 125 and employees in 124; those values are unknown (`blank`). No row has an invalid employee count, and the file has no range column.
 
@@ -241,7 +241,7 @@ The Results step opens with "Your criteria" (TR-16): the brief in plain language
 - **Change** opens an inline editor under the line for just that item, with the Criteria step's controls (`ui/criteria-controls.tsx`). The Preferences line has one button per part: Change industry, Change title, Change company size and, when ordered, Change order. Goal, location, each must-have, each exclusion and list size have one Change each. Assumptions have none (the form has no input for them).
 - **Edits apply only on Save.** The editor works on a draft copy of the form that produced the brief; typing there changes nothing. Save runs `toBrief()` on the draft. If it is invalid, the error shows inline (a clash with another criterion, such as "You can't require and leave out Tempe.", is listed in the editor) and nothing changes. If it is valid, the form and the pending brief are updated, and so is the confirmed brief when results are showing, which re-ranks. Cancel discards the draft. Opening another editor cancels the open one.
 - **A Save changes only that item.** Every other key in the brief stays the same. One exception follows from the schema: with an importance order on, setting a preference to No preference also removes it from `priorityOrder`.
-- **Confirm and rank** (shown until results show) ranks the pending brief. Results are a placeholder until TR-22: "Ranked against the criteria above. Results table comes in TR-22."
+- **Confirm and rank** (shown until results show) ranks the pending brief. Until the results table (TR-22) and counts summary (TR-23), the results are one line of [filter](#filtering) counts: "100 match. 0 left out by your exclusions. 399 didn't meet a must-have (0 only because of missing data)."
 - **The summary always shows the brief behind the results**: `results.brief`, the brief `rank()` got, once confirmed, and the pending brief before. It is never rebuilt from form state.
 - **Going back to Criteria** shows the same values as the summary, because a Save writes to the same form state. A Save starts from the form that produced the current brief, so changes made on Criteria without pressing Continue are replaced by it.
 - **Accessibility:** Change moves focus to the editor's heading. After Save or Cancel, focus returns to that item's Change button (or the "Your criteria" heading if the item is gone), and a live region says "Updated." or, once results show, "Updated. Results refreshed." After a failed Save, focus goes to the first problem. After Confirm and rank, focus moves to the results.
@@ -250,7 +250,7 @@ The Results step opens with "Your criteria" (TR-16): the brief in plain language
 
 ## Ranking
 
-`rank(records, brief)` (`ranking/index.ts`) returns `{ brief, rows }`, where `brief` is the brief it ranked against. Until TR-17 to TR-19 it is a stub that returns no rows.
+`rank(records, brief)` (`ranking/index.ts`) returns `{ brief, rows, filter }`, where `brief` is the brief it ranked against and `filter` is `{ counts, byCriterion, statusById }` from [filtering](#filtering). Until TR-18 and TR-19, `rows` is every eligible record, unscored, in input order.
 
 1. Apply exclusions (a missing value is not a match).
 2. Apply must-haves (a missing value fails). Count rows that failed because of missing data.
@@ -259,6 +259,45 @@ The Results step opens with "Your criteria" (TR-16): the brief in plain language
 5. Pinned rows first (labelled, keep their score). Omitted rows removed. Excluded rows cannot be pinned.
 6. Every result lists its reasons from its own values.
 
+### Filtering
+Steps 1 and 2 (TR-17). Code: `filterRecords(records, brief)` in `ranking/filter.ts`, on the grouped `records` from [duplicate grouping](#duplicate-grouping) (499 for the sample, not the 500 source rows).
+
+**One comparison function.** `matchCriterion(record, criterion)` (`ranking/match.ts`) is the only place a record is compared with a criterion; scoring (TR-18) reuses it for preferences. It returns `"match"`, `"no-match"` or `"unknown"`. The brief's criteria are first turned into match keys once per brief with `prepareCriterion()`, not once per row.
+
+- `equals`: the record's match key equals `matchKey(value)`.
+- `in`: the record's match key is one of the values' match keys.
+- `range` (employees only): an actual count matches when `min <= count <= max`. A range-sourced count follows the [range fit rule](#cleaning-values): `10 to 19` matches 10 to 99, `10 to 249` doesn't, and an open range such as `10,000+` never does.
+- A value the record doesn't have (blank or invalid) gives `"unknown"`.
+
+**Two stages that don't overlap.**
+
+1. Exclusions: a record is excluded when any exclusion gives `"match"`. `"unknown"` and `"no-match"` don't exclude, so a row with a blank title is not left out by "Leave out Owner".
+2. Must-haves, only for records that weren't excluded: a record fails when any must-have gives `"no-match"` or `"unknown"`. An excluded record is never checked against the must-haves.
+
+Every criterion in a stage is tested, so a record counts under each one it failed.
+
+**What it returns:** `{ eligible, statusById, counts, byCriterion }`.
+
+- `eligible`: the records that passed, in input order.
+- `statusById`: `Map` of Record ID to `"eligible"`, `"excluded"` or `"failed-must-have"`, for every record. Pin and omit (TR-21) use it, because excluded rows can't be pinned.
+- `counts`: `{ input, excluded, failedMustHave, failedOnlyMissing, eligible }`, with `input = excluded + failedMustHave + eligible`.
+- `byCriterion`: one entry per exclusion, then per must-have, in brief order: `{ stage, index, field, removed, removedMissing }`. `stage` is `"exclusions"` or `"mustHaves"`, so `brief[stage][index]` is the criterion. For an exclusion, `removed` is the rows it matched and `removedMissing` is always 0. For a must-have, `removed` is the rows it failed, including missing values, and `removedMissing` the ones with no value. The no-results helper (TR-24) uses this to name the most restrictive filters.
+
+**"Only because of missing data"** (`failedOnlyMissing`): rows that failed must-haves where every failed must-have was `"unknown"` and none was a real mismatch. These are the rows that might qualify if their data were complete. A row outside Phoenix with a blank title fails on city anyway, so it isn't counted.
+
+**With the synthetic sample** (499 records):
+
+| Brief | eligible | excluded | failedMustHave | failedOnlyMissing |
+|---|---|---|---|---|
+| Business owner (`BUSINESS_OWNER_BRIEF`) | 100 | 0 | 399 | 0 |
+| Job seeker (`JOB_SEEKER_BRIEF`) | 100 | 0 | 399 | 0 |
+| Must Phoenix, AZ, title Operations Manager | 25 | 0 | 474 | 25 |
+| Must title Operations Manager only | 126 | 0 | 373 | 125 |
+| Must Phoenix, AZ; leave out Retail | 80 | 99 | 320 | 0 |
+| Must city not in the file | 0 | 0 | 499 | 0 |
+
+With Phoenix, AZ and title Operations Manager, `byCriterion` gives city removed 399, state removed 0, and title removed 373 with `removedMissing` 125 (every blank title in the file, inside Phoenix or not). Leaving out Retail excludes all 99 Retail records in the file, not only the 20 in Phoenix, because exclusions run first on every record.
+
 ## Expected results
 
 | Scenario | Expected |
@@ -266,8 +305,8 @@ The Results step opens with "Your criteria" (TR-16): the brief in plain language
 | Phoenix, AZ must-have; prefer Fabrication, Owner, 10 to 99; 40 rows | 500 in, 1 duplicate (SYN-0500 under SYN-0001), 499 unique, 100 eligible, 40 out, SYN-0001 first at 100 |
 | Same, title Owner changed to Operations Manager | SYN-0006 first at 100 |
 | Tempe, AZ; prefer Logistics, Operations Manager, 10 to 99; 30 rows | 100 eligible, 30 out, SYN-0002 first at 100 |
-| City not in the workbook | Empty list with a filter-specific explanation |
-| Required title Operations Manager | Rows with unknown title fail that filter |
+| City not in the workbook | 0 eligible; empty list with a filter-specific explanation |
+| Required title Operations Manager | Rows with unknown title fail that filter. With Phoenix, AZ: 25 eligible, 474 failed a must-have, 25 only because of missing data |
 | Altered copy of the workbook | Rejected by the file gate |
 
 ## Phase 1 rules
