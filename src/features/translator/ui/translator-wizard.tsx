@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { type CriteriaForm, EMPTY_CRITERIA_FORM } from "../criteria/from-form";
 import type { SearchBrief } from "../criteria/schema";
 import { checkWorkbookFile, type WorkbookFileInput } from "../import/check-file";
@@ -10,9 +10,11 @@ import { groupDuplicates } from "../normalize/duplicates";
 import { normalizeWorkbook } from "../normalize/normalize";
 import type { ImportState } from "../normalize/summary";
 import { compareIssues, validateRows } from "../normalize/validate-rows";
+import { rank } from "../ranking";
 import { CriteriaStep } from "./criteria-step";
 import { FileUpload } from "./file-upload";
 import { PreviewStep } from "./preview-step";
+import { ResultsStep } from "./results-step";
 import { SampleButtons } from "./sample-buttons";
 import { StepIndicator } from "./step-indicator";
 import { isStepAvailable, STEPS, type StepId } from "./steps";
@@ -44,8 +46,12 @@ export function TranslatorWizard() {
   const [fileError, setFileError] = useState<string | null>(null);
   // What the Criteria step's form holds, kept here so going back to Criteria shows the same choices.
   const [criteriaForm, setCriteriaForm] = useState<CriteriaForm>(EMPTY_CRITERIA_FORM);
-  // The SearchBrief from the last Continue on Criteria. Ranking (TR-17) reads it.
-  const [, setBrief] = useState<SearchBrief | null>(null);
+  // The brief waiting to be ranked: set by Continue on Criteria and by a Save in the criteria
+  // summary (TR-16), with the form that produced it, so the summary's editors start from that form.
+  const [pendingBrief, setPendingBrief] = useState<SearchBrief | null>(null);
+  const [pendingForm, setPendingForm] = useState<CriteriaForm | null>(null);
+  // The brief the user confirmed with "Confirm and rank". Only this one is ranked.
+  const [confirmedBrief, setConfirmedBrief] = useState<SearchBrief | null>(null);
   // Counts workbook attempts, so a slow check can't override a newer choice.
   const attempt = useRef(0);
 
@@ -118,11 +124,20 @@ export function TranslatorWizard() {
     setWorkbook({ file, buffer, entry: gate.entry, parsed: normalized, validation, records, duplicateCount, issues });
     // A new workbook has its own values, so earlier criteria no longer apply.
     setCriteriaForm(EMPTY_CRITERIA_FORM);
-    setBrief(null);
+    setPendingBrief(null);
+    setPendingForm(null);
+    setConfirmedBrief(null);
     setDone(new Set<StepId>(["upload"]));
     focusHeading.current = true;
     setCurrent("preview");
   }
+
+  // Ranked again whenever the confirmed brief changes. `results.brief` is the brief the rows came from.
+  const records = workbook?.records;
+  const results = useMemo(
+    () => (records && confirmedBrief ? rank(records, confirmedBrief) : null),
+    [records, confirmedBrief],
+  );
 
   const step = STEPS.find((s) => s.id === current) ?? STEPS[0];
 
@@ -170,13 +185,31 @@ export function TranslatorWizard() {
             records={workbook.records}
             form={criteriaForm}
             onFormChange={setCriteriaForm}
-            onContinue={(next) => {
-              setBrief(next);
+            onContinue={(next, form) => {
+              // A new brief from the form replaces the pending one and has to be confirmed again.
+              setPendingBrief(next);
+              setPendingForm(form);
+              setConfirmedBrief(null);
               setDone(new Set<StepId>(["upload", "preview", "criteria"]));
               focusHeading.current = true;
-              // Results (TR-22) replaces the placeholder this opens today.
               setCurrent("results");
             }}
+          />
+        ) : step.id === "results" && workbook && pendingBrief && pendingForm ? (
+          <ResultsStep
+            records={workbook.records}
+            pendingBrief={pendingBrief}
+            pendingForm={pendingForm}
+            results={results}
+            onSave={(next, form) => {
+              // The form is committed too, so going back to Criteria shows what the summary shows.
+              setCriteriaForm(form);
+              setPendingForm(form);
+              setPendingBrief(next);
+              // With results showing, the edit re-ranks straight away.
+              if (confirmedBrief) setConfirmedBrief(next);
+            }}
+            onConfirm={() => setConfirmedBrief(pendingBrief)}
           />
         ) : (
           <p className="mt-3 text-base text-muted">This step isn’t built yet.</p>

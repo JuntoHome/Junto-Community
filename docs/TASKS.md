@@ -72,7 +72,8 @@ These may be done; confirm and move them.
 | TR-12 | Duplicate grouping | Merged into `translator` (PR #47): `groupDuplicates()` in `normalize/duplicates.ts` runs on `kept` and folds rows equal on every field except the Record ID (after normalizing) into the earliest one, with `duplicateIds` and `duplicateRows`. Rows with the same company, city and state (and address, when both have one) are kept and flagged as `possible-duplicate` warnings. The wizard keeps `records` and `duplicateCount`; ranking (TR-17) will use `records`. Sample: SYN-0500 under SYN-0001, 499 records | [#12](https://github.com/JuntoHome/Junto-Community/issues/12), [PR #47](https://github.com/JuntoHome/Junto-Community/pull/47) |
 | TR-13 | Preview step | Merged into `translator` (PR #48): `ui/preview-step.tsx` shows the file, the counts from `summarizeImport()` (`normalize/summary.ts`), duplicate groups, the column mapping from `describeMapping()` (`import/describe-mapping.ts`) and every row issue, then "Continue to criteria". Sample: 500 read, 1 duplicate grouped, 499 unique, 0 left out, 0 with warnings | [#13](https://github.com/JuntoHome/Junto-Community/issues/13), [PR #48](https://github.com/JuntoHome/Junto-Community/pull/48) |
 | TR-14 | Criteria form: goal and must-haves | Merged into `translator` (PR #49): `ui/criteria-step.tsx` asks for the goal (required) and optional City, State, Industry and Title must-haves, each a `ui/value-picker.tsx` multi-select of the values `fieldOptions()` (`normalize/field-options.ts`) finds in `records`, with counts. `toBrief()` (`criteria/from-form.ts`) builds and validates the `SearchBrief` (one value `equals`, several `in`). Inline errors and a focused summary; choices kept in the wizard | [#14](https://github.com/JuntoHome/Junto-Community/issues/14), [PR #49](https://github.com/JuntoHome/Junto-Community/pull/49) |
-| TR-15 | Criteria form: preferences, exclusions and list size | In review (PR into `translator`, branch `tr-15-criteria-preferences`): `ui/criteria-step.tsx` adds Preferences (Industry, Title, Company size, each No preference or Prefer), an optional importance order with Move up and Move down, Leave out (Industry, Title, City) and List size (1 to 100, default 40). `toBrief()` fills `preferences`, `exclusions`, `priorityOrder` and `listSize`. `searchBriefSchema` now rejects a value that is both left out and required or preferred on one field. Continue opens the Results placeholder until TR-22 | [#15](https://github.com/JuntoHome/Junto-Community/issues/15), PR pending |
+| TR-15 | Criteria form: preferences, exclusions and list size | Merged into `translator` (PR #50): `ui/criteria-step.tsx` adds Preferences (Industry, Title, Company size, each No preference or Prefer), an optional importance order with Move up and Move down, Leave out (Industry, Title, City) and List size (1 to 100, default 40). `toBrief()` fills `preferences`, `exclusions`, `priorityOrder` and `listSize`. `searchBriefSchema` now rejects a value that is both left out and required or preferred on one field. Continue opens the Results placeholder until TR-22 | [#15](https://github.com/JuntoHome/Junto-Community/issues/15), [PR #50](https://github.com/JuntoHome/Junto-Community/pull/50) |
+| TR-16 | Criteria summary panel | In review (PR into `translator`, branch `tr-16-criteria-summary`): the Results step opens with "Your criteria", the brief in plain language from `describeBrief()` and `describeLines()` (`criteria/describe.ts`), each item with a Change button that opens an inline editor using the Criteria step's controls (now shared in `ui/criteria-controls.tsx`). A change applies only on Save. "Confirm and rank" ranks the pending brief; after that a Save re-ranks. `rank(records, brief)` (`ranking/index.ts`) returns `{ brief, rows }` and is a stub with no rows until TR-17 to TR-19 | [#16](https://github.com/JuntoHome/Junto-Community/issues/16), PR pending |
 
 ## Pending
 
@@ -83,12 +84,6 @@ Data Axle Translator Phase 1, all open. Each issue has the steps and acceptance 
 | ID | Title | Expected location | Issue |
 |---|---|---|---|
 | TR-35 | Synthetic test file in the real Reference Solutions layout | `docs/translator/` | [#35](https://github.com/JuntoHome/Junto-Community/issues/35) |
-
-### Criteria
-
-| ID | Title | Expected location | Issue |
-|---|---|---|---|
-| TR-16 | Criteria summary panel | `ui/` | [#16](https://github.com/JuntoHome/Junto-Community/issues/16) |
 
 ### Ranking
 
