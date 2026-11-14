@@ -129,6 +129,34 @@ Right after a workbook is parsed, every row's record is normalized in the browse
 
 **In the synthetic workbook** all 500 rows have known company, city, state and industry. Title is blank in 125 rows, email in 125 and employees in 124; those values are unknown (`blank`). No row has an invalid employee count, and the file has no range column.
 
+## Row checks
+
+After cleaning, every row is checked for problems (TR-11). Code: `validateRows()` in `src/features/translator/normalize/validate-rows.ts`. It returns `kept` (rows that go forward), `excluded` (rows left out) and `issues`. Every later step (duplicate grouping, ranking, pin and omit, export) uses only `kept`.
+
+Each issue is `{ sourceRow, recordId, code, severity, reason }`. `severity` is `warning` (the row is kept) or `excluded` (the row is left out). Issues are sorted by row number, then code, so the same file always gives the same list. A row can have more than one issue.
+
+| Code | When | Severity | Reason shown |
+|---|---|---|---|
+| `invalid-employees` | The employees cell has text that isn't a whole number (`25.5`, `-3`, `N/A`). Blank cells are not flagged | `warning` | Employees value "25.5" isn't a whole number, so company size is treated as unknown. When a size range was read instead, it ends: Using the size range 10 to 19 instead. |
+| `duplicate-id` | The Record ID was already used on an earlier row. IDs are compared with `matchKey()`, so `SYN-0007` and ` syn-0007 ` are the same | `excluded` | Record ID SYN-0007 is also used on row 5. Row 5 is used and this row is left out. |
+| `generated-id` | The ID cell was blank, so the row was given a `ROW-0001` style ID | `warning` | Record ID is blank, so this row was given the ID ROW-0016. (The Reference Solutions layout names its column: IUSA Number is blank, ...) |
+
+Cell values quoted in a reason are trimmed and cut to 40 characters. They are shown on screen but never logged.
+
+**Keep or exclude:**
+
+- **Invalid employee count: kept, with a warning.** Employees is optional. An unknown size already scores 0 on the employees preference and fails an employees must-have ([Ranking](#ranking)), so dropping the whole business over one bad cell would lose more than it protects.
+- **Duplicate Record ID: the first row (lowest row number) is kept; every later one is excluded.** Pin, omit, the Record ID tiebreak in sorting and export all identify a row by its Record ID ([Ranking](#ranking) rules 4 and 5), so two rows with one ID would break all four. After this step every Record ID in `kept` is unique, ignoring case and spacing.
+- **Generated ID: kept, with a warning.** For the Reference Solutions layout, when no row has an IUSA Number (the column is optional), there is one summary issue for the whole file instead of one per row. It has no row number (`sourceRow` and `recordId` are null) and reads: No row has an IUSA Number, so every row was given an ID from its row number (row 2 is ROW-0001).
+
+**"Invalid rows"** in the counts summary (TR-23) means `excluded.length`. Warnings are shown but don't reduce the count. These excluded rows are not the same as rows removed by an exclusion criterion during ranking.
+
+**Not checked here:** the same business under two different IDs (SYN-0500 repeats SYN-0001). That is duplicate grouping (TR-12).
+
+**Preview** (placeholder until the full Preview step, TR-13): when there are issues it shows "N rows need attention" and lists up to 20 as "Row 17: reason" (a whole-file issue as "All rows: reason"), then "and N more".
+
+**The synthetic sample has 0 issues:** 500 kept, 0 excluded. Its 124 blank employee counts are not flagged, and its Record IDs are all filled and unique.
+
 ## Ranking
 
 1. Apply exclusions (a missing value is not a match).
