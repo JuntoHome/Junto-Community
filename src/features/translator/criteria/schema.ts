@@ -23,7 +23,8 @@ import { matchKey } from "../normalize/match-key";
  *     assumptions: [],
  *   }
  *
- * Values are only trimmed here. Matching case and spelling is the normalize step's job (TR-10).
+ * Values are only trimmed here. Matching case and spelling is the normalize step's job (TR-10);
+ * the cross-field checks below use the same `matchKey()` only to compare values, never to change them.
  * This module is pure (no React, no I/O) so it runs in the browser and on the server.
  */
 
