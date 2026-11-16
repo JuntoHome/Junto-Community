@@ -227,7 +227,7 @@ export function ResultsStep({
       />
       {results && counts && (
         <div ref={resultsRef} tabIndex={-1} className="border-t border-sand pt-6 focus:outline-none">
-          <CountsSummary counts={counts} listSize={results.brief.listSize} />
+          <CountsSummary counts={counts} />
 
           <div className="mt-5 flex">
             <button type="button" onClick={editCriteria} className={buttonClasses("outline", "sm", "cursor-pointer")}>

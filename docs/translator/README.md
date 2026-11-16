@@ -447,9 +447,11 @@ A row is only left out for repeating an earlier row's Record ID, and that earlie
 
 ## Counts summary
 
-What happened to the rows from upload to shortlist, on the Results step between the [criteria summary](#criteria-summary) and the [results table](#results-table) (TR-23). Code: `buildCounts(importSummary, rankResult)` in `ranking/counts.ts` (pure), shown by `ui/counts-summary.tsx`. `importSummary` is [`summarizeImport()`](#preview-step) for the loaded file and `rankResult` the current `rank()` result, so the numbers change with every brief or override change, from the same result the table shows. The export (TR-26) uses the same function, so the screen and the Excel file match.
+What happened to the rows from upload to shortlist, on the Results step between the [criteria summary](#criteria-summary) and the [results table](#results-table) (TR-23). Code: `buildCounts(importSummary, rankResult)` in `ranking/counts.ts` (pure), shown by `ui/counts-summary.tsx`. `importSummary` is [`summarizeImport()`](#preview-step) for the loaded file and `rankResult` the current `rank()` result, so the numbers change with every brief or override change, from the same result the table shows.
 
-**What it returns:** `{ rowsRead, skippedEmptyRows, rowsLeftOut, rowsWithWarnings, duplicatesGrouped, uniqueRecords, excluded, failedMustHave, failedOnlyMissing, eligible, omittedByUser, pinned, notShownListSize, exported, byCriterion }`.
+**One source of wording.** `describeCounts(counts)` in `ranking/counts.ts` turns the counts into the lines below, with the hide-at-0 rules, and `describeCriterionCount()` writes each "Why rows were filtered out" line. The screen and the export's [Criteria sheet](#sheet-criteria) (TR-26) both show `describeCounts()`, so they always say the same thing.
+
+**What it returns:** `{ rowsRead, skippedEmptyRows, rowsLeftOut, rowsWithWarnings, duplicatesGrouped, uniqueRecords, excluded, failedMustHave, failedOnlyMissing, eligible, omittedByUser, pinned, notShownListSize, exported, byCriterion, listSize }`. `listSize` is the brief's list size, for the "not shown" line.
 
 - The import figures come from `summarizeImport()`, the filter figures from [filtering](#filtering).
 - `omittedByUser`: omitted rows that are still eligible (`omittedRows`). `pinned`: pinned rows in the shortlist.
@@ -589,7 +591,7 @@ When the shortlist is empty, the Results step shows "No matches for these criter
 
 ## Excel export
 
-The Export step builds an Excel file of the shortlist in the browser and downloads it (TR-25). Code: `shortlistTable(rankResult, mapping)` in `export/shortlist-rows.ts` (pure, no ExcelJS), `buildWorkbook(rankResult, mapping)` in `export/workbook.ts`, `textCell()` in `export/cells.ts` and `shortlistFileName()` in `export/file-name.ts`, shown by `ui/export-step.tsx`. `mapping` is [`describeMapping()`](#preview-step) for the loaded file.
+The Export step builds an Excel file of the shortlist in the browser and downloads it (TR-25), with a second sheet that records how the list was made (TR-26). Code: `shortlistTable(rankResult, mapping)` in `export/shortlist-rows.ts` and `criteriaTable({ rankResult, counts, source, now })` in `export/criteria-rows.ts` (both pure, no ExcelJS), `buildWorkbook(rankResult, mapping, { counts, source, now })` in `export/workbook.ts`, `textCell()` in `export/cells.ts` and `shortlistFileName()` in `export/file-name.ts`, shown by `ui/export-step.tsx`. `mapping` is [`describeMapping()`](#preview-step) for the loaded file.
 
 **The step.** **Continue to export**, at the bottom of the Results step, opens it (the button isn't shown for an empty shortlist). It says `40 records will be exported.` (the [counts summary](#counts-summary)'s `exported`) and has a **Download Excel** button. The button builds the workbook, wraps it in a `Blob` (`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`), clicks a temporary `<a download>` with an object URL and revokes the URL a second later (Firefox can cancel a download whose URL is revoked straight away). The file is `JCA_Shortlist_YYYY-MM-DD.xlsx`, using the local date. While it builds, the button is disabled and the step says `Preparing your file...`; focus goes back to the button afterwards. If it fails: `The file couldn't be created. Try again.` Nothing is logged.
 
@@ -629,6 +631,33 @@ The Export step builds an Excel file of the shortlist in the browser and downloa
 
 Invented Reference Solutions-layout records give an empty Email column, filled Phone and Website, Other executives such as `Demo Beta (President); Demo Gamma`, and a 9-digit IUSA Number as text.
 
+### Sheet `Criteria`
+
+After `Shortlist`, sheet `Criteria` records exactly how the list was made, so it can be explained, checked or repeated later (TR-26). Everything about the run comes from `rankResult`, the same result the Shortlist sheet was made from, never from the form: the Criteria rows describe `rankResult.brief`, so a role changed in the criteria summary shows the revised role, and the scoring version is `rankResult.scoringVersion`, recorded from `SCORING_VERSION` when the list was ranked. The Export step passes `counts` (`buildCounts()`), `source` and `now` (the time of the click).
+
+Two columns, `Item` (width 28) and `Details` (width 90), with a bold, frozen header. Each section has its heading in bold on its own row, with a blank row between sections. Every cell is text through `textCell()`, wrapped, so the scoring version stays `1.0` and never becomes the number 1. In order:
+
+| Section | Rows |
+|---|---|
+| (top, no heading) | `JCA Data Axle Translator: how this list was made` (bold), then `Synthetic demonstration. All companies and people are fictional.`, each across both columns |
+| Created | `Date and time`: local time with its offset from UTC, `2026-11-16 11:24 (UTC+05:30)` |
+| Source file | `File name` (the uploaded file's name), `Layout` (detected from the headers: `Synthetic`), `Sheet` (`Contacts`), `SHA-256` (the hash the [file gate](#file-gate) matched in the allowlist) |
+| Criteria | One row per [criteria summary](#criteria-summary) line (`describeLines(rankResult.brief)`), labelled `Goal`, `Must-haves`, `Preferences`, `Leave out`, `List size` or `Assumptions`: the same sentences as on screen, such as `Prefer Fabrication, Owner, 10 to 99 employees.` |
+| Scoring | `Scoring version`; `Weights mode`: `Default weights` or `Ordered by importance` (the brief has a priority order); then one row per active dimension, heaviest first: `Industry`, `35 (50%)`, the share of the active total rounded to 1 decimal. No preferences: `Weights`, `No preferences, so all scores are 0.` |
+| Counts | One row per [counts summary](#counts-summary) line (`describeCounts()`), in the Details column, identical to the screen. The "Why rows were filtered out" lines aren't on the sheet |
+| Overrides | `Pinned`: the pinned Record IDs joined with `, `, or `None`. `Omitted`: `None`, or the number of omitted records followed by one row each, `SYN-0001`, `Synthetic Company 0001, score 100` (the rounded score shown on screen). Omitted rows are listed here because they aren't on the Shortlist sheet |
+| Technical | `Brief (JSON)`: `JSON.stringify(rankResult.brief)`. Parsing it gives back the exact brief, so with the same file (checked by its SHA-256) the run can be repeated and gives the same list |
+
+**With the synthetic sample** (all at `now` 2026-11-16 11:24, UTC+05:30):
+
+| Brief | Criteria sheet |
+|---|---|
+| Business owner | `Must be in Phoenix, AZ.`, `Prefer Fabrication, Owner, 10 to 99 employees.`, `Show 40.`; Scoring version `1.0`, `Default weights`, Industry `35 (50%)`, Title `25 (35.7%)`, Company size `10 (14.3%)`; the 9 count lines from `500 rows read from your file` to `40 in your shortlist and export`; Pinned `None`, Omitted `None`; Source file `JCA_Synthetic_Contacts.xlsx`, `Synthetic`, `Contacts`, `67a5108...580b` |
+| Title preference Operations Manager | `Prefer Fabrication, Operations Manager, 10 to 99 employees.` |
+| Ordered: title, industry, company size | `Ordered by importance`; Title `4 (44.4%)`, Industry `3 (33.3%)`, Company size `2 (22.2%)` |
+| No preferences | `No preferences, so all scores are 0.` |
+| Pin SYN-0496, omit SYN-0001 | Pinned `SYN-0496`; Omitted `1 record`, then `SYN-0001`, `Synthetic Company 0001, score 100`; counts add `1 omitted by you` and `59 more matches not shown (list size 40)` |
+
 ## Expected results
 
 | Scenario | Expected |
@@ -649,6 +678,8 @@ Invented Reference Solutions-layout records give an empty Email column, filled P
 | Required title Operations Manager | Rows with unknown title fail that filter. With Phoenix, AZ: 25 eligible, 474 failed a must-have, 25 only because of missing data |
 | Business owner, Excel export | Sheet `Shortlist`, header and 40 rows, SYN-0001 first with Duplicate IDs `SYN-0500` and Score 100 ([Excel export](#excel-export)) |
 | Title Operations Manager, Excel export | SYN-0011's Title and Email cells empty (not `""` or `Unknown`), Missing `Title, Contact` |
+| Any Excel export | Sheets `Shortlist`, then `Criteria` ([Sheet `Criteria`](#sheet-criteria)); Scoring version `1.0`, the same as `SCORING_VERSION`; Brief (JSON) parses back to `rankResult.brief` |
+| Title changed to Operations Manager in the criteria summary, then exported | Criteria sheet: `Prefer Fabrication, Operations Manager, 10 to 99 employees.` |
 | Altered copy of the workbook | Rejected by the file gate |
 
 ## Phase 1 rules
