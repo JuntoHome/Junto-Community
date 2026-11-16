@@ -9,7 +9,7 @@ import { checkAllowlist, FILE_GATE_MESSAGES, type GatedWorkbook } from "../impor
 import type { ParseResult } from "../import/parse";
 import { groupDuplicates } from "../normalize/duplicates";
 import { normalizeWorkbook } from "../normalize/normalize";
-import type { ImportState } from "../normalize/summary";
+import { type ImportState, summarizeImport } from "../normalize/summary";
 import { compareIssues, validateRows } from "../normalize/validate-rows";
 import { rank } from "../ranking";
 import { NO_OVERRIDES, type Overrides, pinContext } from "../ranking/overrides";
@@ -166,6 +166,9 @@ export function TranslatorWizard() {
     [parsedWorkbook],
   );
 
+  // The import's counts, for the Results step's counts summary (TR-23).
+  const importSummary = useMemo(() => (workbook ? summarizeImport(workbook) : null), [workbook]);
+
   const step = STEPS.find((s) => s.id === current) ?? STEPS[0];
 
   return (
@@ -222,9 +225,10 @@ export function TranslatorWizard() {
               setCurrent("results");
             }}
           />
-        ) : step.id === "results" && workbook && pendingBrief && pendingForm ? (
+        ) : step.id === "results" && workbook && importSummary && pendingBrief && pendingForm ? (
           <ResultsStep
             records={workbook.records}
+            importSummary={importSummary}
             pendingBrief={pendingBrief}
             pendingForm={pendingForm}
             results={results}

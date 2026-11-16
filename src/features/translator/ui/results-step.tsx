@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { buttonClasses } from "@/components/ui/button";
 import { inputClasses } from "@/components/ui/form";
 import { cn } from "@/lib/cn";
@@ -8,9 +8,11 @@ import type { CriteriaForm } from "../criteria/from-form";
 import type { SearchBrief } from "../criteria/schema";
 import type { MappingRow } from "../import/describe-mapping";
 import type { GroupedRecord } from "../normalize/duplicates";
-import type { FilterCounts } from "../ranking/filter";
+import type { ImportSummary } from "../normalize/summary";
 import type { RankedRow, RankResult } from "../ranking";
+import { buildCounts } from "../ranking/counts";
 import { checkPin, hasId, omit, type Overrides, pin, type PinContext, restore, unpin } from "../ranking/overrides";
+import { CountsSummary } from "./counts-summary";
 import { errorText } from "./criteria-controls";
 import { CRITERIA_SUMMARY_HEADING_ID, CriteriaSummary } from "./criteria-summary";
 import { ResultsTable, type ResultsView, type RowControls } from "./results-table";
@@ -21,13 +23,6 @@ function joinIds(ids: readonly string[]): string {
 }
 
 const TEXT = {
-  /** "100 match. 0 left out by your exclusions. 399 didn't meet a must-have (0 only because of missing data)." */
-  filterCounts: (counts: FilterCounts) =>
-    `${counts.eligible} ${counts.eligible === 1 ? "matches" : "match"}. ` +
-    `${counts.excluded} left out by your exclusions. ` +
-    `${counts.failedMustHave} didn't meet a must-have (${counts.failedOnlyMissing} only because of missing data).`,
-  /** "Showing 40 of 100 matches." */
-  showing: (shown: number, total: number) => `Showing ${shown} of ${total} ${total === 1 ? "match" : "matches"}.`,
   editCriteria: "Edit criteria",
   /** Until the no-results helper (TR-24). */
   noMatches: "No matches for these criteria.",
@@ -60,12 +55,12 @@ type PendingFocus = { list: OverrideList; action: OverrideAction; recordId: stri
 const buttonKey = (list: OverrideList, action: OverrideAction, recordId: string) => `${list}:${action}:${recordId}`;
 
 /**
- * The Results step: the criteria summary (TR-16), then, once confirmed, the results. The counts
- * summary is TR-23; until then a placeholder line gives the filter counts (TR-17).
+ * The Results step: the criteria summary (TR-16), then, once confirmed, the results.
  *
- * Above the shortlist: how many of the matches it shows, Edit criteria (focus to the summary's
- * heading) and "Pin by Record ID". Then the shortlist as a table, or cards on a phone
- * (`ResultsTable`, TR-22), then "Omitted by you" with Restore.
+ * Above the shortlist: the counts summary (TR-23, from the rows read to the rows in the
+ * shortlist and export), Edit criteria (focus to the summary's heading) and "Pin by Record
+ * ID". Then the shortlist as a table, or cards on a phone (`ResultsTable`, TR-22), then
+ * "Omitted by you" with Restore.
  *
  * Pin and omit (TR-21): each shortlist row has Pin (or Unpin) and Omit buttons, "Pin by Record
  * ID" pins any eligible record, including one below the cut, and "Omitted by you" lists the
@@ -78,6 +73,7 @@ const buttonKey = (list: OverrideList, action: OverrideAction, recordId: string)
  */
 export function ResultsStep({
   records,
+  importSummary,
   pendingBrief,
   pendingForm,
   results,
@@ -89,6 +85,8 @@ export function ResultsStep({
   onOverridesChange,
 }: {
   records: readonly GroupedRecord[];
+  /** `summarizeImport()` for the loaded workbook, for the counts summary. */
+  importSummary: ImportSummary;
   pendingBrief: SearchBrief;
   /** The form that produced `pendingBrief`; the summary's editors start from it. */
   pendingForm: CriteriaForm;
@@ -119,6 +117,8 @@ export function ResultsStep({
   // What the last Pin, Unpin, Omit or Restore button changed.
   const [announcement, setAnnouncement] = useState({ text: "", count: 0 });
 
+  // Recomputed from the same `results` as the table, so the two always agree.
+  const counts = useMemo(() => (results ? buildCounts(importSummary, results) : null), [importSummary, results]);
   const shownRows = results?.shortlist ?? [];
   const omittedRows = results?.omittedRows ?? [];
 
@@ -210,13 +210,11 @@ export function ResultsStep({
           onConfirm();
         }}
       />
-      {results && (
+      {results && counts && (
         <div ref={resultsRef} tabIndex={-1} className="border-t border-sand pt-6 focus:outline-none">
-          {/* TODO(TR-23): the counts summary replaces this line. */}
-          <p className="text-base text-muted">{TEXT.filterCounts(results.filter.counts)}</p>
+          <CountsSummary counts={counts} listSize={results.brief.listSize} />
 
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-            <p className="font-semibold text-ink">{TEXT.showing(results.shortlist.length, results.ranked.length)}</p>
+          <div className="mt-5 flex">
             <button type="button" onClick={editCriteria} className={buttonClasses("outline", "sm", "cursor-pointer")}>
               {TEXT.editCriteria}
             </button>
