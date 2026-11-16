@@ -44,7 +44,7 @@ After the file gate, the browser parses the same bytes with ExcelJS (TR-08). Cod
 - **Layout:** recognised from the mapping's signature headers (matched like all headers: trimmed, ignoring case). The layout with the most signatures in row 1 wins, if it has at least 2. A tie, or fewer than 2, is "couldn't recognize". Extra, unknown and blank header cells are ignored. The layout comes from the headers, never from the allowlist entry. The Preview step shows the layout, sheet name and row count.
 - **Header check:** right after the layout is recognised, and before any data row is read, the required headers are checked (TR-09, below).
 - **Rows:** each data row keeps `sourceRow` (its spreadsheet row number; the header is row 1), `sourceValues` (its cells in column order) and `record` (the mapped `TranslatorRecord`). Rows where every cell is blank or only spaces are skipped. A generated ID still follows the spreadsheet row (row 10 is `ROW-0009`), so skipped rows don't shift it.
-- **Cell values:** text, numbers and true/false stay as they are; rich text and links become their text, formulas their last calculated result, errors their code (`#N/A`) and dates ISO text (`2026-01-02`).
+- **Cell values:** text, numbers and true/false stay as they are; rich text and links become their text, formulas their last calculated result (blank when the file has none) and dates ISO text (`2026-01-02`). Error cells (`#N/A`, `#REF!`) are blank, like an empty cell, so an error code is never matched or shown as if it were a value (changed in TR-29).
 - **Limit:** at most 1,000 data rows (empty rows don't count).
 - **Files from other writers:** some tools (for example the .NET Open XML SDK, which wrote `JCA_Reference_Solutions_Exact_Headers_Jeel.xlsx`) write namespace-prefixed XML and absolute part paths, which ExcelJS can't open on its own. `makeExcelJsCompatible()` in `import/xlsx-compat.ts` rewrites just those two things in the browser first; files saved by Excel are untouched.
 
@@ -677,6 +677,22 @@ The Translator keeps everything for one session only (TR-28). Code: `ui/translat
 - **A new workbook is a new session.** Choosing another file (upload, drop or Load sample) while a workbook is loaded starts a new session with that file, the same remount, so no criteria, brief, pins, omits or results from the old file carry over. If the new file is refused, the Upload step shows why and nothing from the old file is kept. An empty drop does nothing.
 - **Logging.** Translator code never calls `console` directly. Unexpected failures call `logTranslatorError(code)`, which logs only `[translator] <code>`: `file-unreadable`, `parser-unavailable`, `sample-load-failed` or `export-failed`. Never the error object or message, a file name or a value, because ExcelJS errors can quote cell text. Problems the user can fix (wrong type, over 2 MB, not on the allowlist, unrecognised layout) are shown on the page and not logged. The rows never reach the server, so the Vercel function logs can't contain them.
 - **Synthetic labels.** The synthetic banner (`ui/synthetic-banner.tsx`, TR-02) sits above the wizard on the page, outside every step, so it stays on every step and through Start over. Every export says it too: the note next to Download, the file name (`JCA_Shortlist_Synthetic_Demo_YYYY-MM-DD.xlsx`), the file's Title and Subject, row 1 of the Shortlist sheet and the note at the top of the Criteria sheet ([Excel export](#excel-export)).
+
+## Tests
+
+Unit tests run with Vitest: `npm run test` (TR-29). They sit beside the code as `*.test.ts` and run in Node, with no browser, no network and no random data. How to run them: [WAY-OF-WORKING.md](../WAY-OF-WORKING.md#testing).
+
+- **Covered:** import and cleaning. Upload checks, file gate, parsing, header checks, cell values, formula-like text, normalizing, row checks and duplicate grouping, plus TR-04's Reference Solutions fixture row. Ranking walkthroughs come with TR-30; export and other edge cases with TR-31.
+- **Fixtures** live in `src/features/translator/__fixtures__/` and are built in code, never committed as binary workbooks, so every fixture can be read in review and a header change is a one-line diff:
+  - `build-workbook.ts`: `buildXlsx({ sheets: [{ name, rows }] })` writes an `.xlsx` in memory with ExcelJS from plain arrays, with helpers for rich text, formula, hyperlink, error and date cells.
+  - `records.ts`: invented rows and row builders for both layouts (`TST-` IDs, `Test Company 01` names, `.invalid` emails).
+  - `rs-headers.ts`: the 396 Reference Solutions headers in order, blank last column included, copied from the "Header Inventory" sheet of `JCA_Reference_Solutions_Exact_Headers_Jeel.xlsx`. Headers only.
+  - `rs-row.ts`: the TR-04 fixture row and the record it must map to.
+  - `import-pipeline.ts`: runs parse, normalize, row checks and duplicate grouping in the wizard's order.
+- **Fixtures are never allowlisted.** Tests call `parseWorkbook()` directly, past the [file gate](#file-gate). `import/file-gate.test.ts` checks that the allowlist has exactly the expected entries, so adding one fails the tests until that list is changed on purpose (TR-35 will).
+- The real sample is read from `docs/translator/JCA_Synthetic_Contacts.xlsx` with `fs`, in tests only. Fixtures are invented: never copy rows from any real export into them.
+- App code never imports a test or a fixture, so neither reaches the build.
+- From the table below, the tests lock in the import figures (500 rows read, 0 issues, 499 unique with SYN-0500 grouped under SYN-0001) and the altered copy rejected by the file gate. TR-30 locks in the ranking rows.
 
 ## Expected results
 

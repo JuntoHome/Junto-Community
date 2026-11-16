@@ -70,13 +70,15 @@ From [package.json](../package.json):
 | `npm run lint` | ESLint (Next.js rules) |
 | `npm run build` | Production build; also type-checks and pre-renders pages |
 | `npm run start` | Serve the production build locally |
-| `npm run test` | Not yet defined; added with Vitest in TR-29 |
+| `npm run test` | Unit tests (Vitest), run once |
+| `npm run test:watch` | Unit tests, re-run on every save |
 
-Run `typecheck`, `lint` and `build` before pushing ([WAY-OF-WORKING.md](WAY-OF-WORKING.md#testing)).
+Run `typecheck`, `lint`, `build` and `test` before pushing ([WAY-OF-WORKING.md](WAY-OF-WORKING.md#testing)).
 
 ## Testing and debugging
 
-- There are no automated tests yet. Check changes by hand locally and on the branch's preview.
+- Unit tests cover only the Translator's import and cleaning so far (`npm run test`). Check every change by hand too, locally and on the branch's preview.
+- On Windows, run the tests from a folder path with an uppercase drive letter (`C:\`), or every test fails ([TROUBLESHOOTING.md](TROUBLESHOOTING.md#local-development)).
 - Server logs are prefixed by feature (`[profiles]`, `[subscribe]`, `[login]`, `[reset]`, `[set-password]`, `[keep-alive]`). Locally they appear in the `npm run dev` terminal.
 - Calling the cron endpoint and checking database access from outside: [API-DOCUMENTATION.md](API-DOCUMENTATION.md).
 - Symptoms and fixes: [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
