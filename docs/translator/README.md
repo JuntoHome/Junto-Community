@@ -244,6 +244,7 @@ The Results step opens with "Your criteria" (TR-16): the brief in plain language
 - **Confirm and rank** (shown until results show) ranks the pending brief and shows the [results table](#results-table). Until the counts summary (TR-23), a placeholder line above the table gives the [filter](#filtering) counts ("100 match. 0 left out by your exclusions. 399 didn't meet a must-have (0 only because of missing data).").
 - **The summary always shows the brief behind the results**: `results.brief`, the brief `rank()` got, once confirmed, and the pending brief before. It is never rebuilt from form state.
 - **Going back to Criteria** shows the same values as the summary, because a Save writes to the same form state. A Save starts from the form that produced the current brief, so changes made on Criteria without pressing Continue are replaced by it.
+- **Opening an item from elsewhere.** `openItem(itemId)` (through the summary's `ref`) opens that item's editor as if its Change button were pressed, scrolls to it and focuses its first control. The [no-results helper](#no-results-helper) uses it. `editableItemName(itemId)` says whether an item has an editor.
 - **Accessibility:** Change moves focus to the editor's heading. After Save or Cancel, focus returns to that item's Change button (or the "Your criteria" heading if the item is gone), and a live region says "Updated." or, once results show, "Updated. Results refreshed." After a failed Save, focus goes to the first problem. After Confirm and rank, focus moves to the results.
 
 **With the synthetic sample**, the business owner walkthrough shows "Goal: find prospective customers or partners.", "Must be in Phoenix, AZ.", "Prefer Fabrication, Owner, 10 to 99 employees.", "Show 40." and "No assumptions." Changing the title preference to Operations Manager changes only the Preferences line and `preferences[1]` of the brief.
@@ -281,7 +282,7 @@ Every criterion in a stage is tested, so a record counts under each one it faile
 - `eligible`: the records that passed, in input order.
 - `statusById`: `Map` of Record ID to `"eligible"`, `"excluded"` or `"failed-must-have"`, for every record. Pin and omit (TR-21) use it, because excluded rows can't be pinned.
 - `counts`: `{ input, excluded, failedMustHave, failedOnlyMissing, eligible }`, with `input = excluded + failedMustHave + eligible`.
-- `byCriterion`: one entry per exclusion, then per must-have, in brief order: `{ stage, index, field, removed, removedMissing }`. `stage` is `"exclusions"` or `"mustHaves"`, so `brief[stage][index]` is the criterion. For an exclusion, `removed` is the rows it matched and `removedMissing` is always 0. For a must-have, `removed` is the rows it failed, including missing values, and `removedMissing` the ones with no value. The no-results helper (TR-24) uses this to name the most restrictive filters.
+- `byCriterion`: one entry per exclusion, then per must-have, in brief order: `{ stage, index, field, removed, removedMissing }`. `stage` is `"exclusions"` or `"mustHaves"`, so `brief[stage][index]` is the criterion. For an exclusion, `removed` is the rows it matched and `removedMissing` is always 0. For a must-have, `removed` is the rows it failed, including missing values, and `removedMissing` the ones with no value.
 
 **"Only because of missing data"** (`failedOnlyMissing`): rows that failed must-haves where every failed must-have was `"unknown"` and none was a real mismatch. These are the rows that might qualify if their data were complete. A row outside Phoenix with a blank title fails on city anyway, so it isn't counted.
 
@@ -495,7 +496,7 @@ Under it, a closed `<details>` "Why rows were filtered out" lists one line per `
 
 The shortlist on the Results step (TR-22). Code: `ui/results-table.tsx`, inside `ui/results-step.tsx`, with `missingFields()` in `ranking/missing.ts`.
 
-**Above the table:** the [counts summary](#counts-summary) (which replaced "Showing 40 of 100 matches."), an **Edit criteria** button that scrolls to the [criteria summary](#criteria-summary) and moves focus to its "Your criteria" heading, and [Pin by Record ID](#pin-and-omit). **Below it:** "Omitted by you (N)" with Restore. An empty shortlist shows `No matches for these criteria.` until the no-results helper (TR-24).
+**Above the table:** the [counts summary](#counts-summary) (which replaced "Showing 40 of 100 matches."), an **Edit criteria** button that scrolls to the [criteria summary](#criteria-summary) and moves focus to its "Your criteria" heading, and [Pin by Record ID](#pin-and-omit). **Below it:** "Omitted by you (N)" with Restore. An empty shortlist shows the [no-results helper](#no-results-helper) instead of the table.
 
 **Columns**, one row per business:
 
@@ -541,6 +542,51 @@ A value the row doesn't have shows `Unknown`, in a muted style but as real text,
 
 **With the synthetic sample** (business owner brief): 40 rows; row 1 is SYN-0001 (Synthetic Company 0001), Phoenix, AZ, score 100, 4 reasons, Missing `None`, Details `Row 2 in your file` and `Also in your file as SYN-0500 (row 501)`. With the title preference changed to Operations Manager, SYN-0006 is first at 100, and SYN-0011 (rank 8, 64) shows Title `Unknown`, Contact `Unknown` and Missing `Title, Contact`. Pinning SYN-0496 puts it at rank 1 with the badge and Missing `Company size`.
 
+## No-results helper
+
+When the shortlist is empty, the Results step shows "No matches for these criteria" instead of the [results table](#results-table), with hints that say why and an **Edit** button that opens the criterion to change (TR-24). Code: `diagnoseEmpty(records, brief, rankResult)` in `ranking/diagnose.ts` (pure), shown by `ui/no-results.tsx`.
+
+**What it returns:** `{ kind, hints }`, each hint `{ text, itemId, removed }`. `itemId` is the [criteria summary](#criteria-summary) item to open, from `summaryItemFor(stage, field)` in `criteria/describe.ts` (`must-geo` for a city or state must-have, `must-industry`, `exclude-industry` and so on), or null when no single criterion is to blame. `removed` is how many records the hint's filter removes. Every count is over the grouped `records` (499 for the sample), the same records as the [counts summary](#counts-summary). Values are the brief's own, as written, in plain text. Hints never name a value that isn't in the brief, so there are no guesses at "similar" cities.
+
+**Kinds**, decided in this order:
+
+| Kind | When | Hints |
+|---|---|---|
+| `all-omitted` | Records are eligible, but the user omitted every one | `You omitted every match. Restore some below.` (no Edit) |
+| `no-value` | A must-have matches 0 records on its own (`matchCriterion()` on every record) | One per such must-have, see below |
+| `combination` | Each must-have matches some records on its own, but no record matches all of them | `Each must-have matches some records, but no record matches all of them.`, then one per must-have, fewest matches first: `Must-have Title (Owner): 124 records on its own.` |
+| `excluded` | Some records meet every must-have, but Leave out rules removed all of them | One per Leave out rule that removed any of them: `Your Leave out rule for Industry removed 20 records.` The number counts only records that met every must-have, so it can be lower than the rule's line in "Why rows were filtered out", which counts every record |
+
+`no-value` wording, by field:
+
+| Field | Text |
+|---|---|
+| city | `No records are in Flagstaff. Try another city.` Several values: `No records are in Flagstaff or Yuma. Try another city.` |
+| state | `No records are in TX. Try another state.` |
+| industry | `No records are in the Mining industry. Try another industry.` |
+| title | `No records have the title CEO. Try another title.` |
+| employees | `No records have 500 to 999 employees. Try a wider range.` |
+
+**Order and limit.** At most 3 hints name a filter: the ones that removed the most first, ties in brief order. For a must-have, "removed" is the records it fails on its own, so the hint points at the filter to loosen. The combination's opening line comes before them.
+
+**Blank data note.** With any kind, when some records failed only because a must-have value was blank (`failedOnlyMissing` above 0), a note follows for each such field, with an Edit button for that must-have: `25 records have a blank Title, so they can't meet that must-have.` A record blank on two must-have fields counts under both.
+
+**Edit** calls `openItem(itemId)` on the criteria summary, which opens that item's inline editor (cancelling any other), scrolls to it and focuses its first control. Saving re-ranks as usual. A hint for an item the summary can't edit (`must-employees`, `exclude-state` and `exclude-employees`, which only a Phase 2 brief can have) has no Edit button. Each Edit button names its item for screen readers ("Edit location").
+
+**Reaching each kind from the form.** The form only offers values found in the file, so `no-value` can't happen from the form today; it can with a Phase 2 brief or a changed file. With the synthetic sample `combination` can't either: the file has one state (AZ), and every pairing of its cities, industries and titles has records. `excluded` and `all-omitted` can. All four are checked through `diagnoseEmpty()` directly.
+
+**With the synthetic sample:**
+
+| Brief | Kind | Hints |
+|---|---|---|
+| Must city Flagstaff, state AZ | `no-value` | `No records are in Flagstaff. Try another city.` (Edit location) |
+| Must state TX | `no-value` | `No records are in TX. Try another state.` |
+| Must city Flagstaff or Yuma | `no-value` | `No records are in Flagstaff or Yuma. Try another city.` |
+| Must title CEO | `no-value` | `No records have the title CEO. Try another title.`, then `125 records have a blank Title, so they can't meet that must-have.` |
+| Must Phoenix, AZ, title Owner, 40 employees (Phase 2 brief) | `combination` | Opening line, then City (Phoenix) 100, Company size (40 employees) 120, Title (Owner) 124. State (AZ, 499) is the fourth, so it isn't shown |
+| Must Phoenix, AZ; leave out every industry found in Phoenix | `excluded` | `Your Leave out rule for Industry removed 100 records.` Removing Retail from that rule brings back the 20 Phoenix Retail records |
+| Must Phoenix, AZ, title Operations Manager; omit all 25 | `all-omitted` | `You omitted every match. Restore some below.`, then `25 records have a blank Title, so they can't meet that must-have.` |
+
 ## Expected results
 
 | Scenario | Expected |
@@ -557,7 +603,7 @@ A value the row doesn't have shows `Unknown`, in a muted style but as real text,
 | Phoenix, AZ; prefer only Fabrication and 10 to 99 | Active weight total 45. Both match 100, industry only 77.78, employees only 22.22 |
 | No preferences | Every score 0, empty breakdown |
 | Prefer city Phoenix and state AZ; a Mesa, AZ row | Geography no match, 0 points |
-| City not in the workbook | 0 eligible; empty list with a filter-specific explanation |
+| City not in the workbook | 0 eligible; empty list with `No records are in [city]. Try another city.` ([No-results helper](#no-results-helper)). The form can't produce this brief, so it is checked through `diagnoseEmpty()` |
 | Required title Operations Manager | Rows with unknown title fail that filter. With Phoenix, AZ: 25 eligible, 474 failed a must-have, 25 only because of missing data |
 | Altered copy of the workbook | Rejected by the file gate |
 

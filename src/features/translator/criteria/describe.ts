@@ -65,8 +65,11 @@ function orList(items: readonly string[]): string {
 
 const number = (n: number) => n.toLocaleString("en-US");
 
-/** One criterion's values as words: "Phoenix or Tempe", "10 to 99 employees". */
-function criterionText(criterion: BriefCriterion): string {
+/**
+ * One criterion's values as words: "Phoenix or Tempe", "10 to 99 employees". Values are the
+ * brief's own, as written. The no-results helper (TR-24) uses the same words.
+ */
+export function criterionText(criterion: BriefCriterion): string {
   if (criterion.operator === "equals") return criterion.value;
   if (criterion.operator === "in") return orList(criterion.value);
   const { min, max } = criterion.value;
@@ -127,6 +130,28 @@ const EXCLUSIONS = [
   ["exclude-state", "state"],
   ["exclude-employees", "employees"],
 ] as const satisfies readonly (readonly [BriefItemId, BriefField])[];
+
+/** The brief lists that filter rows, as `brief[stage]`. */
+export type FilterSection = Extract<BriefSection, "mustHaves" | "exclusions">;
+
+const MUST_HAVE_IDS: Record<BriefField, BriefItemId> = {
+  city: "must-geo",
+  state: "must-geo",
+  industry: "must-industry",
+  title: "must-title",
+  employees: "must-employees",
+};
+
+const EXCLUSION_IDS = Object.fromEntries(EXCLUSIONS.map(([id, field]) => [field, id])) as Record<BriefField, BriefItemId>;
+
+/**
+ * The summary item a must-have or exclusion on `field` belongs to, so whatever points at a
+ * criterion (the no-results helper, TR-24) can open that item: `must-geo` for a city or state
+ * must-have, `must-industry`, `exclude-industry` and so on.
+ */
+export function summaryItemFor(stage: FilterSection, field: BriefField): BriefItemId {
+  return stage === "mustHaves" ? MUST_HAVE_IDS[field] : EXCLUSION_IDS[field];
+}
 
 /**
  * Everything the brief says, one item each, in a fixed order: goal; must-haves (location, then
