@@ -12,8 +12,10 @@ import { normalizeWorkbook } from "../normalize/normalize";
 import { type ImportState, summarizeImport } from "../normalize/summary";
 import { compareIssues, validateRows } from "../normalize/validate-rows";
 import { rank } from "../ranking";
+import { buildCounts } from "../ranking/counts";
 import { NO_OVERRIDES, type Overrides, pinContext } from "../ranking/overrides";
 import { CriteriaStep } from "./criteria-step";
+import { ExportStep } from "./export-step";
 import { FileUpload } from "./file-upload";
 import { PreviewStep } from "./preview-step";
 import { ResultsStep } from "./results-step";
@@ -254,6 +256,17 @@ export function TranslatorWizard() {
               setUnpinned([]);
               setOverrides(change);
             }}
+            onContinueToExport={() => {
+              setDone(new Set<StepId>(["upload", "preview", "criteria", "results"]));
+              focusHeading.current = true;
+              setCurrent("export");
+            }}
+          />
+        ) : step.id === "export" && results && importSummary ? (
+          <ExportStep
+            results={results}
+            mapping={mapping}
+            exported={buildCounts(importSummary, results).exported}
           />
         ) : (
           <p className="mt-3 text-base text-muted">This step isn’t built yet.</p>

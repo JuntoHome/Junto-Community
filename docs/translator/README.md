@@ -107,7 +107,7 @@ Right after a workbook is parsed, every row's record is normalized in the browse
 
 | Version | What it is | Used for |
 |---|---|---|
-| `original` | The mapped value, untouched | Export (TR-25) |
+| `original` | The mapped value, untouched | Kept for reference. The export (TR-25) writes `value`, like the screen |
 | `value` | Trimmed, inner whitespace (including non-breaking spaces) collapsed to one space | Display |
 | `key` | `matchKey(value)`; only city, state, industry and title have one | Matching. Never shown |
 
@@ -316,7 +316,7 @@ Step 3 (TR-18). Code: `scoreRecords(eligible, brief)` in `ranking/score.ts`, wit
 - Otherwise a real mismatch on any of the dimension's fields gives `"no-match"`, and a missing value (with no mismatch) gives `"unknown"`. A row with a blank title and a title preference is `"unknown"`. So is Phoenix with a blank state, because the state might have matched.
 - The dimension earns its full weight on `"match"` and 0 on `"no-match"` or `"unknown"`.
 
-**The score.** `score = earned total / active weight total * 100`, kept **unrounded**: in the business owner walkthrough, a record matching industry and title scores 60 / 70 * 100 = 85.71428571428571, not 86. Sorting (TR-19) and the export (TR-25) use `score`. `displayScore = Math.round(score)` is only for the screen. Weights are whole numbers, so the totals are exact and the one division comes last, in a fixed dimension order: the same records and brief give the same scores to the last bit. With no preferences every record scores 0, with no weights and an empty breakdown.
+**The score.** `score = earned total / active weight total * 100`, kept **unrounded**: in the business owner walkthrough, a record matching industry and title scores 60 / 70 * 100 = 85.71428571428571, not 86. Sorting (TR-19) uses `score`. `displayScore = Math.round(score)` is what the screen and the [Excel export](#excel-export) show, so the file never disagrees with what the user saw; `rank` keeps the exact order. Weights are whole numbers, so the totals are exact and the one division comes last, in a fixed dimension order: the same records and brief give the same scores to the last bit. With no preferences every record scores 0, with no weights and an empty breakdown.
 
 **Breakdown.** Each row has one `breakdown` entry per active dimension, in default order: `{ dimension, weight, earned, result, criteria }`. `criteria` lists each preference in that dimension as `{ index, field, result }`, where `index` is its position in `brief.preferences`. [Match reasons](#match-reasons) (TR-20) are built from it.
 
@@ -431,7 +431,7 @@ A row is only left out for repeating an earlier row's Record ID, and that earlie
 3. `shortlist` is every pinned row, then the best others until it has `listSize` rows. **Pins take slots within the list size**: 40 with 2 pins is 2 pins and the top 38 others. With more pins than the list size, every pin is shown and nothing else.
 4. Ranks run 1 to N over the whole shortlist. Pinned rows get `override: "pinned"` (others `null`) and `Pinned by user` as their first reason. Scores don't change.
 
-`rank()` also returns `overrides` (the ones given, minus `droppedPins`), `droppedPins` (pinned IDs with no eligible row under this brief, which the wizard removes and reports) and `omittedRows` (the omitted rows that are still eligible, with score and reasons, in `ranked` order). The export (TR-25) uses `shortlist`, `omittedRows` and `overrides`, so it shows exactly what is on screen.
+`rank()` also returns `overrides` (the ones given, minus `droppedPins`), `droppedPins` (pinned IDs with no eligible row under this brief, which the wizard removes and reports) and `omittedRows` (the omitted rows that are still eligible, with score and reasons, in `ranked` order). The [Shortlist sheet](#excel-export) (TR-25) is exactly `shortlist`; the Criteria sheet (TR-26) lists `omittedRows` and `overrides`, so the file shows exactly what is on screen.
 
 **On screen** (in the [results table](#results-table), TR-22): each row has Pin (Unpin when pinned) and Omit buttons, and a pinned row has a `Pinned by user` badge under its rank. "Pin by Record ID" above the table pins any eligible record, including one below the cut, with the messages above in a live region. "Omitted by you (N)" under the table has a Restore button for each row. After a button, focus stays on that row's button, or goes to the same button on the row now in its place when it left the list, and a live region says what changed.
 
@@ -587,6 +587,48 @@ When the shortlist is empty, the Results step shows "No matches for these criter
 | Must Phoenix, AZ; leave out every industry found in Phoenix | `excluded` | `Your Leave out rule for Industry removed 100 records.` Removing Retail from that rule brings back the 20 Phoenix Retail records |
 | Must Phoenix, AZ, title Operations Manager; omit all 25 | `all-omitted` | `You omitted every match. Restore some below.`, then `25 records have a blank Title, so they can't meet that must-have.` |
 
+## Excel export
+
+The Export step builds an Excel file of the shortlist in the browser and downloads it (TR-25). Code: `shortlistTable(rankResult, mapping)` in `export/shortlist-rows.ts` (pure, no ExcelJS), `buildWorkbook(rankResult, mapping)` in `export/workbook.ts`, `textCell()` in `export/cells.ts` and `shortlistFileName()` in `export/file-name.ts`, shown by `ui/export-step.tsx`. `mapping` is [`describeMapping()`](#preview-step) for the loaded file.
+
+**The step.** **Continue to export**, at the bottom of the Results step, opens it (the button isn't shown for an empty shortlist). It says `40 records will be exported.` (the [counts summary](#counts-summary)'s `exported`) and has a **Download Excel** button. The button builds the workbook, wraps it in a `Blob` (`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`), clicks a temporary `<a download>` with an object URL and revokes the URL a second later (Firefox can cancel a download whose URL is revoked straight away). The file is `JCA_Shortlist_YYYY-MM-DD.xlsx`, using the local date. While it builds, the button is disabled and the step says `Preparing your file...`; focus goes back to the button afterwards. If it fails: `The file couldn't be created. Try again.` Nothing is logged.
+
+**Browser only.** No Server Action, no upload, no file on a server: the workbook is built from the `rank()` result in memory. ExcelJS is loaded with `await import()` on the first click, like the parser, so the first click also downloads that code from the site; after that a download makes no request. The uploaded workbook's bytes are never read or changed, so its hash still passes the [file gate](#file-gate) afterwards.
+
+**Sheet `Shortlist`**: exactly `rankResult.shortlist`, in the same order, so it has as many rows as the counts summary's "in your shortlist and export". **Omitted rows aren't on it**: the Criteria sheet (TR-26) lists them with the overrides. Columns, in order:
+
+| Column | Value | Cell |
+|---|---|---|
+| Rank | `rank` | Number |
+| Record ID | The Record ID | Text |
+| Duplicate IDs | `duplicateIds` joined with `, ` (`SYN-0500`) | Text |
+| Source row | `sourceRow`, the row in the uploaded file | Number |
+| Company, Name, Title, City, State, Industry | The tidy `value` | Text |
+| Employees | The actual count. Empty when unknown or read from the size range | Number |
+| Employee range | The `employeeRange` text as written, so a range-only row still shows its size | Text |
+| Email, Phone, Website | The tidy `value`. Always present, even when the layout has no such column (Reference Solutions has no email) | Text |
+| Other executives | `Name (Title); Name (Title)`. No `()` when the title is blank, `(Title)` alone when the name is | Text |
+| Score | `displayScore`, the rounded score shown on screen | Number |
+| Reasons | `reasonText` from [Match reasons](#match-reasons), unchanged | Text |
+| Missing | [`missingFields()`](#results-table) joined with `, `, the same as on screen | Text |
+| Override | `Pinned`, or empty | Text |
+
+- **Blanks stay blank.** A value the row doesn't have is left as a truly empty cell: never `""`, `Unknown` or `None`. The same goes for an empty Duplicate IDs, Other executives, Missing or Override.
+- **Text and numbers.** Only Rank, Source row, Employees and Score are numbers. Everything else is stored as text with Excel's Text format (`@`), so a long IUSA Number or a phone number never becomes a number or scientific notation, even when the source cell was a number. Excel may mark a digits-only Record ID with a small "number stored as text" triangle; that is expected. The sheet has no ZIP column.
+- **One way in for text.** Every text cell, headers included, goes through `textCell()`. Today it returns the text unchanged; formula safety (TR-27) is added there.
+- **Layout.** Bold header row, frozen (`ySplit: 1`), with a filter over the header and every row. Column widths are set; Reasons and Other executives wrap. Workbook creator: `JCA Data Axle Translator`.
+
+**With the synthetic sample:**
+
+| Brief | Sheet |
+|---|---|
+| Business owner | Header and 40 rows. Row 1: SYN-0001, Duplicate IDs `SYN-0500`, Source row 2, Employees 25, Score 100, Reasons = SYN-0001's `reasonText`, Missing and Override empty |
+| Title preference Operations Manager | SYN-0006 first at 100. SYN-0011 (rank 8): Title and Email empty, Missing `Title, Contact` |
+| Business owner, pin SYN-0496 | Rank 1 SYN-0496, Override `Pinned`, Score 0, Reasons start with `Pinned by user; `, Missing `Company size` |
+| Business owner, omit SYN-0001 | 40 rows, SYN-0001 not on the sheet, SYN-0101 first |
+
+Invented Reference Solutions-layout records give an empty Email column, filled Phone and Website, Other executives such as `Demo Beta (President); Demo Gamma`, and a 9-digit IUSA Number as text.
+
 ## Expected results
 
 | Scenario | Expected |
@@ -605,6 +647,8 @@ When the shortlist is empty, the Results step shows "No matches for these criter
 | Prefer city Phoenix and state AZ; a Mesa, AZ row | Geography no match, 0 points |
 | City not in the workbook | 0 eligible; empty list with `No records are in [city]. Try another city.` ([No-results helper](#no-results-helper)). The form can't produce this brief, so it is checked through `diagnoseEmpty()` |
 | Required title Operations Manager | Rows with unknown title fail that filter. With Phoenix, AZ: 25 eligible, 474 failed a must-have, 25 only because of missing data |
+| Business owner, Excel export | Sheet `Shortlist`, header and 40 rows, SYN-0001 first with Duplicate IDs `SYN-0500` and Score 100 ([Excel export](#excel-export)) |
+| Title Operations Manager, Excel export | SYN-0011's Title and Email cells empty (not `""` or `Unknown`), Missing `Title, Contact` |
 | Altered copy of the workbook | Rejected by the file gate |
 
 ## Phase 1 rules
