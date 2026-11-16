@@ -6,13 +6,14 @@ import { inputClasses } from "@/components/ui/form";
 import { cn } from "@/lib/cn";
 import type { CriteriaForm } from "../criteria/from-form";
 import type { SearchBrief } from "../criteria/schema";
+import type { MappingRow } from "../import/describe-mapping";
 import type { GroupedRecord } from "../normalize/duplicates";
 import type { FilterCounts } from "../ranking/filter";
-import type { RankedRow, RankResult, ShortlistRow } from "../ranking";
+import type { RankedRow, RankResult } from "../ranking";
 import { checkPin, hasId, omit, type Overrides, pin, type PinContext, restore, unpin } from "../ranking/overrides";
-import { REASON_TEXT } from "../ranking/reasons";
 import { errorText } from "./criteria-controls";
-import { CriteriaSummary } from "./criteria-summary";
+import { CRITERIA_SUMMARY_HEADING_ID, CriteriaSummary } from "./criteria-summary";
+import { ResultsTable, type ResultsView, type RowControls } from "./results-table";
 
 /** "SYN-0001", "SYN-0001 and SYN-0016", "SYN-0001, SYN-0016 and SYN-0021". */
 function joinIds(ids: readonly string[]): string {
@@ -25,13 +26,11 @@ const TEXT = {
     `${counts.eligible} ${counts.eligible === 1 ? "matches" : "match"}. ` +
     `${counts.excluded} left out by your exclusions. ` +
     `${counts.failedMustHave} didn't meet a must-have (${counts.failedOnlyMissing} only because of missing data).`,
-  /** "1. SYN-0001 (100)" */
-  shortlistRow: (row: ShortlistRow) => `${row.rank}. ${row.record.normalized.recordId} (${row.displayScore})`,
   /** "Showing 40 of 100 matches." */
   showing: (shown: number, total: number) => `Showing ${shown} of ${total} ${total === 1 ? "match" : "matches"}.`,
-  pin: "Pin",
-  unpin: "Unpin",
-  omit: "Omit",
+  editCriteria: "Edit criteria",
+  /** Until the no-results helper (TR-24). */
+  noMatches: "No matches for these criteria.",
   restore: "Restore",
   pinByIdLabel: "Pin by Record ID",
   pinByIdHint: "A pinned record shows at the top of the list, even if its score would leave it out.",
@@ -52,28 +51,27 @@ const TEXT = {
       : `${joinIds(ids)} were unpinned because they no longer match your criteria.`,
 } as const;
 
-/** How many shortlist rows the placeholder lists until the results table (TR-22). */
-const PREVIEW_ROWS = 5;
-
 /** The button an override was pressed on, so focus can go back to it after the lists change. */
 type OverrideAction = "pin" | "omit" | "restore";
-/** The list an override button is in: the shortlist lines or Omitted by you. */
-type OverrideList = "shortlist" | "omitted";
+/** The list an override button is in: the shortlist's table or cards (TR-22), or Omitted by you. */
+type OverrideList = ResultsView | "omitted";
 type PendingFocus = { list: OverrideList; action: OverrideAction; recordId: string; index: number };
 
 const buttonKey = (list: OverrideList, action: OverrideAction, recordId: string) => `${list}:${action}:${recordId}`;
 
 /**
- * The Results step: the criteria summary (TR-16), then, once confirmed, the results. The
- * results table is TR-22 and the counts summary TR-23; until then placeholder lines give the
- * filter counts (TR-17), the first rows of the shortlist (TR-19) with their reasons (TR-20) and
- * how many of the matches it shows.
+ * The Results step: the criteria summary (TR-16), then, once confirmed, the results. The counts
+ * summary is TR-23; until then a placeholder line gives the filter counts (TR-17).
  *
- * Pin and omit (TR-21): each line has Pin (or Unpin) and Omit buttons, "Pin by Record ID" pins
- * any eligible record, including one below the cut, and "Omitted by you" lists the omitted rows
- * with Restore. The overrides live in the wizard; this step only asks for changes. After a
- * button, focus stays on that row, or moves to the row now in its place when it left the list,
- * and a live region says what changed. TR-22 moves these controls into the results table.
+ * Above the shortlist: how many of the matches it shows, Edit criteria (focus to the summary's
+ * heading) and "Pin by Record ID". Then the shortlist as a table, or cards on a phone
+ * (`ResultsTable`, TR-22), then "Omitted by you" with Restore.
+ *
+ * Pin and omit (TR-21): each shortlist row has Pin (or Unpin) and Omit buttons, "Pin by Record
+ * ID" pins any eligible record, including one below the cut, and "Omitted by you" lists the
+ * omitted rows with Restore. The overrides live in the wizard; this step only asks for changes.
+ * After a button, focus stays on that row's button, or moves to the row now in its place when
+ * it left the list, and a live region says what changed.
  *
  * The summary describes `results.brief` once there are results, the exact brief `rank()` got,
  * and the pending brief before that. It is never rebuilt from form state.
@@ -84,6 +82,7 @@ export function ResultsStep({
   pendingForm,
   results,
   pinContext,
+  mapping,
   unpinned,
   onSave,
   onConfirm,
@@ -96,6 +95,8 @@ export function ResultsStep({
   results: RankResult | null;
   /** What a typed Record ID is checked against. Null until there are results. */
   pinContext: PinContext | null;
+  /** `describeMapping()` for the loaded file, for the shortlist's Missing column. */
+  mapping: readonly MappingRow[];
   /** Pins the last brief change removed because their rows stopped matching. Empty for none. */
   unpinned: readonly string[];
   onSave: (brief: SearchBrief, form: CriteriaForm) => void;
@@ -118,7 +119,7 @@ export function ResultsStep({
   // What the last Pin, Unpin, Omit or Restore button changed.
   const [announcement, setAnnouncement] = useState({ text: "", count: 0 });
 
-  const shownRows = results ? results.shortlist.slice(0, PREVIEW_ROWS) : [];
+  const shownRows = results?.shortlist ?? [];
   const omittedRows = results?.omittedRows ?? [];
 
   // After an override button, focus goes to the same button on that row once the lists have
@@ -130,7 +131,7 @@ export function ResultsStep({
     const next = focusNext.current;
     if (!next) return;
     focusNext.current = null;
-    const ids = (next.list === "shortlist" ? shownRows : omittedRows).map((row) => row.record.normalized.recordId);
+    const ids = (next.list === "omitted" ? omittedRows : shownRows).map((row) => row.record.normalized.recordId);
     const target = ids.includes(next.recordId) ? next.recordId : ids[Math.min(next.index, ids.length - 1)];
     const button = target === undefined ? undefined : overrideButtons.current.get(buttonKey(next.list, next.action, target));
     (button ?? resultsRef.current)?.focus();
@@ -147,6 +148,32 @@ export function ResultsStep({
     onOverridesChange(change);
     setAnnouncement((a) => ({ text: message, count: a.count + 1 }));
     focusNext.current = at;
+  }
+
+  /** The table's and cards' Pin and Omit buttons. */
+  const rowControls: RowControls = {
+    buttonRef: (view, action, recordId) => buttonRef(buttonKey(view, action, recordId)),
+    onPin: (view, row, index) => {
+      const id = row.record.normalized.recordId;
+      const pinned = row.override === "pinned";
+      press(
+        { list: view, action: "pin", recordId: id, index },
+        (current) => (pinned ? unpin(current, id) : pin(current, id)),
+        pinned ? TEXT.unpinned(id) : TEXT.pinned(id),
+      );
+    },
+    onOmit: (view, row, index) => {
+      const id = row.record.normalized.recordId;
+      press({ list: view, action: "omit", recordId: id, index }, (current) => omit(current, id), TEXT.omitted(id));
+    },
+  };
+
+  /** Edit criteria: scrolls to the criteria summary and moves focus to its heading. */
+  function editCriteria() {
+    const heading = document.getElementById(CRITERIA_SUMMARY_HEADING_ID);
+    if (!heading) return;
+    heading.scrollIntoView({ block: "start" });
+    heading.focus({ preventScroll: true });
   }
 
   function pinById(event: FormEvent<HTMLFormElement>) {
@@ -185,8 +212,15 @@ export function ResultsStep({
       />
       {results && (
         <div ref={resultsRef} tabIndex={-1} className="border-t border-sand pt-6 focus:outline-none">
-          {/* TODO(TR-22, TR-23): the results table from results.shortlist, and the counts summary. */}
+          {/* TODO(TR-23): the counts summary replaces this line. */}
           <p className="text-base text-muted">{TEXT.filterCounts(results.filter.counts)}</p>
+
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+            <p className="font-semibold text-ink">{TEXT.showing(results.shortlist.length, results.ranked.length)}</p>
+            <button type="button" onClick={editCriteria} className={buttonClasses("outline", "sm", "cursor-pointer")}>
+              {TEXT.editCriteria}
+            </button>
+          </div>
 
           <form onSubmit={pinById} noValidate className="mt-5 flex flex-col gap-2">
             <label htmlFor={pinIds.input} className="font-semibold text-ink">
@@ -225,60 +259,14 @@ export function ResultsStep({
             )}
           </div>
 
-          {shownRows.length > 0 && (
-            <ol className="mt-4 flex flex-col gap-3 text-base text-muted">
-              {shownRows.map((row, index) => {
-                const id = row.record.normalized.recordId;
-                const pinned = row.override === "pinned";
-                return (
-                  <li key={id} className="flex flex-col gap-1">
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                      <span>{TEXT.shortlistRow(row)}</span>
-                      {pinned && (
-                        <span className="rounded-md bg-navy px-2 py-0.5 text-sm font-semibold text-white">
-                          {REASON_TEXT.pinned}
-                        </span>
-                      )}
-                      <button
-                        ref={buttonRef(buttonKey("shortlist", "pin", id))}
-                        type="button"
-                        onClick={() =>
-                          press(
-                            { list: "shortlist", action: "pin", recordId: id, index },
-                            (current) => (pinned ? unpin(current, id) : pin(current, id)),
-                            pinned ? TEXT.unpinned(id) : TEXT.pinned(id),
-                          )
-                        }
-                        className={buttonClasses("outline", "sm", "cursor-pointer px-4")}
-                      >
-                        {pinned ? TEXT.unpin : TEXT.pin}
-                        <span className="sr-only"> {id}</span>
-                      </button>
-                      <button
-                        ref={buttonRef(buttonKey("shortlist", "omit", id))}
-                        type="button"
-                        onClick={() =>
-                          press(
-                            { list: "shortlist", action: "omit", recordId: id, index },
-                            (current) => omit(current, id),
-                            TEXT.omitted(id),
-                          )
-                        }
-                        className={buttonClasses("outline", "sm", "cursor-pointer px-4")}
-                      >
-                        {TEXT.omit}
-                        <span className="sr-only"> {id}</span>
-                      </button>
-                    </div>
-                    <p className="text-sm">{row.reasonText}</p>
-                  </li>
-                );
-              })}
-            </ol>
-          )}
-          <p className="mt-2 text-base text-muted">
-            {TEXT.showing(results.shortlist.length, results.ranked.length)}
-          </p>
+          <div className="mt-4">
+            {shownRows.length > 0 ? (
+              <ResultsTable rows={shownRows} mapping={mapping} controls={rowControls} />
+            ) : (
+              // TODO(TR-24): the no-results helper replaces this line.
+              <p className="text-base text-ink">{TEXT.noMatches}</p>
+            )}
+          </div>
 
           {omittedRows.length > 0 && (
             <section aria-labelledby="translator-omitted-heading" className="mt-6">
