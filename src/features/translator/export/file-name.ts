@@ -9,7 +9,10 @@ export const XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spr
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** "JCA_Shortlist_2026-11-16.xlsx", from `date`'s local calendar date. */
+/**
+ * "JCA_Shortlist_Synthetic_Demo_2026-11-16.xlsx", from `date`'s local calendar date. The name
+ * says the file is a synthetic demonstration (TR-28).
+ */
 export function shortlistFileName(date: Date): string {
-  return `JCA_Shortlist_${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}.xlsx`;
+  return `JCA_Shortlist_Synthetic_Demo_${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}.xlsx`;
 }

@@ -2,6 +2,7 @@ import { type BriefSection, DIMENSION_NAMES, describeLines } from "../criteria/d
 import type { AllowedWorkbook } from "../import/allowlist";
 import type { RankResult } from "../ranking";
 import { type Counts, describeCounts } from "../ranking/counts";
+import { SYNTHETIC_NOTE } from "./labels";
 
 /**
  * The Criteria sheet as plain data (TR-26): how the list was made, so it can be explained and
@@ -37,7 +38,7 @@ export type CriteriaSection = { heading: string | null; rows: CriteriaRow[] };
 // Every string the Criteria sheet shows. Plain language, no em-dashes.
 export const CRITERIA_TEXT = {
   title: "JCA Data Axle Translator: how this list was made",
-  synthetic: "Synthetic demonstration. All companies and people are fictional.",
+  synthetic: SYNTHETIC_NOTE,
   created: "Created",
   dateTime: "Date and time",
   source: "Source file",
