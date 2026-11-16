@@ -444,11 +444,58 @@ A row is only left out for repeating an earlier row's Record ID, and that earlie
 | Pin SYN-0496, then change the must-have to Tempe, AZ | SYN-0496 in `droppedPins`, removed from the overrides, notice shown |
 | List size 2, pin SYN-0016, SYN-0021, SYN-0496 | 3 rows, all pinned: SYN-0021 (36), SYN-0016, SYN-0496 |
 
+## Counts summary
+
+What happened to the rows from upload to shortlist, on the Results step between the [criteria summary](#criteria-summary) and the [results table](#results-table) (TR-23). Code: `buildCounts(importSummary, rankResult)` in `ranking/counts.ts` (pure), shown by `ui/counts-summary.tsx`. `importSummary` is [`summarizeImport()`](#preview-step) for the loaded file and `rankResult` the current `rank()` result, so the numbers change with every brief or override change, from the same result the table shows. The export (TR-26) uses the same function, so the screen and the Excel file match.
+
+**What it returns:** `{ rowsRead, skippedEmptyRows, rowsLeftOut, rowsWithWarnings, duplicatesGrouped, uniqueRecords, excluded, failedMustHave, failedOnlyMissing, eligible, omittedByUser, pinned, notShownListSize, exported, byCriterion }`.
+
+- The import figures come from `summarizeImport()`, the filter figures from [filtering](#filtering).
+- `omittedByUser`: omitted rows that are still eligible (`omittedRows`). `pinned`: pinned rows in the shortlist.
+- `exported`: the shortlist length, after pins and omits: exactly what the Excel file will contain.
+- `notShownListSize`: `eligible - omittedByUser - exported`, never below 0.
+- `byCriterion`: filtering's `byCriterion`, each with a `label`: `Leave out Industry`, `Must-have City`, `Must-have Company size` and so on.
+
+**Checks.** `buildCounts()` throws an error naming the numbers when any of these fails, so a bug shows up instead of wrong figures:
+
+- `rowsRead = rowsLeftOut + duplicatesGrouped + uniqueRecords`
+- `uniqueRecords = excluded + failedMustHave + eligible`
+- `exported <= eligible - omittedByUser`, or `exported = pinned` when there are more pins than the list size
+
+**On screen:** "From your file to your shortlist", an ordered list in the order the data flows (read, clean, group, filter, override, cut), so each line follows from the one above. "Rows left out" and "rows with warnings" are separate lines: left out rows are gone, warned rows are still included and don't reduce any count.
+
+| Line | Text | Hidden at 0 |
+|---|---|---|
+| Rows read | `500 rows read from your file` | No |
+| Empty rows | `N empty rows skipped` | Yes |
+| Left out | `N rows left out because of problems in the file` | No |
+| Warnings | `N rows have warnings (still included)` | Yes |
+| Duplicates | `1 duplicate grouped` | No |
+| Unique | `499 unique records` | No |
+| Excluded | `N removed by your Leave out rules` | No |
+| Must-haves | `399 didn't meet your must-haves (0 only because a value was blank)` | No |
+| Eligible | `100 match your criteria` | No |
+| Omitted | `N omitted by you` | Yes |
+| Not shown | `60 more matches not shown (list size 40)` | Yes |
+| Exported | `40 in your shortlist and export` (bold) | No |
+
+Under it, a closed `<details>` "Why rows were filtered out" lists one line per `byCriterion` entry, for example `Must-have City: 399 rows (0 with a blank value)` (exclusions have no blank count, since a blank never matches a Leave out rule), then `A row can fail more than one rule, so these can add up to more than the total.` It isn't shown when the brief has no exclusions or must-haves.
+
+**With the synthetic sample:**
+
+| Brief | Lines |
+|---|---|
+| Business owner | 500 read, 0 left out, 1 duplicate, 499 unique, 0 removed, 399 didn't meet the must-haves (0 only blank), 100 match, 60 not shown (list size 40), 40 in the shortlist and export. Why: Must-have City 399 (0 blank), Must-have State 0 |
+| Job seeker | Same to 100 match, then 70 not shown (list size 30), 30 in the shortlist and export |
+| Business owner, omit SYN-0001 | 1 omitted by you, 59 not shown, 40 in the shortlist and export |
+| Business owner, leave out Retail | 99 removed, 320 didn't meet the must-haves, 80 match, 40 not shown, 40 in the shortlist and export |
+| Must Phoenix, AZ and title Operations Manager | 474 didn't meet the must-haves (25 only blank), 25 match, no "not shown" line, 25 in the shortlist and export. Why: Must-have Title 373 (125 blank) |
+
 ## Results table
 
 The shortlist on the Results step (TR-22). Code: `ui/results-table.tsx`, inside `ui/results-step.tsx`, with `missingFields()` in `ranking/missing.ts`.
 
-**Above the table:** "Showing 40 of 100 matches." (shortlist rows of eligible rows), an **Edit criteria** button that scrolls to the [criteria summary](#criteria-summary) and moves focus to its "Your criteria" heading, and [Pin by Record ID](#pin-and-omit). **Below it:** "Omitted by you (N)" with Restore. An empty shortlist shows `No matches for these criteria.` until the no-results helper (TR-24).
+**Above the table:** the [counts summary](#counts-summary) (which replaced "Showing 40 of 100 matches."), an **Edit criteria** button that scrolls to the [criteria summary](#criteria-summary) and moves focus to its "Your criteria" heading, and [Pin by Record ID](#pin-and-omit). **Below it:** "Omitted by you (N)" with Restore. An empty shortlist shows `No matches for these criteria.` until the no-results helper (TR-24).
 
 **Columns**, one row per business:
 
@@ -498,7 +545,7 @@ A value the row doesn't have shows `Unknown`, in a muted style but as real text,
 
 | Scenario | Expected |
 |---|---|
-| Phoenix, AZ must-have; prefer Fabrication, Owner, 10 to 99; 40 rows | 500 in, 1 duplicate (SYN-0500 under SYN-0001), 499 unique, 100 eligible, 40 out, SYN-0001 first at 100. SYN-0001 is the only 100. Scores of the 100 eligible: 100 (1), 85.71 (4), 64.29 (7), 50 (10), 35.71 (20), 14.29 (19), 0 (39) |
+| Phoenix, AZ must-have; prefer Fabrication, Owner, 10 to 99; 40 rows | 500 in, 1 duplicate (SYN-0500 under SYN-0001), 499 unique, 100 eligible, 40 out (counts summary: 60 not shown, 40 in the shortlist and export), SYN-0001 first at 100. SYN-0001 is the only 100. Scores of the 100 eligible: 100 (1), 85.71 (4), 64.29 (7), 50 (10), 35.71 (20), 14.29 (19), 0 (39) |
 | Same, title Owner changed to Operations Manager | SYN-0006 first at 100, with `Title: Operations Manager (preferred)` in its reasons ([Match reasons](#match-reasons)). The first 6, all at 100, in order: SYN-0006, SYN-0026, SYN-0126, SYN-0226, SYN-0326, SYN-0426 (tied, so ordered by Record ID). SYN-0001 64.29, 7th |
 | Tempe, AZ; prefer Logistics, Operations Manager, 10 to 99; 30 rows | 100 eligible, 30 out, SYN-0002 first at 100, tied with 6 others (first by Record ID) |
 | Business owner, list size 1 / 100 | 1 row (SYN-0001) / all 100 eligible rows |
