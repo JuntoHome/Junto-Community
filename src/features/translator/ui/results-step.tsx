@@ -26,6 +26,7 @@ function joinIds(ids: readonly string[]): string {
 
 const TEXT = {
   editCriteria: "Edit criteria",
+  continueToExport: "Continue to export",
   restore: "Restore",
   pinByIdLabel: "Pin by Record ID",
   pinByIdHint: "A pinned record shows at the top of the list, even if its score would leave it out.",
@@ -62,7 +63,8 @@ const buttonKey = (list: OverrideList, action: OverrideAction, recordId: string)
  * ID". Then the shortlist as a table, or cards on a phone (`ResultsTable`, TR-22), then
  * "Omitted by you" with Restore. An empty shortlist shows the no-results helper instead of the
  * table (TR-24, `NoResults` with `diagnoseEmpty()`), whose Edit buttons open that item in the
- * summary through its `openItem()`.
+ * summary through its `openItem()`. Last, Continue to export opens the Export step (TR-25);
+ * it isn't shown for an empty shortlist.
  *
  * Pin and omit (TR-21): each shortlist row has Pin (or Unpin) and Omit buttons, "Pin by Record
  * ID" pins any eligible record, including one below the cut, and "Omitted by you" lists the
@@ -85,6 +87,7 @@ export function ResultsStep({
   onSave,
   onConfirm,
   onOverridesChange,
+  onContinueToExport,
 }: {
   records: readonly GroupedRecord[];
   /** `summarizeImport()` for the loaded workbook, for the counts summary. */
@@ -103,6 +106,8 @@ export function ResultsStep({
   onConfirm: () => void;
   /** Changes the overrides, given the current ones. */
   onOverridesChange: (change: (current: Overrides) => Overrides) => void;
+  /** Opens the Export step. */
+  onContinueToExport: () => void;
 }) {
   // After Confirm and rank the button disappears, so move focus to what replaced it.
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -306,6 +311,14 @@ export function ResultsStep({
                 })}
               </ul>
             </section>
+          )}
+
+          {shownRows.length > 0 && (
+            <div className="mt-8 flex border-t border-sand pt-6">
+              <button type="button" onClick={onContinueToExport} className={buttonClasses("navy", "md", "cursor-pointer")}>
+                {TEXT.continueToExport}
+              </button>
+            </div>
           )}
 
           <p role="status" className="sr-only">
