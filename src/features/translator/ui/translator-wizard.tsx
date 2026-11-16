@@ -11,6 +11,7 @@ import { normalizeWorkbook } from "../normalize/normalize";
 import type { ImportState } from "../normalize/summary";
 import { compareIssues, validateRows } from "../normalize/validate-rows";
 import { rank } from "../ranking";
+import { NO_OVERRIDES, type Overrides, pinContext } from "../ranking/overrides";
 import { CriteriaStep } from "./criteria-step";
 import { FileUpload } from "./file-upload";
 import { PreviewStep } from "./preview-step";
@@ -52,6 +53,10 @@ export function TranslatorWizard() {
   const [pendingForm, setPendingForm] = useState<CriteriaForm | null>(null);
   // The brief the user confirmed with "Confirm and rank". Only this one is ranked.
   const [confirmedBrief, setConfirmedBrief] = useState<SearchBrief | null>(null);
+  // The user's pins and omits (TR-21), two lists of Record IDs. They survive brief edits.
+  const [overrides, setOverrides] = useState<Overrides>(NO_OVERRIDES);
+  // Pins the last brief change removed because those rows stopped matching, for a notice on Results.
+  const [unpinned, setUnpinned] = useState<string[]>([]);
   // Counts workbook attempts, so a slow check can't override a newer choice.
   const attempt = useRef(0);
 
@@ -132,11 +137,25 @@ export function TranslatorWizard() {
     setCurrent("preview");
   }
 
-  // Ranked again whenever the confirmed brief changes. `results.brief` is the brief the rows came from.
+  // Ranked again whenever the confirmed brief or the overrides change. `results.brief` is the
+  // brief the rows came from, and `results.overrides` the pins and omits they were made with.
   const records = workbook?.records;
   const results = useMemo(
-    () => (records && confirmedBrief ? rank(records, confirmedBrief) : null),
-    [records, confirmedBrief],
+    () => (records && confirmedBrief ? rank(records, confirmedBrief, overrides) : null),
+    [records, confirmedBrief, overrides],
+  );
+  // A pin whose row no longer matches the brief is dropped from state, and the user is told. Done
+  // while rendering, so the stale pin is never shown; the next render has nothing to drop.
+  if (results && results.droppedPins.length > 0) {
+    setOverrides(results.overrides);
+    setUnpinned(results.droppedPins);
+  }
+  // What a typed Record ID is checked against before it is pinned.
+  const leftOutRows = workbook?.validation.excluded;
+  const statusById = results?.filter.statusById;
+  const pinCheckContext = useMemo(
+    () => (records && leftOutRows && statusById ? pinContext(records, leftOutRows, statusById) : null),
+    [records, leftOutRows, statusById],
   );
 
   const step = STEPS.find((s) => s.id === current) ?? STEPS[0];
@@ -201,15 +220,27 @@ export function TranslatorWizard() {
             pendingBrief={pendingBrief}
             pendingForm={pendingForm}
             results={results}
+            pinContext={pinCheckContext}
+            unpinned={unpinned}
             onSave={(next, form) => {
               // The form is committed too, so going back to Criteria shows what the summary shows.
               setCriteriaForm(form);
               setPendingForm(form);
               setPendingBrief(next);
-              // With results showing, the edit re-ranks straight away.
-              if (confirmedBrief) setConfirmedBrief(next);
+              // With results showing, the edit re-ranks straight away. The overrides are kept.
+              if (confirmedBrief) {
+                setUnpinned([]);
+                setConfirmedBrief(next);
+              }
             }}
-            onConfirm={() => setConfirmedBrief(pendingBrief)}
+            onConfirm={() => {
+              setUnpinned([]);
+              setConfirmedBrief(pendingBrief);
+            }}
+            onOverridesChange={(change) => {
+              setUnpinned([]);
+              setOverrides(change);
+            }}
           />
         ) : (
           <p className="mt-3 text-base text-muted">This step isn’t built yet.</p>

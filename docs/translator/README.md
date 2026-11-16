@@ -250,13 +250,13 @@ The Results step opens with "Your criteria" (TR-16): the brief in plain language
 
 ## Ranking
 
-`rank(records, brief)` (`ranking/index.ts`) returns `{ brief, scoringVersion, weights, filter, ranked, shortlist }`, where `brief` is the brief it ranked against, `scoringVersion` is `SCORING_VERSION` ("1.0"), `weights` and each row's score come from [scoring](#scoring), and `filter` is `{ counts, byCriterion, statusById }` from [filtering](#filtering). `ranked` is every eligible row, sorted, and `shortlist` is its first `listSize` rows, each with a `rank` ([Sorting and list size](#sorting-and-list-size)). Each row is `{ record, score, displayScore, breakdown, reasons, reasonText }`, plus `rank` in `shortlist`.
+`rank(records, brief, overrides)` (`ranking/index.ts`) returns `{ brief, scoringVersion, weights, filter, ranked, shortlist, overrides, droppedPins, omittedRows }`, where `brief` is the brief it ranked against, `scoringVersion` is `SCORING_VERSION` ("1.0"), `weights` and each row's score come from [scoring](#scoring), and `filter` is `{ counts, byCriterion, statusById }` from [filtering](#filtering). `ranked` is every eligible row, sorted, before pins and omits. `shortlist` is what the user sees: pinned rows first, then the best of the rest up to `listSize`, each with a `rank` ([Pin and omit](#pin-and-omit)). `overrides` (optional, none by default) is the user's pins and omits; the result's `overrides`, `droppedPins` and `omittedRows` are described there. Each row is `{ record, score, displayScore, breakdown, reasons, reasonText }`, plus `rank` and `override` in `shortlist`.
 
 1. Apply exclusions (a missing value is not a match).
 2. Apply must-haves (a missing value fails). Count rows that failed because of missing data.
 3. Score 0 to 100 from preferences. Default weights: industry 35, geography 30, title 25, employees 10. Full weight for a match in a dimension, 0 if missing. Only active dimensions count, scaled to 100. No preferences = 0. If the user orders preferences, use weights 4, 3, 2, 1. Details: [Scoring](#scoring).
 4. Sort by unrounded score descending, then Record ID ascending. Default list size 40 (1 to 100). Details: [Sorting and list size](#sorting-and-list-size).
-5. Pinned rows first (labelled, keep their score). Omitted rows removed. Excluded rows cannot be pinned.
+5. Pinned rows first (labelled, keep their score). Omitted rows removed. Excluded rows cannot be pinned. Pins take slots within the list size, omits happen before the cut, and only eligible rows can be pinned. Details: [Pin and omit](#pin-and-omit).
 6. Every result lists its reasons from its own values. Details: [Match reasons](#match-reasons).
 
 ### Filtering
@@ -344,7 +344,7 @@ Step 4 and the list size (TR-19). Code: `sortScored(rows)` in `ranking/sort.ts`,
 
 Digit IDs go first as a group, not compared as text with the others, so the order has no loops (see [KNOWN-ISSUES.md](../KNOWN-ISSUES.md)). For `ROW-0001` and `SYN-0001` style IDs this is the same as text order.
 
-**List size.** `shortlist` is the first `listSize` rows of `ranked`, or all of them when fewer are eligible: 40 of 100 gives 40, 40 of 12 gives 12. Each gets `rank` 1 to N in order; tied scores still get different, sequential ranks. `ranked` keeps every eligible row so pin and omit (TR-21) can change it before the cut, and an omitted row lets the next one move up into the shortlist.
+**List size.** Without pins or omits, `shortlist` is the first `listSize` rows of `ranked`, or all of them when fewer are eligible: 40 of 100 gives 40, 40 of 12 gives 12. Each gets `rank` 1 to N in order; tied scores still get different, sequential ranks. `ranked` keeps every eligible row, so pins and omits ([Pin and omit](#pin-and-omit)) are applied to the full list before the cut.
 
 ### Match reasons
 
@@ -375,7 +375,7 @@ Step 6 (TR-20). Code: `explain(row, brief)` in `ranking/reasons.ts`. `rank()` ca
 - **Employee counts** are written from the parsed number, with commas from plain code (not `toLocaleString()`), so every browser gives the same text: `1 employee`, `1,200 employees`, a range `10 to 19 employees` (whether the cell said "10-19" or "10 to 19"), an open range `10,000 or more employees`.
 - **Long values** are cut to 60 characters, the last one being `…`. Reasons are plain text.
 - **Exclusions aren't listed.** Every eligible row passed them, so "not Retail" would only add noise.
-- **Pins** (TR-21) will add their own `info` line.
+- **Pins** (TR-21): a pinned row in `shortlist` gets `Pinned by user` (`info`) as its first reason, and its `reasonText` starts with it: `Pinned by user; Location: Phoenix, AZ (required); ...`. The same row in `ranked` and `omittedRows` keeps its own reasons. Built by `withPinReason()` in `reasons.ts`.
 
 **Order** (the same every time):
 
@@ -400,6 +400,50 @@ Every row has at least one reason: a brief with preferences gives one line per a
 
 The "not preferred" lines show why scores differ. With the business owner brief SYN-0001 has 100 and SYN-0006 has 64, and SYN-0006's reasons say why: `Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title: Operations Manager (not preferred); Company size: 25 employees (preferred)`.
 
+### Pin and omit
+
+Step 5 (TR-21). Code: `ranking/overrides.ts`. The user can keep a record in the list (pin) or take one out (omit). Pure: no React, no storage.
+
+**The overrides** are two lists of Record IDs, `{ pinned, omitted }`, each sorted with `compareRecordIds()`, so the same choices always give the same value. They live only in the wizard's memory, next to the confirmed brief: nothing is saved anywhere. Change them only with `pin()`, `unpin()`, `omit()` and `restore()`. Record IDs are compared with `matchKey()`, so ` syn-0496 ` is SYN-0496.
+
+- **Pin and omit cancel each other.** Pinning an omitted record un-omits it; omitting a pinned one unpins it. The latest action wins, so an ID is never in both lists.
+- **Overrides survive brief edits.** When a brief change makes a pinned row ineligible, the pin is removed and the user sees `SYN-0496 was unpinned because it no longer matches your criteria.` Omitted IDs stay omitted; an omitted row that isn't eligible is simply not listed. A new workbook resetting them is TR-28.
+
+**Who can be pinned.** Only eligible records. `checkPin(typed, context)` returns `{ ok: true, recordId }` (the ID as the file has it) or `{ ok: false, message }`. `context` comes from `pinContext(records, leftOutRows, statusById)`: the filter's `statusById`, the duplicate map (each folded duplicate's ID to the ID it was folded into) and the rows the [row checks](#row-checks) left out. Checked in this order:
+
+| Case | Message |
+|---|---|
+| Nothing typed | `Type a Record ID to pin.` |
+| No row has the ID | `No record with ID NOPE-1 in this file.` |
+| Only rows the row checks left out have it | `X was left out when the file was checked, so it can't be pinned.` |
+| A grouped duplicate | `SYN-0500 is a duplicate of SYN-0001. Pin SYN-0001 instead.` |
+| Matches an exclusion | `SYN-0016 can't be pinned because it matches your Leave out rule.` |
+| Fails a must-have | `SYN-0002 can't be pinned because it doesn't meet your must-haves.` |
+| Omitted | Allowed: pinning un-omits it |
+
+A row is only left out for repeating an earlier row's Record ID, and that earlier row is kept, so a typed ID always finds the kept row first. The "left out" message is there for any future reason a row check removes a row with an ID of its own.
+
+**Applying them.** `applyOverrides(ranked, overrides, listSize)` runs in `rank()` between sorting (and reasons) and the cut, and replaces TR-19's plain cut:
+
+1. Omitted rows are taken out of `ranked` first, so the next row moves up and the list stays at `listSize`.
+2. The rest split into pinned rows and the others. Both keep `ranked` order (score, then Record ID), so the order within pins doesn't depend on when they were pinned.
+3. `shortlist` is every pinned row, then the best others until it has `listSize` rows. **Pins take slots within the list size**: 40 with 2 pins is 2 pins and the top 38 others. With more pins than the list size, every pin is shown and nothing else.
+4. Ranks run 1 to N over the whole shortlist. Pinned rows get `override: "pinned"` (others `null`) and `Pinned by user` as their first reason. Scores don't change.
+
+`rank()` also returns `overrides` (the ones given, minus `droppedPins`), `droppedPins` (pinned IDs with no eligible row under this brief, which the wizard removes and reports) and `omittedRows` (the omitted rows that are still eligible, with score and reasons, in `ranked` order). The export (TR-25) uses `shortlist`, `omittedRows` and `overrides`, so it shows exactly what is on screen.
+
+**On screen** (placeholder until the results table, TR-22): each of the first 5 lines has Pin (Unpin when pinned) and Omit buttons and a `Pinned by user` label when pinned. "Pin by Record ID" above the list pins any eligible record, including one below the cut, with the messages above in a live region. "Omitted by you (N)" under the list has a Restore button for each row. After a button, focus stays on that row, or goes to the row now in its place when it left the list, and a live region says what changed.
+
+**With the synthetic sample** (business owner brief, list size 40; without overrides SYN-0441 is 40th and SYN-0461 41st):
+
+| Overrides | Result |
+|---|---|
+| Pin SYN-0496 (score 0, last) | 40 rows. 1 SYN-0496 at 0 with `Pinned by user` first, 2 SYN-0001 at 100. SYN-0441 drops out |
+| Omit SYN-0001 | 40 rows. SYN-0101 (86) first; SYN-0461 comes in at 40. SYN-0001 is in `omittedRows` at 100 |
+| Pin SYN-0496 and SYN-0016 | Both first, SYN-0016 before SYN-0496 (both 0, so by Record ID) |
+| Pin SYN-0496, then change the must-have to Tempe, AZ | SYN-0496 in `droppedPins`, removed from the overrides, notice shown |
+| List size 2, pin SYN-0016, SYN-0021, SYN-0496 | 3 rows, all pinned: SYN-0021 (36), SYN-0016, SYN-0496 |
+
 ## Expected results
 
 | Scenario | Expected |
@@ -409,6 +453,9 @@ The "not preferred" lines show why scores differ. With the business owner brief 
 | Tempe, AZ; prefer Logistics, Operations Manager, 10 to 99; 30 rows | 100 eligible, 30 out, SYN-0002 first at 100, tied with 6 others (first by Record ID) |
 | Business owner, list size 1 / 100 | 1 row (SYN-0001) / all 100 eligible rows |
 | Same brief twice, or the records shuffled first | Identical `shortlist`, reasons included |
+| Business owner, pin SYN-0496 | 40 rows, SYN-0496 first at 0 with `Pinned by user`, SYN-0001 second, SYN-0441 out ([Pin and omit](#pin-and-omit)) |
+| Business owner, omit SYN-0001 | 40 rows, SYN-0461 comes in at 40 |
+| Same brief and overrides twice, records shuffled, or pins made in another order | Identical `shortlist` |
 | Any brief, every row in `ranked` | At least one reason, none empty, no em-dashes |
 | Phoenix, AZ; prefer only Fabrication and 10 to 99 | Active weight total 45. Both match 100, industry only 77.78, employees only 22.22 |
 | No preferences | Every score 0, empty breakdown |
