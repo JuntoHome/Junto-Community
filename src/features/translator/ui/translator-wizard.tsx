@@ -46,6 +46,9 @@ export function TranslatorWizard() {
   // Later tickets mark each step done as its work is built.
   const [done, setDone] = useState<ReadonlySet<StepId>>(() => new Set());
   // The accepted workbook: the file, its bytes (read once, for the gate and the parser), its allowlist entry and its parsed rows.
+  // `buffer` is read-only: it is used only for hashing (file gate) and parsing, and is never
+  // changed, written back or passed to the export (TR-27). The export builds a new file from the
+  // ranking result, so the uploaded file stays exactly as it was.
   const [workbook, setWorkbook] = useState<LoadedWorkbook | null>(null);
   // The last workbook check's problem, shown on the Upload step.
   const [fileError, setFileError] = useState<string | null>(null);
@@ -130,6 +133,7 @@ export function TranslatorWizard() {
     // Then exact duplicates among the kept rows are folded into the earliest one; look-alikes are flagged.
     const { records, duplicateCount, issues: duplicateIssues } = groupDuplicates(validation.kept);
     const issues = [...validation.issues, ...duplicateIssues].sort(compareIssues);
+    // `buffer` is kept read-only: only the gate and the parser above ever read it (TR-27).
     setWorkbook({ file, buffer, entry: gate.entry, parsed: normalized, validation, records, duplicateCount, issues });
     // A new workbook has its own values, so earlier criteria no longer apply.
     setCriteriaForm(EMPTY_CRITERIA_FORM);
