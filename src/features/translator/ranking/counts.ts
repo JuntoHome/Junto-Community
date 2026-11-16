@@ -12,8 +12,11 @@ import type { RankResult } from "./index";
  * Pure and deterministic: no React, no I/O, no logging.
  */
 
-/** How each brief field is named in a filter label: "Must-have City", "Leave out Company size". */
-const FIELD_NAMES: Record<BriefField, string> = {
+/**
+ * How each brief field is named in a filter label: "Must-have City", "Leave out Company size".
+ * The no-results helper (TR-24) uses the same names.
+ */
+export const FIELD_NAMES: Record<BriefField, string> = {
   city: "City",
   state: "State",
   industry: "Industry",

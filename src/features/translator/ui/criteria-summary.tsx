@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, type ReactNode, type Ref, useEffect, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, type Ref, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { buttonClasses } from "@/components/ui/button";
 import { type BriefItemId, describeLines } from "../criteria/describe";
 import { type CriteriaForm, type CriteriaFormErrors, type CriteriaFormField, toBrief } from "../criteria/from-form";
@@ -114,8 +114,29 @@ const EDITORS: Partial<Record<BriefItemId, Editor>> = {
   },
 };
 
+/**
+ * What an item's editor is called ("location", "industries to leave out"), or null when the
+ * item has no editor (assumptions, and items only a Phase 2 brief can have). Whatever offers to
+ * open an item (the no-results helper, TR-24) shows its button only when this isn't null.
+ */
+export function editableItemName(id: BriefItemId): string | null {
+  return EDITORS[id]?.name ?? null;
+}
+
+/** What the Results step can ask of the summary. */
+export type CriteriaSummaryHandle = {
+  /**
+   * Opens `id`'s inline editor (cancelling any other), scrolls to it and focuses its first
+   * control, as if its Change button were pressed. Does nothing for an item with no editor.
+   */
+  openItem: (id: BriefItemId) => void;
+};
+
 /** The open inline editor: which item, the draft copy of the form it edits, and its errors. */
 type Editing = { id: BriefItemId; editor: Editor; draft: CriteriaForm; errors: CriteriaFormErrors };
+
+/** The first control in an editor that can take focus. */
+const FIRST_CONTROL = "input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])";
 
 /**
  * The criteria summary (TR-16), at the top of the Results step: `brief` in plain language
@@ -127,8 +148,11 @@ type Editing = { id: BriefItemId; editor: Editor; draft: CriteriaForm; errors: C
  * `brief` must be the brief the current results were ranked against (or the pending one before
  * confirming), never one rebuilt from form state, so the summary always matches the results.
  * `form` is the form that produced it, so a Save changes only the item being edited.
+ *
+ * `ref` gives `openItem()` (TR-24), so the no-results helper's Edit buttons can open an item.
  */
 export function CriteriaSummary({
+  ref,
   records,
   brief,
   form,
@@ -136,6 +160,7 @@ export function CriteriaSummary({
   onSave,
   onConfirm,
 }: {
+  ref?: Ref<CriteriaSummaryHandle>;
   records: readonly GroupedRecord[];
   brief: SearchBrief;
   form: CriteriaForm;
@@ -151,18 +176,28 @@ export function CriteriaSummary({
 
   const headingRef = useRef<HTMLHeadingElement>(null);
   const editorHeadingRef = useRef<HTMLHeadingElement>(null);
+  const editorFormRef = useRef<HTMLFormElement>(null);
   const otherErrorsRef = useRef<HTMLDivElement>(null);
   const changeButtons = useRef(new Map<BriefItemId, HTMLButtonElement>());
 
-  // Focus to move after the next render: into a newly opened editor, back to an item's Change
-  // button after Save or Cancel (the heading if that item is gone), or to the first problem.
-  const focusNext = useRef<{ to: "editor" } | { to: "item"; id: BriefItemId } | { to: "errors" } | null>(null);
+  // Focus to move after the next render: into a newly opened editor (its heading after Change,
+  // its first control after `openItem()`), back to an item's Change button after Save or Cancel
+  // (the heading if that item is gone), or to the first problem.
+  const focusNext = useRef<
+    { to: "editor" } | { to: "control" } | { to: "item"; id: BriefItemId } | { to: "errors" } | null
+  >(null);
   useEffect(() => {
     const next = focusNext.current;
     if (!next) return;
     focusNext.current = null;
     if (next.to === "editor") editorHeadingRef.current?.focus();
-    else if (next.to === "item") (changeButtons.current.get(next.id) ?? headingRef.current)?.focus();
+    else if (next.to === "control") {
+      const editorForm = editorFormRef.current;
+      if (!editorForm) return;
+      editorForm.scrollIntoView({ block: "start" });
+      const control = editorForm.querySelector<HTMLElement>(FIRST_CONTROL);
+      (control ?? editorHeadingRef.current)?.focus({ preventScroll: true });
+    } else if (next.to === "item") (changeButtons.current.get(next.id) ?? headingRef.current)?.focus();
     else if (editing) {
       const own = editing.editor.fields.find((field) => editing.errors[field]);
       if (own) document.getElementById(fieldId(own))?.focus();
@@ -170,11 +205,18 @@ export function CriteriaSummary({
     }
   });
 
-  function open(id: BriefItemId, editor: Editor) {
+  function open(id: BriefItemId, editor: Editor, focus: "editor" | "control" = "editor") {
     // A fresh draft every time, so whatever an earlier editor held is dropped.
     setEditing({ id, editor, draft: form, errors: {} });
-    focusNext.current = { to: "editor" };
+    focusNext.current = { to: focus };
   }
+
+  useImperativeHandle(ref, () => ({
+    openItem(id) {
+      const editor = EDITORS[id];
+      if (editor) open(id, editor, "control");
+    },
+  }));
 
   function close(id: BriefItemId) {
     setEditing(null);
@@ -261,6 +303,7 @@ export function CriteriaSummary({
                   onSave={save}
                   onCancel={() => close(lineEditing.id)}
                   headingRef={editorHeadingRef}
+                  formRef={editorFormRef}
                   otherErrorsRef={otherErrorsRef}
                 />
               )}
@@ -297,6 +340,7 @@ function ItemEditor({
   onSave,
   onCancel,
   headingRef,
+  formRef,
   otherErrorsRef,
 }: {
   editing: Editing;
@@ -305,6 +349,7 @@ function ItemEditor({
   onSave: (event: FormEvent<HTMLFormElement>) => void;
   onCancel: () => void;
   headingRef: Ref<HTMLHeadingElement>;
+  formRef: Ref<HTMLFormElement>;
   otherErrorsRef: Ref<HTMLDivElement>;
 }) {
   const { editor } = editing;
@@ -312,6 +357,7 @@ function ItemEditor({
   const otherErrors = FORM_FIELDS.filter((field) => editing.errors[field] && !editor.fields.includes(field));
   return (
     <form
+      ref={formRef}
       onSubmit={onSave}
       noValidate
       aria-labelledby={headingId}

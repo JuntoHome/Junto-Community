@@ -11,10 +11,12 @@ import type { GroupedRecord } from "../normalize/duplicates";
 import type { ImportSummary } from "../normalize/summary";
 import type { RankedRow, RankResult } from "../ranking";
 import { buildCounts } from "../ranking/counts";
+import { diagnoseEmpty } from "../ranking/diagnose";
 import { checkPin, hasId, omit, type Overrides, pin, type PinContext, restore, unpin } from "../ranking/overrides";
 import { CountsSummary } from "./counts-summary";
 import { errorText } from "./criteria-controls";
-import { CRITERIA_SUMMARY_HEADING_ID, CriteriaSummary } from "./criteria-summary";
+import { CRITERIA_SUMMARY_HEADING_ID, CriteriaSummary, type CriteriaSummaryHandle } from "./criteria-summary";
+import { NoResults } from "./no-results";
 import { ResultsTable, type ResultsView, type RowControls } from "./results-table";
 
 /** "SYN-0001", "SYN-0001 and SYN-0016", "SYN-0001, SYN-0016 and SYN-0021". */
@@ -24,8 +26,6 @@ function joinIds(ids: readonly string[]): string {
 
 const TEXT = {
   editCriteria: "Edit criteria",
-  /** Until the no-results helper (TR-24). */
-  noMatches: "No matches for these criteria.",
   restore: "Restore",
   pinByIdLabel: "Pin by Record ID",
   pinByIdHint: "A pinned record shows at the top of the list, even if its score would leave it out.",
@@ -60,7 +60,9 @@ const buttonKey = (list: OverrideList, action: OverrideAction, recordId: string)
  * Above the shortlist: the counts summary (TR-23, from the rows read to the rows in the
  * shortlist and export), Edit criteria (focus to the summary's heading) and "Pin by Record
  * ID". Then the shortlist as a table, or cards on a phone (`ResultsTable`, TR-22), then
- * "Omitted by you" with Restore.
+ * "Omitted by you" with Restore. An empty shortlist shows the no-results helper instead of the
+ * table (TR-24, `NoResults` with `diagnoseEmpty()`), whose Edit buttons open that item in the
+ * summary through its `openItem()`.
  *
  * Pin and omit (TR-21): each shortlist row has Pin (or Unpin) and Omit buttons, "Pin by Record
  * ID" pins any eligible record, including one below the cut, and "Omitted by you" lists the
@@ -121,6 +123,13 @@ export function ResultsStep({
   const counts = useMemo(() => (results ? buildCounts(importSummary, results) : null), [importSummary, results]);
   const shownRows = results?.shortlist ?? [];
   const omittedRows = results?.omittedRows ?? [];
+  // Only worked out for an empty shortlist, from the same `results` as the counts.
+  const diagnosis = useMemo(
+    () => (results && results.shortlist.length === 0 ? diagnoseEmpty(records, results.brief, results) : null),
+    [records, results],
+  );
+  // The no-results helper's Edit buttons open an item in the criteria summary.
+  const summaryRef = useRef<CriteriaSummaryHandle>(null);
 
   // After an override button, focus goes to the same button on that row once the lists have
   // changed. When the row left that list, it goes to the row now in its place (or the last
@@ -200,6 +209,7 @@ export function ResultsStep({
   return (
     <div className="flex flex-col gap-8">
       <CriteriaSummary
+        ref={summaryRef}
         records={records}
         brief={results?.brief ?? pendingBrief}
         form={pendingForm}
@@ -258,11 +268,10 @@ export function ResultsStep({
           </div>
 
           <div className="mt-4">
-            {shownRows.length > 0 ? (
-              <ResultsTable rows={shownRows} mapping={mapping} controls={rowControls} />
+            {diagnosis ? (
+              <NoResults diagnosis={diagnosis} onEdit={(id) => summaryRef.current?.openItem(id)} />
             ) : (
-              // TODO(TR-24): the no-results helper replaces this line.
-              <p className="text-base text-ink">{TEXT.noMatches}</p>
+              <ResultsTable rows={shownRows} mapping={mapping} controls={rowControls} />
             )}
           </div>
 
