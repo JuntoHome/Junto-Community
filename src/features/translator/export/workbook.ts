@@ -2,7 +2,7 @@ import ExcelJS from "exceljs";
 import type { MappingRow } from "../import/describe-mapping";
 import type { RankResult } from "../ranking";
 import type { Counts } from "../ranking/counts";
-import { textCell } from "./cells";
+import { setTextCell } from "./cells";
 import { type CriteriaSection, criteriaTable, type ExportSource } from "./criteria-rows";
 import { type ShortlistColumnKey, shortlistTable } from "./shortlist-rows";
 
@@ -13,7 +13,10 @@ import { type ShortlistColumnKey, shortlistTable } from "./shortlist-rows";
  *
  * Nothing is sent, stored or logged, and the uploaded workbook's bytes are never read or
  * changed here: the sheets are built from the ranking result, the counts and the file's
- * allowlist details only.
+ * allowlist details only. The result is always a new file; nothing is saved over the upload.
+ *
+ * Formula safety (TR-27): every text cell is written by `setTextCell()` (`cells.ts`), and
+ * `assertNoFormulas()` checks the whole workbook right before it is written out.
  *
  * No React. The only I/O is writing the new file's bytes in memory.
  */
@@ -57,8 +60,29 @@ const WIDTHS: Record<ShortlistColumnKey, number> = {
 /** Long text that wraps inside its cell instead of running across the next ones. */
 const WRAPPED: ReadonlySet<ShortlistColumnKey> = new Set(["otherExecutives", "reasons"]);
 
-/** Excel's "Text" number format, so an ID or phone number typed over later also stays text. */
-const TEXT_FORMAT = "@";
+/** Why `buildWorkbook()` refused to write the file. The Export step shows its own generic message. */
+export const FORMULA_BLOCKED_MESSAGE = "Export blocked: a cell would contain a formula.";
+
+/**
+ * Throws `FORMULA_BLOCKED_MESSAGE` if any cell of any sheet holds a formula: its type is
+ * Formula, or its value is an object with `formula` or `sharedFormula`. Today nothing in the
+ * export writes one; this makes a later mistake fail loudly instead of shipping a file that
+ * calculates. The error never quotes the cell, because its value could be row data.
+ */
+export function assertNoFormulas(workbook: ExcelJS.Workbook): void {
+  workbook.eachSheet((sheet) => {
+    sheet.eachRow({ includeEmpty: true }, (row) => {
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        const value: unknown = cell.value;
+        const isFormulaObject =
+          typeof value === "object" && value !== null && ("formula" in value || "sharedFormula" in value);
+        if (cell.type === ExcelJS.ValueType.Formula || isFormulaObject) {
+          throw new Error(FORMULA_BLOCKED_MESSAGE);
+        }
+      });
+    });
+  });
+}
 
 /** The bytes ExcelJS wrote, as a plain ArrayBuffer of exactly the file's length. */
 function toArrayBuffer(data: ExcelJS.Buffer): ArrayBuffer {
@@ -73,7 +97,7 @@ function toArrayBuffer(data: ExcelJS.Buffer): ArrayBuffer {
  * Adds the Criteria sheet (TR-26): a bold, frozen `Item` / `Details` header, then each section
  * of `criteriaTable()` with its heading in bold on its own row and a blank row between sections.
  * The first section (title and synthetic note) has no heading; its rows span both columns, and
- * the title is bold. Every cell is text, through `textCell()`, so "1.0" stays "1.0". Empty
+ * the title is bold. Every cell is text, through `setTextCell()`, so "1.0" stays "1.0". Empty
  * strings are left as truly empty cells.
  */
 function addCriteriaSheet(workbook: ExcelJS.Workbook, sections: readonly CriteriaSection[]) {
@@ -83,8 +107,7 @@ function addCriteriaSheet(workbook: ExcelJS.Workbook, sections: readonly Criteri
   const write = (cell: ExcelJS.Cell, text: string, bold = false) => {
     cell.alignment = { vertical: "top", wrapText: true };
     if (text === "") return;
-    cell.value = textCell(text);
-    cell.numFmt = TEXT_FORMAT;
+    setTextCell(cell, text);
     if (bold) cell.font = { bold: true };
   };
 
@@ -131,6 +154,10 @@ export type CriteriaInput = {
  * numbers. Values the row doesn't have are left as truly empty cells.
  *
  * Sheet `Criteria`, after it: how the list was made (`criteriaTable()`), see `addCriteriaSheet()`.
+ *
+ * Every text cell is a literal string with the Text format (`setTextCell()`), so a value such as
+ * `=SUM(1,1)` shows as that text, never as 2. Throws `FORMULA_BLOCKED_MESSAGE` if a cell would
+ * hold a formula (`assertNoFormulas()`).
  */
 export async function buildWorkbook(
   rankResult: RankResult,
@@ -148,7 +175,7 @@ export async function buildWorkbook(
   const header = sheet.getRow(1);
   columns.forEach((column, index) => {
     const cell = header.getCell(index + 1);
-    cell.value = textCell(column.header);
+    setTextCell(cell, column.header);
     cell.font = { bold: true };
     cell.alignment = { vertical: "top", wrapText: true };
   });
@@ -160,12 +187,11 @@ export async function buildWorkbook(
       // A value the row doesn't have stays a truly empty cell.
       if (value === null) return;
       const cell = row.getCell(index + 1);
-      // `shortlistTable()` gives numbers only in the number columns. Every string goes through textCell().
+      // `shortlistTable()` gives numbers only in the number columns. Every string goes through setTextCell().
       if (typeof value === "number") {
         cell.value = value;
       } else {
-        cell.value = textCell(value);
-        cell.numFmt = TEXT_FORMAT;
+        setTextCell(cell, value);
       }
       cell.alignment = WRAPPED.has(column.key) ? { vertical: "top", wrapText: true } : { vertical: "top" };
     });
@@ -178,5 +204,7 @@ export async function buildWorkbook(
 
   addCriteriaSheet(workbook, criteriaTable({ rankResult, counts, source, now }));
 
+  // The backstop: no formula ever leaves this function.
+  assertNoFormulas(workbook);
   return toArrayBuffer(await workbook.xlsx.writeBuffer());
 }

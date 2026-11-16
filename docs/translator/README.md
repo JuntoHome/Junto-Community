@@ -591,11 +591,19 @@ When the shortlist is empty, the Results step shows "No matches for these criter
 
 ## Excel export
 
-The Export step builds an Excel file of the shortlist in the browser and downloads it (TR-25), with a second sheet that records how the list was made (TR-26). Code: `shortlistTable(rankResult, mapping)` in `export/shortlist-rows.ts` and `criteriaTable({ rankResult, counts, source, now })` in `export/criteria-rows.ts` (both pure, no ExcelJS), `buildWorkbook(rankResult, mapping, { counts, source, now })` in `export/workbook.ts`, `textCell()` in `export/cells.ts` and `shortlistFileName()` in `export/file-name.ts`, shown by `ui/export-step.tsx`. `mapping` is [`describeMapping()`](#preview-step) for the loaded file.
+The Export step builds an Excel file of the shortlist in the browser and downloads it (TR-25), with a second sheet that records how the list was made (TR-26). Code: `shortlistTable(rankResult, mapping)` in `export/shortlist-rows.ts` and `criteriaTable({ rankResult, counts, source, now })` in `export/criteria-rows.ts` (both pure, no ExcelJS), `buildWorkbook(rankResult, mapping, { counts, source, now })` in `export/workbook.ts`, `setTextCell()` in `export/cells.ts`, `assertNoFormulas()` in `export/workbook.ts` and `shortlistFileName()` in `export/file-name.ts`, shown by `ui/export-step.tsx`. `mapping` is [`describeMapping()`](#preview-step) for the loaded file.
 
 **The step.** **Continue to export**, at the bottom of the Results step, opens it (the button isn't shown for an empty shortlist). It says `40 records will be exported.` (the [counts summary](#counts-summary)'s `exported`) and has a **Download Excel** button. The button builds the workbook, wraps it in a `Blob` (`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`), clicks a temporary `<a download>` with an object URL and revokes the URL a second later (Firefox can cancel a download whose URL is revoked straight away). The file is `JCA_Shortlist_YYYY-MM-DD.xlsx`, using the local date. While it builds, the button is disabled and the step says `Preparing your file...`; focus goes back to the button afterwards. If it fails: `The file couldn't be created. Try again.` Nothing is logged.
 
 **Browser only.** No Server Action, no upload, no file on a server: the workbook is built from the `rank()` result in memory. ExcelJS is loaded with `await import()` on the first click, like the parser, so the first click also downloads that code from the site; after that a download makes no request. The uploaded workbook's bytes are never read or changed, so its hash still passes the [file gate](#file-gate) afterwards.
+
+**Formula safety (TR-27).** A cell starting with `=`, `+`, `-` or `@` must never run as a formula, and the uploaded file must stay as it was:
+
+- **Literal text cells.** Every text cell in both sheets, headers included, is written by `setTextCell(cell, value)`, the only text writer in the export. It sets the value to the plain string (never an object such as `{ formula }`, `{ richText }` or `{ hyperlink }`), so the file stores a string cell (`t="s"`), which Excel and Google Sheets never calculate. `=SUM(1,1)` shows as `=SUM(1,1)`, not 2.
+- **Text format.** `setTextCell()` also sets Excel's Text format (`@`), so if someone opens the cell in Excel and presses Enter, it stays text instead of becoming a formula.
+- **No prefix.** The value is written exactly as it is: no leading `'`, space or tab. That is a fix for CSV files; in .xlsx a string cell is never a formula, and a visible `'` would change the data. So `'quoted` stays `'quoted` and a value starting with a tab keeps its tab.
+- **Guard before saving.** `buildWorkbook()` calls `assertNoFormulas(workbook)` right before writing the file. It checks every cell of every sheet and, if one is a formula (its type is Formula, or its value has `formula` or `sharedFormula`), throws `Export blocked: a cell would contain a formula.` The Export step then shows its usual `The file couldn't be created. Try again.` Nothing writes a formula today; the guard makes a later mistake fail instead of shipping a file that calculates.
+- **The source file is never modified.** The export reads only `rankResult`, `counts` and the `source` details. The wizard keeps the gated `ArrayBuffer` read-only, for hashing and parsing only, and never passes it to the export. The download is always a new `Blob` with its own name (`JCA_Shortlist_YYYY-MM-DD.xlsx`); nothing is saved over the uploaded file.
 
 **Sheet `Shortlist`**: exactly `rankResult.shortlist`, in the same order, so it has as many rows as the counts summary's "in your shortlist and export". **Omitted rows aren't on it**: the Criteria sheet (TR-26) lists them with the overrides. Columns, in order:
 
@@ -617,7 +625,7 @@ The Export step builds an Excel file of the shortlist in the browser and downloa
 
 - **Blanks stay blank.** A value the row doesn't have is left as a truly empty cell: never `""`, `Unknown` or `None`. The same goes for an empty Duplicate IDs, Other executives, Missing or Override.
 - **Text and numbers.** Only Rank, Source row, Employees and Score are numbers. Everything else is stored as text with Excel's Text format (`@`), so a long IUSA Number or a phone number never becomes a number or scientific notation, even when the source cell was a number. Excel may mark a digits-only Record ID with a small "number stored as text" triangle; that is expected. The sheet has no ZIP column.
-- **One way in for text.** Every text cell, headers included, goes through `textCell()`. Today it returns the text unchanged; formula safety (TR-27) is added there.
+- **One way in for text.** Every text cell, headers included, goes through `setTextCell()`, which writes it as literal text with the Text format (see Formula safety above).
 - **Layout.** Bold header row, frozen (`ySplit: 1`), with a filter over the header and every row. Column widths are set; Reasons and Other executives wrap. Workbook creator: `JCA Data Axle Translator`.
 
 **With the synthetic sample:**
@@ -635,7 +643,7 @@ Invented Reference Solutions-layout records give an empty Email column, filled P
 
 After `Shortlist`, sheet `Criteria` records exactly how the list was made, so it can be explained, checked or repeated later (TR-26). Everything about the run comes from `rankResult`, the same result the Shortlist sheet was made from, never from the form: the Criteria rows describe `rankResult.brief`, so a role changed in the criteria summary shows the revised role, and the scoring version is `rankResult.scoringVersion`, recorded from `SCORING_VERSION` when the list was ranked. The Export step passes `counts` (`buildCounts()`), `source` and `now` (the time of the click).
 
-Two columns, `Item` (width 28) and `Details` (width 90), with a bold, frozen header. Each section has its heading in bold on its own row, with a blank row between sections. Every cell is text through `textCell()`, wrapped, so the scoring version stays `1.0` and never becomes the number 1. In order:
+Two columns, `Item` (width 28) and `Details` (width 90), with a bold, frozen header. Each section has its heading in bold on its own row, with a blank row between sections. Every cell is text through `setTextCell()`, wrapped, so the scoring version stays `1.0` and never becomes the number 1. In order:
 
 | Section | Rows |
 |---|---|
