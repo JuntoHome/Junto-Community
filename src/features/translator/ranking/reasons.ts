@@ -43,6 +43,8 @@ export const REASON_TEXT = {
   noCriteria: "Matches your criteria. No preferences were set.",
   /** A brief with must-haves but no preferences, after the required lines. */
   noPreferences: "No preferences were set, so all matches score 0.",
+  /** The first reason of a row the user pinned (TR-21). */
+  pinned: "Pinned by user",
 } as const;
 
 /** `value`, cut to `MAX_REASON_VALUE_LENGTH` characters with "…". Counts code points, so no emoji is split. */
@@ -185,5 +187,18 @@ export function explain(row: ScoredRecord, brief: SearchBrief): RowReasons {
       text: reasons.length === 0 ? REASON_TEXT.noCriteria : REASON_TEXT.noPreferences,
     });
   }
+  return withReasonText(reasons);
+}
+
+/** `reasons` and their texts joined into `reasonText`. */
+function withReasonText(reasons: Reason[]): RowReasons {
   return { reasons, reasonText: reasons.map(({ text }) => text).join(REASON_SEPARATOR) };
+}
+
+/**
+ * A pinned row's reasons (TR-21): `Pinned by user` (`info`) first, then the row's own reasons
+ * unchanged, with `reasonText` rebuilt from them.
+ */
+export function withPinReason({ reasons }: RowReasons): RowReasons {
+  return withReasonText([{ kind: "info", dimension: null, text: REASON_TEXT.pinned }, ...reasons]);
 }

@@ -2,7 +2,7 @@
 
 The project's task status in one place. GitHub issues are the source of truth for Translator work; this file summarises them. Update it when a ticket changes state.
 
-**As of:** Nov 14, 2026.
+**As of:** Nov 16, 2026.
 
 **Sources:** GitHub issues #1 to #35 (milestone "Data Axle Translator Phase 1"), [JCA_CMS_Plan.md](JCA_CMS_Plan.md) for CMS tickets, and the commit history for completion evidence.
 
@@ -77,7 +77,8 @@ These may be done; confirm and move them.
 | TR-17 | Filtering engine | Merged into `translator` (PR #52): `filterRecords()` in `ranking/filter.ts` removes rows matching an exclusion, then rows failing a must-have (a missing value fails), and returns `eligible`, `statusById`, `counts` (including `failedOnlyMissing`) and `byCriterion`. All comparisons go through `matchCriterion()` in `ranking/match.ts`. `rank()` now returns `{ brief, rows, filter }`; the Results step shows the counts in a placeholder line. Sample, business owner: 100 eligible, 399 failed a must-have | [#17](https://github.com/JuntoHome/Junto-Community/issues/17), [PR #52](https://github.com/JuntoHome/Junto-Community/pull/52) |
 | TR-18 | Scoring engine | Merged into `translator` (PR #53): `scoreRecords()` in `ranking/score.ts` scores each eligible record 0 to 100 against the preferences, with weights from `weightsFor()` (defaults industry 35, geography 30, title 25, employees 10, or 4, 3, 2, 1 by `priorityOrder`; constants in `ranking/weights.ts`). Geography needs the city and the state to match when both are preferred. `score` stays unrounded; `displayScore` is rounded. `rank()` now also returns `weights` and `scoringVersion`, and each row its `score`, `displayScore` and `breakdown`; the Results step shows "Top score: 100 (1 record)." Sample, business owner: SYN-0001 the only 100 | [#18](https://github.com/JuntoHome/Junto-Community/issues/18), [PR #53](https://github.com/JuntoHome/Junto-Community/pull/53) |
 | TR-19 | Sorting and list limit | Merged into `translator` (PR #54): `sortScored()` in `ranking/sort.ts` sorts by unrounded score descending (exact equality, no tolerance), then Record ID ascending with `compareRecordIds()` (`ranking/compare-ids.ts`: digit IDs first, by length then text; other IDs by upper-cased text; no `localeCompare()`). `takeShortlist()` in `ranking/limit.ts` keeps the first `listSize` rows with `rank` 1 to N. `rank()` now returns `{ brief, scoringVersion, weights, filter, ranked, shortlist }`; the Results step lists the first 5 rows and "Showing 40 of 100 matches." Sample, business owner: SYN-0001 first; title Operations Manager: SYN-0006 first | [#19](https://github.com/JuntoHome/Junto-Community/issues/19), [PR #54](https://github.com/JuntoHome/Junto-Community/pull/54) |
-| TR-20 | Match reasons | In review (PR into `translator`, branch `tr-20-match-reasons`): `explain(row, brief)` in `ranking/reasons.ts` returns `reasons` (`{ kind, dimension, text }`, kind `required`, `preferred`, `not-preferred`, `unknown` or `info`) and `reasonText` (the texts joined with "; ", for the export). Values are the record's own; required lines first (city and state as one Location line), then preferences by weight, then an `info` line when there are no preferences. `rank()` adds them to every row of `ranked`; the Results placeholder shows `reasonText` under each of the first 5 rows. Sample, title Operations Manager: SYN-0006 shows "Title: Operations Manager (preferred)" | [#20](https://github.com/JuntoHome/Junto-Community/issues/20), [PR #55](https://github.com/JuntoHome/Junto-Community/pull/55) |
+| TR-20 | Match reasons | Merged into `translator` (PR #55): `explain(row, brief)` in `ranking/reasons.ts` returns `reasons` (`{ kind, dimension, text }`, kind `required`, `preferred`, `not-preferred`, `unknown` or `info`) and `reasonText` (the texts joined with "; ", for the export). Values are the record's own; required lines first (city and state as one Location line), then preferences by weight, then an `info` line when there are no preferences. `rank()` adds them to every row of `ranked`; the Results placeholder shows `reasonText` under each of the first 5 rows. Sample, title Operations Manager: SYN-0006 shows "Title: Operations Manager (preferred)" | [#20](https://github.com/JuntoHome/Junto-Community/issues/20), [PR #55](https://github.com/JuntoHome/Junto-Community/pull/55) |
+| TR-21 | Pin and omit overrides | In review (PR into `translator`, branch `tr-21-pin-and-omit`): `ranking/overrides.ts` keeps the user's pins and omits as two sorted lists of Record IDs (`pin()`, `unpin()`, `omit()`, `restore()`; pin and omit cancel each other). `applyOverrides()` runs in `rank(records, brief, overrides)` between sorting and the cut: omitted rows out first, then pinned rows (labelled `Pinned by user`, score unchanged), then the best of the rest up to the list size. `checkPin()` allows only eligible records, with a message for each other case. `rank()` also returns `overrides`, `droppedPins` and `omittedRows` for the export (TR-25). The wizard keeps the overrides next to the confirmed brief; brief edits keep them and drop pins that stop matching, with a notice. The Results placeholder has Pin, Unpin and Omit buttons, Pin by Record ID and Omitted by you with Restore. Sample: pin SYN-0496 puts it first and SYN-0441 out; omit SYN-0001 brings SYN-0461 in | [#21](https://github.com/JuntoHome/Junto-Community/issues/21), [PR #56](https://github.com/JuntoHome/Junto-Community/pull/56) |
 
 ## Pending
 
@@ -88,12 +89,6 @@ Data Axle Translator Phase 1, all open. Each issue has the steps and acceptance 
 | ID | Title | Expected location | Issue |
 |---|---|---|---|
 | TR-35 | Synthetic test file in the real Reference Solutions layout | `docs/translator/` | [#35](https://github.com/JuntoHome/Junto-Community/issues/35) |
-
-### Ranking
-
-| ID | Title | Expected location | Issue |
-|---|---|---|---|
-| TR-21 | Pin and omit overrides | `ranking/`, `ui/` | [#21](https://github.com/JuntoHome/Junto-Community/issues/21) |
 
 ### Results and export
 
