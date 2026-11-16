@@ -8,12 +8,14 @@ import type { MappingRow } from "../import/describe-mapping";
 import type { RankResult } from "../ranking";
 import type { Counts } from "../ranking/counts";
 import { errorText } from "./criteria-controls";
+import { logTranslatorError } from "./log-error";
 
 // Every string the Export step shows. Plain language, no em-dashes.
 const TEXT = {
   /** "40 records will be exported." */
   willExport: (n: number) => `${n.toLocaleString("en-US")} ${n === 1 ? "record" : "records"} will be exported.`,
   download: "Download Excel",
+  synthetic: "This file is a synthetic demonstration. All companies and people are fictional.",
   preparing: "Preparing your file...",
   failed: "The file couldn't be created. Try again.",
 } as const;
@@ -42,12 +44,13 @@ function saveFile(bytes: ArrayBuffer, fileName: string) {
 
 /**
  * The Export step (TR-25): how many records the file will have, and Download Excel, which
- * builds the workbook in the browser and saves it as `JCA_Shortlist_YYYY-MM-DD.xlsx`. The file
- * has the Shortlist sheet and the Criteria sheet (TR-26), which records how the list was made.
+ * builds the workbook in the browser and saves it as `JCA_Shortlist_Synthetic_Demo_YYYY-MM-DD.xlsx`.
+ * The file has the Shortlist sheet and the Criteria sheet (TR-26), which records how the list was
+ * made. The synthetic note sits next to the button, and in the file (TR-28).
  *
  * Nothing is sent anywhere: the file is made from `results` in memory and handed to the browser
- * as a download. The uploaded workbook is never changed. A failure shows a message and is not
- * logged, because the error could quote row data.
+ * as a download. The uploaded workbook is never changed. A failure shows a message and logs only
+ * the code `export-failed`, never the error, because it could quote row data.
  *
  * `counts` is `buildCounts()` for `results`: its `exported` figure is the shortlist length, and
  * the Criteria sheet lists the same count lines as the Results step.
@@ -87,7 +90,8 @@ export function ExportStep({
       saveFile(bytes, shortlistFileName(now));
       setState("idle");
     } catch {
-      // Not logged: the error could quote cell data.
+      // Only the code: the error could quote cell data.
+      logTranslatorError("export-failed");
       setState("failed");
     }
   }
@@ -97,17 +101,20 @@ export function ExportStep({
   return (
     <div className="mt-3 flex flex-col gap-4">
       <p className="text-base text-ink">{TEXT.willExport(counts.exported)}</p>
-      <div className="flex">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         <button
           ref={buttonRef}
           type="button"
           onClick={download}
           disabled={preparing}
-          aria-describedby="translator-export-status"
+          aria-describedby="translator-export-note translator-export-status"
           className={buttonClasses("navy", "md", "cursor-pointer")}
         >
           {TEXT.download}
         </button>
+        <p id="translator-export-note" className="text-base text-muted">
+          {TEXT.synthetic}
+        </p>
       </div>
       <p id="translator-export-status" role="status" className={state === "failed" ? errorText : "text-base text-muted"}>
         {preparing ? TEXT.preparing : state === "failed" ? TEXT.failed : ""}

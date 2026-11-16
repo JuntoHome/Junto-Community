@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { buttonClasses } from "@/components/ui/button";
+import { logTranslatorError } from "./log-error";
 import { SAMPLE_WORKBOOKS, XLSX_MIME_TYPE, type SampleWorkbook } from "./samples";
 
 const LOAD_FAILED = "The sample couldn't be loaded. Refresh the page and try again.";
@@ -29,6 +30,7 @@ export function SampleButtons({ onWorkbook }: { onWorkbook: (file: File) => void
     try {
       file = await fetchSample(sample);
     } catch {
+      logTranslatorError("sample-load-failed");
       setError(LOAD_FAILED);
       return;
     } finally {

@@ -408,7 +408,7 @@ Step 5 (TR-21). Code: `ranking/overrides.ts`. The user can keep a record in the 
 **The overrides** are two lists of Record IDs, `{ pinned, omitted }`, each sorted with `compareRecordIds()`, so the same choices always give the same value. They live only in the wizard's memory, next to the confirmed brief: nothing is saved anywhere. Change them only with `pin()`, `unpin()`, `omit()` and `restore()`. Record IDs are compared with `matchKey()`, so ` syn-0496 ` is SYN-0496.
 
 - **Pin and omit cancel each other.** Pinning an omitted record un-omits it; omitting a pinned one unpins it. The latest action wins, so an ID is never in both lists.
-- **Overrides survive brief edits.** When a brief change makes a pinned row ineligible, the pin is removed and the user sees `SYN-0496 was unpinned because it no longer matches your criteria.` Omitted IDs stay omitted; an omitted row that isn't eligible is simply not listed. A new workbook resetting them is TR-28.
+- **Overrides survive brief edits.** When a brief change makes a pinned row ineligible, the pin is removed and the user sees `SYN-0496 was unpinned because it no longer matches your criteria.` Omitted IDs stay omitted; an omitted row that isn't eligible is simply not listed. A new workbook starts a new session, which clears them ([Session and Start over](#session-and-start-over)).
 
 **Who can be pinned.** Only eligible records. `checkPin(typed, context)` returns `{ ok: true, recordId }` (the ID as the file has it) or `{ ok: false, message }`. `context` comes from `pinContext(records, leftOutRows, statusById)`: the filter's `statusById`, the duplicate map (each folded duplicate's ID to the ID it was folded into) and the rows the [row checks](#row-checks) left out. Checked in this order:
 
@@ -593,7 +593,7 @@ When the shortlist is empty, the Results step shows "No matches for these criter
 
 The Export step builds an Excel file of the shortlist in the browser and downloads it (TR-25), with a second sheet that records how the list was made (TR-26). Code: `shortlistTable(rankResult, mapping)` in `export/shortlist-rows.ts` and `criteriaTable({ rankResult, counts, source, now })` in `export/criteria-rows.ts` (both pure, no ExcelJS), `buildWorkbook(rankResult, mapping, { counts, source, now })` in `export/workbook.ts`, `setTextCell()` in `export/cells.ts`, `assertNoFormulas()` in `export/workbook.ts` and `shortlistFileName()` in `export/file-name.ts`, shown by `ui/export-step.tsx`. `mapping` is [`describeMapping()`](#preview-step) for the loaded file.
 
-**The step.** **Continue to export**, at the bottom of the Results step, opens it (the button isn't shown for an empty shortlist). It says `40 records will be exported.` (the [counts summary](#counts-summary)'s `exported`) and has a **Download Excel** button. The button builds the workbook, wraps it in a `Blob` (`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`), clicks a temporary `<a download>` with an object URL and revokes the URL a second later (Firefox can cancel a download whose URL is revoked straight away). The file is `JCA_Shortlist_YYYY-MM-DD.xlsx`, using the local date. While it builds, the button is disabled and the step says `Preparing your file...`; focus goes back to the button afterwards. If it fails: `The file couldn't be created. Try again.` Nothing is logged.
+**The step.** **Continue to export**, at the bottom of the Results step, opens it (the button isn't shown for an empty shortlist). It says `40 records will be exported.` (the [counts summary](#counts-summary)'s `exported`) and has a **Download Excel** button. The button builds the workbook, wraps it in a `Blob` (`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`), clicks a temporary `<a download>` with an object URL and revokes the URL a second later (Firefox can cancel a download whose URL is revoked straight away). The file is `JCA_Shortlist_Synthetic_Demo_YYYY-MM-DD.xlsx`, using the local date. Next to the button: `This file is a synthetic demonstration. All companies and people are fictional.` While it builds, the button is disabled and the step says `Preparing your file...`; focus goes back to the button afterwards. If it fails: `The file couldn't be created. Try again.` The console gets only `[translator] export-failed`, never the error itself.
 
 **Browser only.** No Server Action, no upload, no file on a server: the workbook is built from the `rank()` result in memory. ExcelJS is loaded with `await import()` on the first click, like the parser, so the first click also downloads that code from the site; after that a download makes no request. The uploaded workbook's bytes are never read or changed, so its hash still passes the [file gate](#file-gate) afterwards.
 
@@ -603,7 +603,7 @@ The Export step builds an Excel file of the shortlist in the browser and downloa
 - **Text format.** `setTextCell()` also sets Excel's Text format (`@`), so if someone opens the cell in Excel and presses Enter, it stays text instead of becoming a formula.
 - **No prefix.** The value is written exactly as it is: no leading `'`, space or tab. That is a fix for CSV files; in .xlsx a string cell is never a formula, and a visible `'` would change the data. So `'quoted` stays `'quoted` and a value starting with a tab keeps its tab.
 - **Guard before saving.** `buildWorkbook()` calls `assertNoFormulas(workbook)` right before writing the file. It checks every cell of every sheet and, if one is a formula (its type is Formula, or its value has `formula` or `sharedFormula`), throws `Export blocked: a cell would contain a formula.` The Export step then shows its usual `The file couldn't be created. Try again.` Nothing writes a formula today; the guard makes a later mistake fail instead of shipping a file that calculates.
-- **The source file is never modified.** The export reads only `rankResult`, `counts` and the `source` details. The wizard keeps the gated `ArrayBuffer` read-only, for hashing and parsing only, and never passes it to the export. The download is always a new `Blob` with its own name (`JCA_Shortlist_YYYY-MM-DD.xlsx`); nothing is saved over the uploaded file.
+- **The source file is never modified.** The export reads only `rankResult`, `counts` and the `source` details. The wizard keeps the gated `ArrayBuffer` read-only, for hashing and parsing only, and never passes it to the export. The download is always a new `Blob` with its own name (`JCA_Shortlist_Synthetic_Demo_YYYY-MM-DD.xlsx`); nothing is saved over the uploaded file.
 
 **Sheet `Shortlist`**: exactly `rankResult.shortlist`, in the same order, so it has as many rows as the counts summary's "in your shortlist and export". **Omitted rows aren't on it**: the Criteria sheet (TR-26) lists them with the overrides. Columns, in order:
 
@@ -626,13 +626,14 @@ The Export step builds an Excel file of the shortlist in the browser and downloa
 - **Blanks stay blank.** A value the row doesn't have is left as a truly empty cell: never `""`, `Unknown` or `None`. The same goes for an empty Duplicate IDs, Other executives, Missing or Override.
 - **Text and numbers.** Only Rank, Source row, Employees and Score are numbers. Everything else is stored as text with Excel's Text format (`@`), so a long IUSA Number or a phone number never becomes a number or scientific notation, even when the source cell was a number. Excel may mark a digits-only Record ID with a small "number stored as text" triangle; that is expected. The sheet has no ZIP column.
 - **One way in for text.** Every text cell, headers included, goes through `setTextCell()`, which writes it as literal text with the Text format (see Formula safety above).
-- **Layout.** Bold header row, frozen (`ySplit: 1`), with a filter over the header and every row. Column widths are set; Reasons and Other executives wrap. Workbook creator: `JCA Data Axle Translator`.
+- **Layout (TR-28).** Row 1: `Synthetic demonstration. All companies and people are fictional.` in bold. Row 2: blank. Row 3: the bold header row. Shortlist rows start on row 4. Frozen at row 3 (`ySplit: 3`, so the note and header stay in view), with a filter from the header (row 3) over every row. Column widths are set; Reasons and Other executives wrap.
+- **File properties.** Creator `JCA Data Axle Translator`, Title `JCA Data Axle Translator shortlist (synthetic demonstration)`, Subject `Synthetic demonstration` (`export/labels.ts`).
 
 **With the synthetic sample:**
 
 | Brief | Sheet |
 |---|---|
-| Business owner | Header and 40 rows. Row 1: SYN-0001, Duplicate IDs `SYN-0500`, Source row 2, Employees 25, Score 100, Reasons = SYN-0001's `reasonText`, Missing and Override empty |
+| Business owner | Note, blank row, header and 40 rows. The first shortlist row (sheet row 4): SYN-0001, Duplicate IDs `SYN-0500`, Source row 2, Employees 25, Score 100, Reasons = SYN-0001's `reasonText`, Missing and Override empty |
 | Title preference Operations Manager | SYN-0006 first at 100. SYN-0011 (rank 8): Title and Email empty, Missing `Title, Contact` |
 | Business owner, pin SYN-0496 | Rank 1 SYN-0496, Override `Pinned`, Score 0, Reasons start with `Pinned by user; `, Missing `Company size` |
 | Business owner, omit SYN-0001 | 40 rows, SYN-0001 not on the sheet, SYN-0101 first |
@@ -666,6 +667,17 @@ Two columns, `Item` (width 28) and `Details` (width 90), with a bold, frozen hea
 | No preferences | `No preferences, so all scores are 0.` |
 | Pin SYN-0496, omit SYN-0001 | Pinned `SYN-0496`; Omitted `1 record`, then `SYN-0001`, `Synthetic Company 0001, score 100`; counts add `1 omitted by you` and `59 more matches not shown (list size 40)` |
 
+## Session and Start over
+
+The Translator keeps everything for one session only (TR-28). Code: `ui/translator-session.tsx`, `ui/start-over.tsx`, `ui/log-error.ts`.
+
+- **Session-only data.** The file, its bytes, the parsed rows, the criteria form, both briefs, the pins and omits, the results and the export status live only in the wizard's React state. Nothing is written to `localStorage`, `sessionStorage`, IndexedDB, cookies or the Cache API, nothing goes in the URL, and nothing is sent to the server. Refreshing or closing the page starts fresh on Upload. Going back to the tab may restore the page from the browser's back/forward cache; that is the same session in the same tab, and still nothing is written anywhere. There is no "leave page" warning.
+- **Start over.** A **Start over** button sits under the step indicator once a workbook is loaded (Preview, Criteria, Results and Export, and Upload when it is reopened with a file loaded). Before results exist it clears straight away. Once results exist it first asks, on the page: `Start over?` / `This clears your file, criteria and shortlist. Download your file first if you need it.` with **Clear everything** and **Cancel** (Escape also cancels, and focus goes back to Start over). After clearing, the wizard is on Upload with nothing loaded, focus is on the Upload heading, and a live region announces `Everything was cleared.`
+- **How it clears.** `TranslatorSession` renders `<TranslatorWizard key={sessionKey} />` and Start over changes the key, so React throws the whole wizard away and mounts a new one. Nothing is cleared by hand, so state added later is cleared too. Keep every piece of Translator state inside the wizard (or its children).
+- **A new workbook is a new session.** Choosing another file (upload, drop or Load sample) while a workbook is loaded starts a new session with that file, the same remount, so no criteria, brief, pins, omits or results from the old file carry over. If the new file is refused, the Upload step shows why and nothing from the old file is kept. An empty drop does nothing.
+- **Logging.** Translator code never calls `console` directly. Unexpected failures call `logTranslatorError(code)`, which logs only `[translator] <code>`: `file-unreadable`, `parser-unavailable`, `sample-load-failed` or `export-failed`. Never the error object or message, a file name or a value, because ExcelJS errors can quote cell text. Problems the user can fix (wrong type, over 2 MB, not on the allowlist, unrecognised layout) are shown on the page and not logged. The rows never reach the server, so the Vercel function logs can't contain them.
+- **Synthetic labels.** The synthetic banner (`ui/synthetic-banner.tsx`, TR-02) sits above the wizard on the page, outside every step, so it stays on every step and through Start over. Every export says it too: the note next to Download, the file name (`JCA_Shortlist_Synthetic_Demo_YYYY-MM-DD.xlsx`), the file's Title and Subject, row 1 of the Shortlist sheet and the note at the top of the Criteria sheet ([Excel export](#excel-export)).
+
 ## Expected results
 
 | Scenario | Expected |
@@ -684,7 +696,7 @@ Two columns, `Item` (width 28) and `Details` (width 90), with a bold, frozen hea
 | Prefer city Phoenix and state AZ; a Mesa, AZ row | Geography no match, 0 points |
 | City not in the workbook | 0 eligible; empty list with `No records are in [city]. Try another city.` ([No-results helper](#no-results-helper)). The form can't produce this brief, so it is checked through `diagnoseEmpty()` |
 | Required title Operations Manager | Rows with unknown title fail that filter. With Phoenix, AZ: 25 eligible, 474 failed a must-have, 25 only because of missing data |
-| Business owner, Excel export | Sheet `Shortlist`, header and 40 rows, SYN-0001 first with Duplicate IDs `SYN-0500` and Score 100 ([Excel export](#excel-export)) |
+| Business owner, Excel export | `JCA_Shortlist_Synthetic_Demo_YYYY-MM-DD.xlsx`. Sheet `Shortlist`: note on row 1, header on row 3, 40 rows from row 4, SYN-0001 first with Duplicate IDs `SYN-0500` and Score 100 ([Excel export](#excel-export)) |
 | Title Operations Manager, Excel export | SYN-0011's Title and Email cells empty (not `""` or `Unknown`), Missing `Title, Contact` |
 | Any Excel export | Sheets `Shortlist`, then `Criteria` ([Sheet `Criteria`](#sheet-criteria)); Scoring version `1.0`, the same as `SCORING_VERSION`; Brief (JSON) parses back to `rankResult.brief` |
 | Title changed to Operations Manager in the criteria summary, then exported | Criteria sheet: `Prefer Fabrication, Operations Manager, 10 to 99 employees.` |
@@ -693,7 +705,7 @@ Two columns, `Item` (width 28) and `Details` (width 90), with a bold, frozen hea
 ## Phase 1 rules
 
 - **Synthetic data only.** No Data Axle connection. Never upload, copy, paste or commit real Data Axle or Reference Solutions records, not even one row.
-- **Browser only.** Parsing, cleaning, ranking and export all run in the browser. Rows are never sent to the server, stored (Supabase, localStorage, cookies) or logged.
+- **Browser only.** Parsing, cleaning, ranking and export all run in the browser. Rows are never sent to the server, stored (Supabase, localStorage, cookies) or logged. They last for one session: Start over or a refresh clears them ([Session and Start over](#session-and-start-over)).
 - **Independent modules.** Code lives in `src/features/translator/`: `import/`, `normalize/`, `criteria/`, `ranking/`, `export/` (no React) and `ui/`.
 - **Two input layouts, one set of fields.** The 9-column synthetic workbook and the 396-column Reference Solutions export are read through mapping configs (see the table above).
 - **One row per business.** Record ID is the IUSA Number, or `ROW-0001` style when blank. Industry is the Primary SIC Description. Real exports have no email; phone and website are the contact fallbacks.

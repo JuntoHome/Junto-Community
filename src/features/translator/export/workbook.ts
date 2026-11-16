@@ -4,6 +4,7 @@ import type { RankResult } from "../ranking";
 import type { Counts } from "../ranking/counts";
 import { setTextCell } from "./cells";
 import { type CriteriaSection, criteriaTable, type ExportSource } from "./criteria-rows";
+import { SYNTHETIC_NOTE, WORKBOOK_SUBJECT, WORKBOOK_TITLE } from "./labels";
 import { type ShortlistColumnKey, shortlistTable } from "./shortlist-rows";
 
 /**
@@ -26,6 +27,13 @@ export const WORKBOOK_CREATOR = "JCA Data Axle Translator";
 
 export const SHORTLIST_SHEET_NAME = "Shortlist";
 export const CRITERIA_SHEET_NAME = "Criteria";
+
+/**
+ * The Shortlist sheet's layout (TR-28): row 1 is the synthetic note, row 2 is blank, the table
+ * header is row 3 and the first shortlist row is row 4.
+ */
+export const SHORTLIST_NOTE_ROW = 1;
+export const SHORTLIST_HEADER_ROW = 3;
 
 /** The Criteria sheet's two columns. */
 const CRITERIA_COLUMNS = [
@@ -148,8 +156,9 @@ export type CriteriaInput = {
  * The export workbook for one ranking run, as the bytes of an .xlsx file. `mapping` is
  * `describeMapping()` for the loaded file, for the Missing column.
  *
- * Sheet `Shortlist`: a bold, frozen header row with a filter, then one row per shortlist row
- * (`shortlistTable()`). Text columns are stored as text, so long IUSA numbers and phone numbers
+ * Sheet `Shortlist`: row 1 is the synthetic note in bold, row 2 is blank, row 3 is a bold header
+ * with a filter, frozen with everything above it, then one row per shortlist row
+ * (`shortlistTable()`) from row 4. Text columns are stored as text, so long IUSA numbers and phone numbers
  * never turn into numbers or scientific notation; only Rank, Source row, Employees and Score are
  * numbers. Values the row doesn't have are left as truly empty cells.
  *
@@ -168,11 +177,21 @@ export async function buildWorkbook(
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = WORKBOOK_CREATOR;
+  // The file's properties say it is a synthetic demonstration too (TR-28).
+  workbook.title = WORKBOOK_TITLE;
+  workbook.subject = WORKBOOK_SUBJECT;
 
-  const sheet = workbook.addWorksheet(SHORTLIST_SHEET_NAME, { views: [{ state: "frozen", ySplit: 1 }] });
+  const sheet = workbook.addWorksheet(SHORTLIST_SHEET_NAME, {
+    views: [{ state: "frozen", ySplit: SHORTLIST_HEADER_ROW }],
+  });
   sheet.columns = columns.map(({ key }) => ({ key, width: WIDTHS[key] }));
 
-  const header = sheet.getRow(1);
+  // The note: one bold cell that runs across the empty cells next to it. Row 2 stays blank.
+  const note = sheet.getRow(SHORTLIST_NOTE_ROW).getCell(1);
+  setTextCell(note, SYNTHETIC_NOTE);
+  note.font = { bold: true };
+
+  const header = sheet.getRow(SHORTLIST_HEADER_ROW);
   columns.forEach((column, index) => {
     const cell = header.getCell(index + 1);
     setTextCell(cell, column.header);
@@ -181,7 +200,7 @@ export async function buildWorkbook(
   });
 
   rows.forEach((values, rowIndex) => {
-    const row = sheet.getRow(rowIndex + 2);
+    const row = sheet.getRow(SHORTLIST_HEADER_ROW + 1 + rowIndex);
     columns.forEach((column, index) => {
       const value = values[index];
       // A value the row doesn't have stays a truly empty cell.
@@ -198,8 +217,8 @@ export async function buildWorkbook(
   });
 
   sheet.autoFilter = {
-    from: { row: 1, column: 1 },
-    to: { row: rows.length + 1, column: columns.length },
+    from: { row: SHORTLIST_HEADER_ROW, column: 1 },
+    to: { row: SHORTLIST_HEADER_ROW + rows.length, column: columns.length },
   };
 
   addCriteriaSheet(workbook, criteriaTable({ rankResult, counts, source, now }));

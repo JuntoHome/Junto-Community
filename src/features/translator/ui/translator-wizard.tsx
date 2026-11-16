@@ -18,9 +18,11 @@ import { NO_OVERRIDES, type Overrides, pinContext } from "../ranking/overrides";
 import { CriteriaStep } from "./criteria-step";
 import { ExportStep } from "./export-step";
 import { FileUpload } from "./file-upload";
+import { logTranslatorError } from "./log-error";
 import { PreviewStep } from "./preview-step";
 import { ResultsStep } from "./results-step";
 import { SampleButtons } from "./sample-buttons";
+import { StartOver } from "./start-over";
 import { StepIndicator } from "./step-indicator";
 import { isStepAvailable, STEPS, type StepId } from "./steps";
 
@@ -37,11 +39,33 @@ type LoadedWorkbook = GatedWorkbook & ImportState;
 /** Shown when the parser's code can't be downloaded. */
 const PARSER_UNAVAILABLE = "The Translator couldn't finish loading. Check your connection, reload the page and try again.";
 
+/** What a workbook input holds, as a list: one File, a FileList or an array. */
+function toFiles(input: WorkbookFileInput): readonly File[] {
+  if (input == null) return [];
+  return input instanceof File ? [input] : Array.from(input);
+}
+
 /**
  * The Translator's steps and the panel for the current one. Everything happens in the
- * browser: the workbook and its rows are kept in this component's state only.
+ * browser: the workbook and its rows are kept in this component's state only, never stored or
+ * sent. `TranslatorSession` (TR-28) remounts it with a new `key` to start over, so all of this
+ * state goes at once; don't keep Translator data anywhere else.
  */
-export function TranslatorWizard() {
+export function TranslatorWizard({
+  initialFiles,
+  focusOnMount,
+  onStartOver,
+  onNewFiles,
+}: {
+  /** Files chosen in the previous session, loaded as soon as this one starts. */
+  initialFiles: readonly File[] | null;
+  /** After Start over: move focus to the Upload heading on mount. */
+  focusOnMount: boolean;
+  /** Clears everything: called by Start over. */
+  onStartOver: () => void;
+  /** Another workbook was chosen while one is loaded: start a new session with it. */
+  onNewFiles: (files: readonly File[]) => void;
+}) {
   const [current, setCurrent] = useState<StepId>("upload");
   // Later tickets mark each step done as its work is built.
   const [done, setDone] = useState<ReadonlySet<StepId>>(() => new Set());
@@ -69,7 +93,8 @@ export function TranslatorWizard() {
 
   // After a workbook loads, the button that was clicked disappears, so move focus to the new step's heading.
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const focusHeading = useRef(false);
+  // True on mount after Start over, so focus lands on the Upload heading.
+  const focusHeading = useRef(focusOnMount);
   useEffect(() => {
     if (!focusHeading.current) return;
     focusHeading.current = false;
@@ -78,11 +103,24 @@ export function TranslatorWizard() {
 
   /**
    * The single entry point for a workbook, whether it comes from a sample button, the file
-   * picker or a drop. It checks the size and type first, then reads the file once, runs the
-   * file gate on those bytes and parses them; on a problem it stays on Upload and shows why.
-   * A new workbook replaces the previous one and resets later steps.
+   * picker or a drop. While a workbook is loaded, another one starts a new session (TR-28), so
+   * nothing from the old file (criteria, briefs, pins, omits, results) carries over; the new
+   * session then loads it with `checkAndLoad()`.
    */
-  async function handleWorkbook(input: WorkbookFileInput) {
+  function handleWorkbook(input: WorkbookFileInput) {
+    const files = toFiles(input);
+    if (workbook && files.length > 0) {
+      onNewFiles(files);
+      return;
+    }
+    void checkAndLoad(files);
+  }
+
+  /**
+   * Checks the size and type first, then reads the file once, runs the file gate on those bytes
+   * and parses them; on a problem it stays on Upload and shows why.
+   */
+  async function checkAndLoad(input: WorkbookFileInput) {
     const thisAttempt = ++attempt.current;
     // Cleared first so the same message is announced again if the next file has the same problem.
     setFileError(null);
@@ -99,6 +137,7 @@ export function TranslatorWizard() {
       buffer = await file.arrayBuffer();
     } catch {
       // The browser couldn't read it (for example, the file changed on disk after it was chosen).
+      logTranslatorError("file-unreadable");
       if (thisAttempt === attempt.current) setFileError(FILE_GATE_MESSAGES.unreadable);
       return;
     }
@@ -117,6 +156,7 @@ export function TranslatorWizard() {
       parsed = await parseWorkbook(buffer);
     } catch {
       // parseWorkbook never throws, so only the download of its code can fail here.
+      logTranslatorError("parser-unavailable");
       if (thisAttempt === attempt.current) setFileError(PARSER_UNAVAILABLE);
       return;
     }
@@ -134,16 +174,22 @@ export function TranslatorWizard() {
     const { records, duplicateCount, issues: duplicateIssues } = groupDuplicates(validation.kept);
     const issues = [...validation.issues, ...duplicateIssues].sort(compareIssues);
     // `buffer` is kept read-only: only the gate and the parser above ever read it (TR-27).
+    // The session is new (a second workbook starts a new one), so later steps have nothing to reset.
     setWorkbook({ file, buffer, entry: gate.entry, parsed: normalized, validation, records, duplicateCount, issues });
-    // A new workbook has its own values, so earlier criteria no longer apply.
-    setCriteriaForm(EMPTY_CRITERIA_FORM);
-    setPendingBrief(null);
-    setPendingForm(null);
-    setConfirmedBrief(null);
     setDone(new Set<StepId>(["upload"]));
     focusHeading.current = true;
     setCurrent("preview");
   }
+
+  // A workbook chosen in the previous session starts this one. Run once, even in Strict Mode.
+  const startedWithFiles = useRef(false);
+  useEffect(() => {
+    if (startedWithFiles.current || !initialFiles) return;
+    startedWithFiles.current = true;
+    void checkAndLoad(initialFiles);
+    // Only on mount: initialFiles never changes for one session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Ranked again whenever the confirmed brief or the overrides change. `results.brief` is the
   // brief the rows came from, and `results.overrides` the pins and omits they were made with.
@@ -192,13 +238,17 @@ export function TranslatorWizard() {
 
   return (
     <div className="flex flex-col gap-6">
-      <StepIndicator
-        current={current}
-        done={done}
-        onSelect={(id) => {
-          if (isStepAvailable(id, done)) setCurrent(id);
-        }}
-      />
+      <div className="flex flex-col gap-3">
+        <StepIndicator
+          current={current}
+          done={done}
+          onSelect={(id) => {
+            if (isStepAvailable(id, done)) setCurrent(id);
+          }}
+        />
+        {/* Once a workbook is loaded there is something to clear. Only results need a confirm. */}
+        {workbook && <StartOver confirm={results !== null} onStartOver={onStartOver} />}
+      </div>
       <section
         aria-labelledby="translator-step-title"
         className="rounded-[18px] border border-sand bg-white p-6 md:p-8"
