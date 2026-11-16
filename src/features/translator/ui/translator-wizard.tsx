@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ExportSource } from "../export/criteria-rows";
 import { type CriteriaForm, EMPTY_CRITERIA_FORM } from "../criteria/from-form";
 import type { SearchBrief } from "../criteria/schema";
 import { checkWorkbookFile, type WorkbookFileInput } from "../import/check-file";
@@ -171,6 +172,18 @@ export function TranslatorWizard() {
   // The import's counts, for the Results step's counts summary (TR-23).
   const importSummary = useMemo(() => (workbook ? summarizeImport(workbook) : null), [workbook]);
 
+  // The file the rows came from, recorded on the export's Criteria sheet (TR-26).
+  const source = useMemo<ExportSource | null>(
+    () =>
+      workbook && {
+        fileName: workbook.file.name,
+        layout: workbook.parsed.layout.label,
+        sheetName: workbook.parsed.sheetName,
+        sha256: workbook.entry.sha256,
+      },
+    [workbook],
+  );
+
   const step = STEPS.find((s) => s.id === current) ?? STEPS[0];
 
   return (
@@ -262,12 +275,8 @@ export function TranslatorWizard() {
               setCurrent("export");
             }}
           />
-        ) : step.id === "export" && results && importSummary ? (
-          <ExportStep
-            results={results}
-            mapping={mapping}
-            exported={buildCounts(importSummary, results).exported}
-          />
+        ) : step.id === "export" && results && importSummary && source ? (
+          <ExportStep results={results} mapping={mapping} counts={buildCounts(importSummary, results)} source={source} />
         ) : (
           <p className="mt-3 text-base text-muted">This step isn’t built yet.</p>
         )}
