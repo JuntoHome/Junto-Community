@@ -83,8 +83,9 @@ function dateText(date: Date): string {
 
 /**
  * An ExcelJS cell value as a plain SourceCell: text, number and true/false stay as they are;
- * rich text and links become their text, formulas their last calculated result, errors their
- * code ("#N/A") and dates ISO text. Anything else is treated as blank.
+ * rich text and links become their text, formulas their last calculated result and dates ISO
+ * text. Error cells ("#N/A", "#REF!") are blank: an error isn't a value, and its code would
+ * otherwise be matched and shown as if it were (TR-29). Anything else is treated as blank.
  */
 export function toSourceCell(value: ExcelJS.CellValue): SourceCell {
   if (value == null) return null;
@@ -97,7 +98,7 @@ export function toSourceCell(value: ExcelJS.CellValue): SourceCell {
     return typeof text === "string" ? text : toSourceCell(text as ExcelJS.CellValue);
   }
   if ("formula" in value || "sharedFormula" in value) return toSourceCell(value.result);
-  if ("error" in value) return value.error;
+  // Error cells ("#N/A") and anything else are blank.
   return null;
 }
 

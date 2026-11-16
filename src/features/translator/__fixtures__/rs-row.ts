@@ -1,5 +1,5 @@
-import type { TranslatorRecord } from "../fields";
-import type { SourceCell } from "../map-row";
+import type { TranslatorRecord } from "../import/fields";
+import type { SourceCell } from "../import/map-row";
 
 /**
  * One invented row in the Reference Solutions layout, and the record mapRow should give for it.
@@ -16,7 +16,7 @@ import type { SourceCell } from "../map-row";
  * - Unmapped columns ("Mailing City", "Advertising  Expenses", the Executive Gender columns) and the
  *   unnamed last column are ignored, even when they have values.
  *
- * TR-29 turns this into a unit test.
+ * Tested in import/map-row.test.ts (TR-29).
  */
 const COLUMNS: readonly (readonly [header: SourceCell, value: SourceCell])[] = [
   ["Company Name", "Synthetic Fixture Co 001"],

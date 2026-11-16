@@ -9,8 +9,7 @@ A review as of November 2026. Nothing here has been fixed unless it says so. Ite
 | Dependencies with published advisories | `npm audit` (Nov 2026): `next` 16.3.6 critical; `zod`, `sharp`, `source-map-js` high. `next` is pinned, so the fix (16.4.6) needs a deliberate upgrade. Several Next.js advisories concern self-hosting or `use cache`, which this project doesn't use | Exposure varies by advisory; needs assessing |
 | The workshop is over but the site still promotes it | BI101 was Oct 21, 2026. The announcement bar, "Upcoming workshop" labels, Register buttons and Event JSON-LD have no date logic | Visitors are invited to register for a past event |
 | One database for everything | No local or staging Supabase project | Local, preview and staging testing changes production data |
-| No automated tests, no CI | No test files or workflow config | Every change is verified by hand; `main` deploys directly |
-| `npm run test` is documented but missing | `CLAUDE.md` lists it; `package.json` has no `test` script until TR-29 | The required pre-commit checks can't all run yet |
+| Few automated tests, no CI | Vitest tests cover only the Translator's import and cleaning (TR-29); no workflow config | Ranking, export, the admin area and public pages are verified by hand; nothing runs the tests automatically; `main` deploys directly |
 
 ## Incomplete features
 

@@ -77,10 +77,11 @@ Run before every commit and pull request:
 npm run typecheck
 npm run lint
 npm run build
-npm run test      # once TR-29 adds Vitest; the script does not exist yet
+npm run test      # Vitest unit tests (TR-29)
 ```
 
-- There are no automated tests yet and no CI. Today every change is also checked by hand on the preview.
+- Unit tests cover the Translator's import and cleaning (TR-29). Ranking (TR-30), export and edge cases (TR-31) come next; everything else has no tests. There is no CI, so nothing runs them for you: run them before every commit, and still check each change by hand on the preview.
+- Tests sit beside the code as `*.test.ts`. `npm run test:watch` re-runs them on save. Translator fixtures and their rules: [translator/README.md](translator/README.md#tests).
 - Translator tests must lock in the expected results in [translator/README.md](translator/README.md#expected-results) and [../CLAUDE.md](../CLAUDE.md).
 - `npm run build` needs the Supabase variables (see [TROUBLESHOOTING.md](TROUBLESHOOTING.md#local-development)).
 

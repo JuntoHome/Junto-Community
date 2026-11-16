@@ -16,7 +16,7 @@ Symptoms, causes and fixes. Causes come from reading the code; entries marked **
 | Symptom | Cause | Fix |
 |---|---|---|
 | `npm run build` fails with "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" while exporting `/admin` (**Reproduced** Nov 11, 2026) | No `.env.local`, or those two variables are empty. The build pre-renders `/admin`, which creates a Supabase client | Fill them in. To check only that the code compiles, set placeholder values for the build: `NEXT_PUBLIC_SUPABASE_URL=https://placeholder.invalid NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=placeholder npm run build` |
-| `npm run test` says the script is missing | Vitest is added in TR-29 | Run `typecheck`, `lint` and `build` until then |
+| Every test fails with `TypeError: Cannot read properties of undefined (reading 'config')` at its first `describe` or `it` (**Reproduced** Nov 16, 2026, Windows) | The terminal's current folder starts with a lowercase drive letter (`c:\...`), as some VS Code and Git Bash terminals open. Vitest then loads two copies of its runner, one from `c:` and one from `C:` | Change to the same folder with an uppercase drive letter, then run again: `cd C:\Users\<you>\...\Junto-Community` in PowerShell, or `cd "C:/Users/<you>/.../Junto-Community"` in Git Bash. A new PowerShell window usually starts at `C:\` |
 | Lint warning about `<img>` in `opengraph-image.tsx` | Expected: `next/image` can't be used in image generation | Ignore |
 | Logos don't show | `NEXT_PUBLIC_SUPABASE_URL` missing at build or dev start, so `next.config.ts` has no allowed image host | Set it and restart |
 | Changes to `.env.local` have no effect | The dev server reads variables at start | Restart `npm run dev` |

@@ -38,11 +38,12 @@ Versions from [package.json](../package.json).
 | `server-only` | ^0.0.1 | Fails the build if server code reaches the browser | Top of every server module |
 | `@vercel/analytics` | ^2.0 | Page views on public pages | `site-shell.tsx` |
 | `exceljs` | ^4.4 | Reads Translator workbooks and writes the Excel export, in the browser; loaded only when a workbook is parsed or exported | `features/translator/import/parse.ts`, `features/translator/export/workbook.ts` |
-| `jszip` | ^3.10 | Opens the .xlsx ZIP to fix files ExcelJS can't read as written (already an ExcelJS dependency) | `features/translator/import/xlsx-compat.ts` |
+| `jszip` | ^3.10 | Opens the .xlsx ZIP to fix files ExcelJS can't read as written (already an ExcelJS dependency) | `features/translator/import/xlsx-compat.ts`; also `import/file-gate.test.ts` |
 | `tailwindcss` | 4 | Styling; design tokens in the `@theme` block of `globals.css` | Class names |
 | `typescript`, `eslint` | 5, 9 | Type checking and linting | `tsconfig.json`, `eslint.config.mjs` |
+| `vitest` | 4.1.12 (exact, dev only) | Unit tests, run in Node by `npm run test` (TR-29). Never bundled: app code imports no test or fixture. 4.x because Vitest 5 requires `@types/node` 22 or later and this project uses 20 | `vitest.config.ts`; `*.test.ts` beside the code; fixtures in `features/translator/__fixtures__/` |
 
-There is no UI kit, form library, ORM, state library or test framework. Vitest is planned for the Translator tests (TR-29).
+There is no UI kit, form library, ORM or state library.
 
 ## Third-party integrations
 
