@@ -37,6 +37,9 @@ const TEXT = {
   updatedAndRefreshed: "Updated. Results refreshed.",
 } as const;
 
+/** The "Your criteria" heading's id. The results' Edit criteria button (TR-22) moves focus to it. */
+export const CRITERIA_SUMMARY_HEADING_ID = "criteria-summary-heading";
+
 type Controls = { form: CriteriaForm; options: CriteriaOptions; errors: CriteriaFormErrors; update: CriteriaUpdate };
 
 /**
@@ -202,10 +205,10 @@ export function CriteriaSummary({
   }
 
   return (
-    <section aria-labelledby="criteria-summary-heading" className="mt-5 flex flex-col gap-4 text-base">
+    <section aria-labelledby={CRITERIA_SUMMARY_HEADING_ID} className="mt-5 flex flex-col gap-4 text-base">
       <div className="flex flex-col gap-2">
         <h3
-          id="criteria-summary-heading"
+          id={CRITERIA_SUMMARY_HEADING_ID}
           ref={headingRef}
           tabIndex={-1}
           className="font-serif text-xl font-bold text-navy focus:outline-none"

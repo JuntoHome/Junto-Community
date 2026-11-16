@@ -241,7 +241,7 @@ The Results step opens with "Your criteria" (TR-16): the brief in plain language
 - **Change** opens an inline editor under the line for just that item, with the Criteria step's controls (`ui/criteria-controls.tsx`). The Preferences line has one button per part: Change industry, Change title, Change company size and, when ordered, Change order. Goal, location, each must-have, each exclusion and list size have one Change each. Assumptions have none (the form has no input for them).
 - **Edits apply only on Save.** The editor works on a draft copy of the form that produced the brief; typing there changes nothing. Save runs `toBrief()` on the draft. If it is invalid, the error shows inline (a clash with another criterion, such as "You can't require and leave out Tempe.", is listed in the editor) and nothing changes. If it is valid, the form and the pending brief are updated, and so is the confirmed brief when results are showing, which re-ranks. Cancel discards the draft. Opening another editor cancels the open one.
 - **A Save changes only that item.** Every other key in the brief stays the same. One exception follows from the schema: with an importance order on, setting a preference to No preference also removes it from `priorityOrder`.
-- **Confirm and rank** (shown until results show) ranks the pending brief. Until the results table (TR-22) and counts summary (TR-23), the results are placeholder lines: the [filter](#filtering) counts ("100 match. 0 left out by your exclusions. 399 didn't meet a must-have (0 only because of missing data)."), the first 5 shortlist rows as `1. SYN-0001 (100)` (Record ID and rounded score), each with its [`reasonText`](#match-reasons) on the line under it, and "Showing 40 of 100 matches." (shortlist rows of eligible rows).
+- **Confirm and rank** (shown until results show) ranks the pending brief and shows the [results table](#results-table). Until the counts summary (TR-23), a placeholder line above the table gives the [filter](#filtering) counts ("100 match. 0 left out by your exclusions. 399 didn't meet a must-have (0 only because of missing data).").
 - **The summary always shows the brief behind the results**: `results.brief`, the brief `rank()` got, once confirmed, and the pending brief before. It is never rebuilt from form state.
 - **Going back to Criteria** shows the same values as the summary, because a Save writes to the same form state. A Save starts from the form that produced the current brief, so changes made on Criteria without pressing Continue are replaced by it.
 - **Accessibility:** Change moves focus to the editor's heading. After Save or Cancel, focus returns to that item's Change button (or the "Your criteria" heading if the item is gone), and a live region says "Updated." or, once results show, "Updated. Results refreshed." After a failed Save, focus goes to the first problem. After Confirm and rank, focus moves to the results.
@@ -432,7 +432,7 @@ A row is only left out for repeating an earlier row's Record ID, and that earlie
 
 `rank()` also returns `overrides` (the ones given, minus `droppedPins`), `droppedPins` (pinned IDs with no eligible row under this brief, which the wizard removes and reports) and `omittedRows` (the omitted rows that are still eligible, with score and reasons, in `ranked` order). The export (TR-25) uses `shortlist`, `omittedRows` and `overrides`, so it shows exactly what is on screen.
 
-**On screen** (placeholder until the results table, TR-22): each of the first 5 lines has Pin (Unpin when pinned) and Omit buttons and a `Pinned by user` label when pinned. "Pin by Record ID" above the list pins any eligible record, including one below the cut, with the messages above in a live region. "Omitted by you (N)" under the list has a Restore button for each row. After a button, focus stays on that row, or goes to the row now in its place when it left the list, and a live region says what changed.
+**On screen** (in the [results table](#results-table), TR-22): each row has Pin (Unpin when pinned) and Omit buttons, and a pinned row has a `Pinned by user` badge under its rank. "Pin by Record ID" above the table pins any eligible record, including one below the cut, with the messages above in a live region. "Omitted by you (N)" under the table has a Restore button for each row. After a button, focus stays on that row's button, or goes to the same button on the row now in its place when it left the list, and a live region says what changed.
 
 **With the synthetic sample** (business owner brief, list size 40; without overrides SYN-0441 is 40th and SYN-0461 41st):
 
@@ -443,6 +443,56 @@ A row is only left out for repeating an earlier row's Record ID, and that earlie
 | Pin SYN-0496 and SYN-0016 | Both first, SYN-0016 before SYN-0496 (both 0, so by Record ID) |
 | Pin SYN-0496, then change the must-have to Tempe, AZ | SYN-0496 in `droppedPins`, removed from the overrides, notice shown |
 | List size 2, pin SYN-0016, SYN-0021, SYN-0496 | 3 rows, all pinned: SYN-0021 (36), SYN-0016, SYN-0496 |
+
+## Results table
+
+The shortlist on the Results step (TR-22). Code: `ui/results-table.tsx`, inside `ui/results-step.tsx`, with `missingFields()` in `ranking/missing.ts`.
+
+**Above the table:** "Showing 40 of 100 matches." (shortlist rows of eligible rows), an **Edit criteria** button that scrolls to the [criteria summary](#criteria-summary) and moves focus to its "Your criteria" heading, and [Pin by Record ID](#pin-and-omit). **Below it:** "Omitted by you (N)" with Restore. An empty shortlist shows `No matches for these criteria.` until the no-results helper (TR-24).
+
+**Columns**, one row per business:
+
+| Column | Shows |
+|---|---|
+| Rank | `rank`, and a `Pinned by user` badge for a pinned row |
+| Company | The company name |
+| Location | `City, ST`, or the one part that is known |
+| Name | The main contact's name |
+| Title | The main contact's title |
+| Contact | See the fallback order below |
+| Score | `displayScore` (rounded) |
+| Why | The row's [`reasons`](#match-reasons), one per line, exactly as ranking wrote them |
+| Missing | `missingFields()` joined with ", ", or `None` |
+| Actions | Pin or Unpin, Omit, Details |
+
+A value the row doesn't have shows `Unknown`, in a muted style but as real text, so it doesn't rely on colour.
+
+**Contact fallback order:** the email when the row has one; otherwise the phone and the website, each that is known, on separate lines; otherwise `Unknown`. The synthetic layout has an email column and no phone or website; Reference Solutions exports have no email column, so they show phone and website.
+
+**No links in results.** Email and website are plain text, never `mailto:` or web links. The values come from a spreadsheet, so plain text avoids any link-scheme risk and needs no URL cleanup. They can still be selected and copied.
+
+**The Missing rule** (`missingFields(record, mapping)`, `mapping` being [`describeMapping()`](#preview-step) for the loaded file): the labels of the shown fields the row has no value for, in this order: Name, Title, Contact, Company size.
+
+- A field is listed only when the file has a column for it (status Found). A column missing from the whole file, or not in the layout, is already explained on the Preview step, so it isn't repeated on every row.
+- **Contact** is listed only when email, phone and website are all unknown, and the file has at least one of those columns. In the Reference Solutions layout, email is never listed (no such column): Contact is missing only when phone and website are both blank.
+- **Company size** is the employee count, which [normalizing](#cleaning-values) fills from the employee range when the count is blank, so it is listed only when both are blank. Either column counts as the file having it.
+- The export (TR-25) uses the same function, so its Missing column matches the screen.
+
+**Details** (in the table, a button that opens a row under that row, with `aria-expanded` and `aria-controls`; on a card, a `<details>`), showing only what has a value:
+
+- Other executives, one `Name, Title` per line, all of them
+- Industry (NAICS): the NAICS description
+- Employee range
+- Address: address and ZIP
+- Where the row is in the file: `Row 2 in your file`, plus `Also in your file as SYN-0500 (row 501)` when exact duplicates were [grouped](#duplicate-grouping) into it
+
+**Desktop and phone.** From the `md` breakpoint up the shortlist is a `<table>` with a visually hidden caption "Your shortlist", `<th scope="col">` headers and the company as each row's header. Below `md` it is a list of cards with the same data: rank, company and score at the top, then location, name, title, contact, reasons and missing, then Details, then Pin and Omit. Both are built from one view of each row, so they can't differ. Both are rendered and CSS hides one; a hidden one (`display: none`) is left out of the accessibility tree. At most 100 rows, so the extra markup is small.
+
+**Width.** At 400 px and 375 px nothing scrolls the page sideways: long values (emails, websites) wrap. On wider screens the table scrolls inside its own box when it is wider than the page; the box is focusable, so keyboard users can scroll it, and an open Details row stays at the box's left edge. The 10 columns are wider than the admin content area even at 1280 px, so on the admin page the right-hand columns (Why, Missing, Actions) are reached by scrolling that box.
+
+**Accessibility.** Every button is at least 44 px high and names its record for screen readers ("Omit SYN-0001"). Focus after Pin, Unpin, Omit and Restore follows [Pin and omit](#pin-and-omit).
+
+**With the synthetic sample** (business owner brief): 40 rows; row 1 is SYN-0001 (Synthetic Company 0001), Phoenix, AZ, score 100, 4 reasons, Missing `None`, Details `Row 2 in your file` and `Also in your file as SYN-0500 (row 501)`. With the title preference changed to Operations Manager, SYN-0006 is first at 100, and SYN-0011 (rank 8, 64) shows Title `Unknown`, Contact `Unknown` and Missing `Title, Contact`. Pinning SYN-0496 puts it at rank 1 with the badge and Missing `Company size`.
 
 ## Expected results
 

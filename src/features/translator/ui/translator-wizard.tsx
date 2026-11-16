@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { type CriteriaForm, EMPTY_CRITERIA_FORM } from "../criteria/from-form";
 import type { SearchBrief } from "../criteria/schema";
 import { checkWorkbookFile, type WorkbookFileInput } from "../import/check-file";
+import { describeMapping } from "../import/describe-mapping";
 import { checkAllowlist, FILE_GATE_MESSAGES, type GatedWorkbook } from "../import/file-gate";
 import type { ParseResult } from "../import/parse";
 import { groupDuplicates } from "../normalize/duplicates";
@@ -158,6 +159,13 @@ export function TranslatorWizard() {
     [records, leftOutRows, statusById],
   );
 
+  // Which fields the file has columns for, so the shortlist lists only the gaps in those (TR-22).
+  const parsedWorkbook = workbook?.parsed;
+  const mapping = useMemo(
+    () => (parsedWorkbook ? describeMapping(parsedWorkbook.layout, parsedWorkbook.headers) : []),
+    [parsedWorkbook],
+  );
+
   const step = STEPS.find((s) => s.id === current) ?? STEPS[0];
 
   return (
@@ -221,6 +229,7 @@ export function TranslatorWizard() {
             pendingForm={pendingForm}
             results={results}
             pinContext={pinCheckContext}
+            mapping={mapping}
             unpinned={unpinned}
             onSave={(next, form) => {
               // The form is committed too, so going back to Criteria shows what the summary shows.
