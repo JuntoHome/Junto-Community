@@ -99,16 +99,11 @@ Merged into `translator` (not yet on `main`, the live site). The evidence is the
 |---|---|---|---|
 | TR-01 | Staging environment and project docs | Docs merged into `translator` (PR #36); Vercel staging alias and Preview variables pending with the project lead | [#1](https://github.com/JuntoHome/Junto-Community/issues/1), [PR #36](https://github.com/JuntoHome/Junto-Community/pull/36) |
 | TR-34 | Phase 1 walkthrough with Paul | In progress. Part A (before the meeting) merged into `translator` (PR #73): `docs/translator/DEMO-SCRIPT.md` (25-minute demo script for Paul, with prep steps, known limits and a fallback) and `docs/translator/PHASE1-REVIEW.md` (22 decisions for Paul and the meeting notes template, answers empty). Docs only. Part B (after the meeting) fills in the review and drafts the follow-up issues. Paul's confirmation **not yet recorded** | [#34](https://github.com/JuntoHome/Junto-Community/issues/34), [PR #73](https://github.com/JuntoHome/Junto-Community/pull/73) |
+| TR-32 | Manual QA on staging | In progress. `docs/translator/QA-CHECKLIST.md` (the checklist: 11 sections with expected results, bug report and results comment templates) in review. Every step that can run without staging, Safari or a phone was pre-checked locally on the `/dev-translator` page in headless Chrome, and both exports opened in desktop Excel; no bugs found. The run on staging (Chrome, Safari, a phone, Google Sheets) needs a person with Vercel and admin access, and its results comment on #32 is **not yet posted** | [#32](https://github.com/JuntoHome/Junto-Community/issues/32) |
 
 ## Pending
 
-Translator tickets with no work merged or in review yet. Each issue has the steps and acceptance criteria.
-
-### Testing, documentation and handover
-
-| ID | Title | Expected location | Issue |
-|---|---|---|---|
-| TR-32 | Manual QA on staging | staging | [#32](https://github.com/JuntoHome/Junto-Community/issues/32) |
+None. Every Translator ticket is completed or in progress.
 
 ## Blocked
 
