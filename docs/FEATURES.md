@@ -32,7 +32,7 @@ What exists, how each feature works, and what is planned. Symptoms and fixes are
 
 | Feature | Status |
 |---|---|
-| Data Axle Translator Phase 1 | In progress: spec, test data and tickets TR-01 to TR-35. See [translator/README.md](translator/README.md) and [TASKS.md](TASKS.md) |
+| Data Axle Translator Phase 1 | In progress. Built and merged into the `translator` branch (not yet on `main`): upload with type and size checks and the file gate, parsing for both layouts (synthetic and Reference Solutions), cleaning and row checks, the criteria form and summary, ranking with reasons, pin and omit, the results table, counts, no-results help and the Excel export (Shortlist and Criteria sheets), with Vitest tests. Still open: TR-01 (Vercel staging), TR-32 (manual QA on staging) and TR-34 (walkthrough with Paul). See [translator/README.md](translator/README.md) and [TASKS.md](TASKS.md) |
 | Events management and own registration (to replace Eventbrite) | Listed under "Coming later" in `src/components/admin/modules.ts`; no spec |
 | Library Intelligence management | Same |
 | Library Profiles | Same |
