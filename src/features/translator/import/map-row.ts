@@ -9,6 +9,9 @@ import type { FieldRules, LayoutMapping, TextRule } from "./mappings/types";
  * Nothing is trimmed, recased, parsed or validated here (that's TR-10 and TR-11), except that
  * joined parts (a first and last name) are trimmed so the join has single spaces.
  *
+ * When the ID cell is blank or the ID column is missing, the record gets a "ROW-0001" style ID
+ * and `idGenerated: true`, so later steps never have to guess from the ID's text (TR-11).
+ *
  * Pure: no React, no I/O, and no workbook library, so it works with whatever parser TR-08 uses.
  */
 
@@ -99,8 +102,11 @@ export function mapRow(
     string | null
   >;
 
+  const sourceId = read(fields.recordId.header);
+
   return {
-    recordId: read(fields.recordId.header) ?? generatedRecordId(position),
+    recordId: sourceId ?? generatedRecordId(position),
+    idGenerated: sourceId === null,
     ...text,
     otherExecutives: readExecutives(fields.otherExecutives),
   };

@@ -71,6 +71,12 @@ export type Executive = {
 export type TranslatorRecord = {
   /** The source ID (Record ID or IUSA Number), or "ROW-0001" style when it is blank. Never null. */
   recordId: string;
+  /**
+   * True when `recordId` was generated ("ROW-0001" style) because the ID cell was blank or the
+   * column is missing; false when it came from the file. Set by `mapRow()`, read by
+   * `validateRows()` (TR-11). Not a field: never shown, exported, ranked or compared for duplicates.
+   */
+  idGenerated: boolean;
   /** Additional executives in source order. Empty when the layout has none. */
   otherExecutives: Executive[];
 } & Record<TextField, string | null>;

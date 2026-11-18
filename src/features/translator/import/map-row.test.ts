@@ -44,6 +44,7 @@ describe("mapRow: synthetic layout", () => {
 
     expect(record).toEqual({
       recordId: "TST-0001",
+      idGenerated: false,
       company: "Test Company 01",
       name: "Test Person 01",
       title: "Owner",

@@ -61,6 +61,7 @@ export const RS_FIXTURE_POSITION = 7;
 
 export const RS_FIXTURE_EXPECTED: TranslatorRecord = {
   recordId: "ROW-0007",
+  idGenerated: true,
   company: "Synthetic Fixture Co 001",
   city: "Phoenix",
   state: "AZ",
