@@ -1064,6 +1064,8 @@ The Translator's limitations and accepted risks are owned by [KNOWN-ISSUES.md](.
 | File | What it is |
 |---|---|
 | [README.md](README.md) | This developer guide |
+| [DEMO-SCRIPT.md](DEMO-SCRIPT.md) | The 25-minute Phase 1 demo for Paul (TR-34): what to click, say and expect, prep steps, known limits and a fallback |
+| [PHASE1-REVIEW.md](PHASE1-REVIEW.md) | Decisions for Paul from the Phase 1 walkthrough (TR-34) and the meeting notes. Answers stay empty until the meeting notes fill them |
 | [JCA_Data_Axle_Translator_Specification.docx](JCA_Data_Axle_Translator_Specification.docx) | Full spec: workflow, ranking rules, walkthroughs, edge cases, phases |
 | [JCA_Synthetic_Contacts.xlsx](JCA_Synthetic_Contacts.xlsx) | 500 fictional records, 9 columns, sheet `Contacts`. Used for the spec walkthroughs. SHA-256: `67a510867ed6c7273cfebabea5c6895e43bd2cae2c98395acd09146ba6ed580b` |
 | [JCA_Reference_Solutions_Exact_Headers_Jeel.xlsx](JCA_Reference_Solutions_Exact_Headers_Jeel.xlsx) | Headers only (no records) of a real Reference Solutions export: 396 columns in order, a numbered inventory, and source notes |
