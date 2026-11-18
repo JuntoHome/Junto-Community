@@ -974,7 +974,7 @@ Scoring is the weights and the rules in [Scoring](#scoring). Any change to them 
 2. **Bump `SCORING_VERSION`** in `criteria/schema.ts` (for example to `"1.1"`), so an exported Criteria sheet says which rules produced it.
 3. **Update the golden files** in `src/features/translator/__fixtures__/walkthroughs/` and the numbers in `ranking/walkthroughs.test.ts`, checking the new order by hand. The PR description must say which rows changed and why ([Tests](#tests)). Never edit a golden file just to make a test pass.
 4. **Update this guide:** [Scoring](#scoring) (weights table and sample scores), [Match reasons](#match-reasons) if the reason order changed, the [Sheet `Criteria`](#sheet-criteria) examples, and [Expected results](#expected-results). If the spec walkthrough results change, `CLAUDE.md`'s expected results table must change too, which needs the project lead's agreement.
-5. **Re-run QA:** `npm run test`, then the [Quick start](#quick-start) walkthrough by hand, and the manual QA checklist planned in TR-32 (QA-CHECKLIST.md, not in the repo yet).
+5. **Re-run QA:** `npm run test`, then the [Quick start](#quick-start) walkthrough by hand, and the manual QA checklist, [QA-CHECKLIST.md](QA-CHECKLIST.md) (TR-32).
 
 ## Troubleshooting
 
@@ -1070,7 +1070,7 @@ The Translator's limitations and accepted risks are owned by [KNOWN-ISSUES.md](.
 | [JCA_Synthetic_Contacts.xlsx](JCA_Synthetic_Contacts.xlsx) | 500 fictional records, 9 columns, sheet `Contacts`. Used for the spec walkthroughs. SHA-256: `67a510867ed6c7273cfebabea5c6895e43bd2cae2c98395acd09146ba6ed580b` |
 | [JCA_Reference_Solutions_Exact_Headers_Jeel.xlsx](JCA_Reference_Solutions_Exact_Headers_Jeel.xlsx) | Headers only (no records) of a real Reference Solutions export: 396 columns in order, a numbered inventory, and source notes |
 | [JCA_Synthetic_RS_Layout.xlsx](JCA_Synthetic_RS_Layout.xlsx) | 100 fictional rows in the real 396-column Reference Solutions layout, sheet `Synthetic Detail Export` (TR-35). See [The Reference Solutions sample](#the-reference-solutions-sample). SHA-256: `ebf0a966b5548fe683f91b94c2a44a6a5f33d4a3274ab3aa217e57e4e4185eeb` |
-| QA-CHECKLIST.md | The manual QA checklist. Planned in TR-32 and **not in the repository yet**; add it to this table with a link when TR-32 merges |
+| [QA-CHECKLIST.md](QA-CHECKLIST.md) | The manual QA checklist (TR-32): what to check on staging in Chrome, Safari and a phone, the expected result of each step, how to report bugs and the results comment for issue #32 |
 
 Both samples are served from `public/translator/` for the Upload step's buttons: `JCA_Synthetic_Contacts.xlsx` for "Load sample (500 fictional records)" (TR-05) and `JCA_Synthetic_RS_Layout.xlsx` for "Load Reference Solutions sample (100 fictional rows)" (TR-35). Each copy must stay byte-identical to the one here, with the same SHA-256 as above, because the [file gate](#file-gate) checks that hash: if one copy changes, replace the other and update the hash here and in `allowlist.ts`. The copies are reachable without a login, which is acceptable only because the records are fictional. Don't link them from any public page or add them to the sitemap.
 
