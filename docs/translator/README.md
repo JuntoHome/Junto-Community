@@ -682,27 +682,31 @@ The Translator keeps everything for one session only (TR-28). Code: `ui/translat
 
 Unit tests run with Vitest: `npm run test` (TR-29). They sit beside the code as `*.test.ts` and run in Node, with no browser, no network and no random data. How to run them: [WAY-OF-WORKING.md](../WAY-OF-WORKING.md#testing).
 
-- **Covered:** import and cleaning. Upload checks, file gate, parsing, header checks, cell values, formula-like text, normalizing, row checks and duplicate grouping, plus TR-04's Reference Solutions fixture row. Ranking walkthroughs come with TR-30; export and other edge cases with TR-31.
+- **Covered:** import and cleaning (TR-29). Upload checks, file gate, parsing, header checks, cell values, formula-like text, normalizing, row checks and duplicate grouping, plus TR-04's Reference Solutions fixture row. The three spec walkthroughs (TR-30, `ranking/walkthroughs.test.ts`), through the whole chain from the sample's bytes. Export and other edge cases come with TR-31.
 - **Fixtures** live in `src/features/translator/__fixtures__/` and are built in code, never committed as binary workbooks, so every fixture can be read in review and a header change is a one-line diff:
   - `build-workbook.ts`: `buildXlsx({ sheets: [{ name, rows }] })` writes an `.xlsx` in memory with ExcelJS from plain arrays, with helpers for rich text, formula, hyperlink, error and date cells.
-  - `records.ts`: invented rows and row builders for both layouts (`TST-` IDs, `Test Company 01` names, `.invalid` emails).
+  - `records.ts`: invented rows and row builders for both layouts (`TST-` IDs, `Test Company 01` names, `.invalid` emails), and `seededShuffle(items, seed)`, a shuffle that gives the same order for the same seed.
   - `rs-headers.ts`: the 396 Reference Solutions headers in order, blank last column included, copied from the "Header Inventory" sheet of `JCA_Reference_Solutions_Exact_Headers_Jeel.xlsx`. Headers only.
   - `rs-row.ts`: the TR-04 fixture row and the record it must map to.
   - `import-pipeline.ts`: runs parse, normalize, row checks and duplicate grouping in the wizard's order.
+  - `pipeline.ts`: `runPipeline(buffer, brief, overrides?)` runs that import, then `summarizeImport()`, `rank()` and `buildCounts()`, and returns the import state, `records`, `rankResult`, `counts` and `mapping` (for the export builders). The real functions in the wizard's order, with no shortcuts.
+  - `walkthroughs/`: the golden files, one per walkthrough (`business-owner.json`, `role-change.json`, `job-seeker.json`). Each is the full shortlist as `rank`, `recordId`, `displayScore` and `reasonText`, generated once from the sample, checked by hand against the [Expected results](#expected-results) and committed. The tests compare against them; there are no Vitest snapshots, so nothing can be accepted with `-u`. Changing a golden file needs a reason in the PR ([WAY-OF-WORKING.md](../WAY-OF-WORKING.md#testing)).
 - **Fixtures are never allowlisted.** Tests call `parseWorkbook()` directly, past the [file gate](#file-gate). `import/file-gate.test.ts` checks that the allowlist has exactly the expected entries, so adding one fails the tests until that list is changed on purpose (TR-35 will).
 - The real sample is read from `docs/translator/JCA_Synthetic_Contacts.xlsx` with `fs`, in tests only. Fixtures are invented: never copy rows from any real export into them.
 - App code never imports a test or a fixture, so neither reaches the build.
-- From the table below, the tests lock in the import figures (500 rows read, 0 issues, 499 unique with SYN-0500 grouped under SYN-0001) and the altered copy rejected by the file gate. TR-30 locks in the ranking rows.
+- From the table below, the tests lock in the import figures (500 rows read, 0 issues, 499 unique with SYN-0500 grouped under SYN-0001), the altered copy rejected by the file gate, and the three walkthroughs (TR-30).
 
 ## Expected results
 
+The first three rows (the spec walkthroughs) and the repeat row are locked in by `ranking/walkthroughs.test.ts` and the golden files in `src/features/translator/__fixtures__/walkthroughs/` ([Tests](#tests)). Scores in "Scores of the 100 eligible" are unrounded scores rounded to 2 decimals; the others are display scores.
+
 | Scenario | Expected |
 |---|---|
-| Phoenix, AZ must-have; prefer Fabrication, Owner, 10 to 99; 40 rows | 500 in, 1 duplicate (SYN-0500 under SYN-0001), 499 unique, 100 eligible, 40 out (counts summary: 60 not shown, 40 in the shortlist and export), SYN-0001 first at 100. SYN-0001 is the only 100. Scores of the 100 eligible: 100 (1), 85.71 (4), 64.29 (7), 50 (10), 35.71 (20), 14.29 (19), 0 (39) |
-| Same, title Owner changed to Operations Manager | SYN-0006 first at 100, with `Title: Operations Manager (preferred)` in its reasons ([Match reasons](#match-reasons)). The first 6, all at 100, in order: SYN-0006, SYN-0026, SYN-0126, SYN-0226, SYN-0326, SYN-0426 (tied, so ordered by Record ID). SYN-0001 64.29, 7th |
-| Tempe, AZ; prefer Logistics, Operations Manager, 10 to 99; 30 rows | 100 eligible, 30 out, SYN-0002 first at 100, tied with 6 others (first by Record ID) |
+| Phoenix, AZ must-have; prefer Fabrication, Owner, 10 to 99; 40 rows | 500 in, 1 duplicate (SYN-0500 under SYN-0001), 499 unique, 0 excluded, 399 failed a must-have (0 only because of missing data), 100 eligible, 40 out (counts summary: 60 not shown, 40 in the shortlist and export), SYN-0001 first at 100. SYN-0001 is the only 100. First 8: SYN-0001 100, SYN-0101 86, SYN-0201 86, SYN-0301 86, SYN-0401 86, SYN-0006 64, SYN-0011 64, SYN-0026 64. Row 40: SYN-0441 (36). Scores of the 100 eligible: 100 (1), 85.71 (4), 64.29 (7), 50 (10), 35.71 (20), 14.29 (19), 0 (39) |
+| Same, title Owner changed to Operations Manager | SYN-0006 first at 100, with `Title: Operations Manager (preferred)` in its reasons ([Match reasons](#match-reasons)). First 8: SYN-0006, SYN-0026, SYN-0126, SYN-0226, SYN-0326, SYN-0426 (all 100, tied, so ordered by Record ID), SYN-0001 64, SYN-0011 64 (8th, with `Title unknown`). Row 40: SYN-0476 (50). Scores of the 100 eligible: 100 (6), 64.29 (2), 50 (33), 0 (59) |
+| Tempe, AZ; prefer Logistics, Operations Manager, 10 to 99; 30 rows | 100 eligible, 30 out, SYN-0002 first at 100, tied with 6 others (first by Record ID). First 8: SYN-0002, SYN-0007, SYN-0027, SYN-0127, SYN-0227, SYN-0327, SYN-0427 (all 100), SYN-0012 64. Row 30: SYN-0347 (50). Scores of the 100 eligible: 100 (7), 64.29 (1), 50 (33), 0 (59) |
 | Business owner, list size 1 / 100 | 1 row (SYN-0001) / all 100 eligible rows |
-| Same brief twice, or the records shuffled first | Identical `shortlist`, reasons included |
+| Same brief twice, or the records shuffled first | Identical `shortlist`, reasons included. Checked for each walkthrough: run twice, and with the records shuffled by 3 fixed seeds |
 | Business owner, pin SYN-0496 | 40 rows, SYN-0496 first at 0 with `Pinned by user`, SYN-0001 second, SYN-0441 out ([Pin and omit](#pin-and-omit)) |
 | Business owner, omit SYN-0001 | 40 rows, SYN-0461 comes in at 40 |
 | Same brief and overrides twice, records shuffled, or pins made in another order | Identical `shortlist` |

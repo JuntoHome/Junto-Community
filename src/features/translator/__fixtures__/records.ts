@@ -109,19 +109,39 @@ export function rsSheet(rows: readonly FixtureRow[]): FixtureRow[] {
   return [[...RS_HEADERS], ...rows];
 }
 
+/** A fixed-seed generator (mulberry32): each call gives the next whole number from 0 to 2^32 - 1. */
+function mulberry32(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return (t ^ (t >>> 14)) >>> 0;
+  };
+}
+
 /**
  * `length` bytes from a fixed-seed generator (mulberry32), so a "random" file is the same on
  * every run. Used for files that aren't workbooks at all.
  */
 export function seededBytes(seed: number, length: number): Uint8Array {
-  let state = seed >>> 0;
+  const next = mulberry32(seed);
   const bytes = new Uint8Array(length);
-  for (let i = 0; i < length; i++) {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    bytes[i] = ((t ^ (t >>> 14)) >>> 0) & 0xff;
-  }
+  for (let i = 0; i < length; i++) bytes[i] = next() & 0xff;
   return bytes;
+}
+
+/**
+ * A new array with `items` in a shuffled order that depends only on `seed` (Fisher-Yates with
+ * mulberry32), so a "shuffled" test gives the same order on every run. `items` is not changed.
+ */
+export function seededShuffle<T>(items: readonly T[], seed: number): T[] {
+  const next = mulberry32(seed);
+  const shuffled = [...items];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = next() % (i + 1);
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
 }

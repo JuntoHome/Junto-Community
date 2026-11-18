@@ -2,7 +2,7 @@
 
 The project's task status in one place. GitHub issues are the source of truth for Translator work; this file summarises them. Update it when a ticket changes state.
 
-**As of:** Nov 16, 2026.
+**As of:** Nov 18, 2026.
 
 **Sources:** GitHub issues #1 to #35 (milestone "Data Axle Translator Phase 1"), [JCA_CMS_Plan.md](JCA_CMS_Plan.md) for CMS tickets, and the commit history for completion evidence.
 
@@ -87,6 +87,7 @@ These may be done; confirm and move them.
 | TR-27 | Safe export cells (formula injection) | Merged into `translator` (PR #62): every text cell in both export sheets is now written by `setTextCell()` (`export/cells.ts`) as a plain string with Excel's Text format (`@`), with no `'` or other prefix, so `=SUM(1,1)` shows as text, not 2, and stays text if edited in Excel. `buildWorkbook()` runs `assertNoFormulas()` before saving and refuses to write a file with any formula cell. The gated upload buffer is documented as read-only and never reaches the export | [#27](https://github.com/JuntoHome/Junto-Community/issues/27), [PR #62](https://github.com/JuntoHome/Junto-Community/pull/62) |
 | TR-28 | Session-only data and reset | In review (PR into `translator`, branch `tr-28-session-reset`): Translator data lives only in the wizard's React state for one session. New `TranslatorSession` (`ui/translator-session.tsx`) remounts the wizard with a new `key` for **Start over** (`ui/start-over.tsx`: under the step indicator once a file is loaded; asks first once results exist; then Upload, focus on its heading, "Everything was cleared." announced) and for a new workbook chosen while one is loaded, which fixes old pins and omits carrying over. `logTranslatorError(code)` (`ui/log-error.ts`) logs only `[translator] <code>`. Exports say they are synthetic: note next to Download, file `JCA_Shortlist_Synthetic_Demo_YYYY-MM-DD.xlsx`, Title and Subject properties, Shortlist note on row 1 with the header on row 3. Vercel log check **Unverified** | [#28](https://github.com/JuntoHome/Junto-Community/issues/28), [PR #63](https://github.com/JuntoHome/Junto-Community/pull/63) (number **Unverified** until the PR is opened) |
 | TR-29 | Unit tests: import and data cleaning | Merged into `translator` (PR #64): Vitest 4.1.12 (exact, dev only) with `npm run test` and `npm run test:watch`, configured in `vitest.config.ts` (Node, `src/**/*.test.ts`, `@` alias). 103 tests in 10 files beside `import/` and `normalize/` cover upload checks, the file gate (and that the allowlist has exactly its expected entry), parsing, missing and duplicate required headers, malformed cells, formula-like text, cleaning, invalid employee counts, duplicate IDs and duplicate grouping (SYN-0500 under SYN-0001), plus TR-04's deferred mapping test. Fixtures are built in code in `src/features/translator/__fixtures__/` (TR-04's `rs-row.ts` moved there) and never allowlisted. Found and fixed: error cells (`#N/A`) were read as their code; they are now blank | [#29](https://github.com/JuntoHome/Junto-Community/issues/29), [PR #64](https://github.com/JuntoHome/Junto-Community/pull/64) |
+| TR-30 | Unit tests: ranking walkthroughs from the spec | In review (PR into `translator`, branch `tr-30-walkthrough-tests`): `ranking/walkthroughs.test.ts` (31 tests) runs the business owner, role change and job seeker walkthroughs from the sample's bytes through the new test helper `runPipeline()` (`__fixtures__/pipeline.ts`: parse, normalize, row checks, duplicate grouping, rank, counts). Each locks in its counts, first 8 rows, last row and score spread; the role change also checks the export builders (SYN-0011's Title and Email cells empty, the Criteria sheet's preference line and scoring version). Each walkthrough runs twice and with the records shuffled by 3 fixed seeds, and its full shortlist must equal a hand-reviewed golden file in `__fixtures__/walkthroughs/`. Every expected number matched the code; nothing in the app changed | [#30](https://github.com/JuntoHome/Junto-Community/issues/30), [PR #66](https://github.com/JuntoHome/Junto-Community/pull/66) (number **Unverified** until the PR is opened) |
 
 ## Pending
 
@@ -102,7 +103,6 @@ Data Axle Translator Phase 1, all open. Each issue has the steps and acceptance 
 
 | ID | Title | Expected location | Issue |
 |---|---|---|---|
-| TR-30 | Unit tests: ranking walkthroughs from the spec | tests | [#30](https://github.com/JuntoHome/Junto-Community/issues/30) |
 | TR-31 | Edge case tests | tests | [#31](https://github.com/JuntoHome/Junto-Community/issues/31) |
 | TR-32 | Manual QA on staging | staging | [#32](https://github.com/JuntoHome/Junto-Community/issues/32) |
 | TR-33 | Developer documentation | `docs/` | [#33](https://github.com/JuntoHome/Junto-Community/issues/33) |

@@ -1,0 +1,182 @@
+[
+  {
+    "rank": 1,
+    "recordId": "SYN-0002",
+    "displayScore": 100,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Logistics (preferred); Title: Operations Manager (preferred); Company size: 25 employees (preferred)"
+  },
+  {
+    "rank": 2,
+    "recordId": "SYN-0007",
+    "displayScore": 100,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Logistics (preferred); Title: Operations Manager (preferred); Company size: 25 employees (preferred)"
+  },
+  {
+    "rank": 3,
+    "recordId": "SYN-0027",
+    "displayScore": 100,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Logistics (preferred); Title: Operations Manager (preferred); Company size: 40 employees (preferred)"
+  },
+  {
+    "rank": 4,
+    "recordId": "SYN-0127",
+    "displayScore": 100,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Logistics (preferred); Title: Operations Manager (preferred); Company size: 40 employees (preferred)"
+  },
+  {
+    "rank": 5,
+    "recordId": "SYN-0227",
+    "displayScore": 100,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Logistics (preferred); Title: Operations Manager (preferred); Company size: 40 employees (preferred)"
+  },
+  {
+    "rank": 6,
+    "recordId": "SYN-0327",
+    "displayScore": 100,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Logistics (preferred); Title: Operations Manager (preferred); Company size: 40 employees (preferred)"
+  },
+  {
+    "rank": 7,
+    "recordId": "SYN-0427",
+    "displayScore": 100,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Logistics (preferred); Title: Operations Manager (preferred); Company size: 40 employees (preferred)"
+  },
+  {
+    "rank": 8,
+    "recordId": "SYN-0012",
+    "displayScore": 64,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Logistics (preferred); Title unknown; Company size: 25 employees (preferred)"
+  },
+  {
+    "rank": 9,
+    "recordId": "SYN-0047",
+    "displayScore": 50,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Fabrication (not preferred); Title: Operations Manager (preferred); Company size: 40 employees (preferred)"
+  },
+  {
+    "rank": 10,
+    "recordId": "SYN-0052",
+    "displayScore": 50,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Logistics (preferred); Title unknown; Company size: 120 employees (not preferred)"
+  },
+  {
+    "rank": 11,
+    "recordId": "SYN-0067",
+    "displayScore": 50,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Technology (not preferred); Title: Operations Manager (preferred); Company size: 40 employees (preferred)"
+  },
+  {
+    "rank": 12,
+    "recordId": "SYN-0077",
+    "displayScore": 50,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Logistics (preferred); Title: General Manager (not preferred); Company size unknown"
+  },
+  {
+    "rank": 13,
+    "recordId": "SYN-0087",
+    "displayScore": 50,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Retail (not preferred); Title: Operations Manager (preferred); Company size: 40 employees (preferred)"
+  },
+  {
+    "rank": 14,
+    "recordId": "SYN-0102",
+    "displayScore": 50,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Logistics (preferred); Title: Owner (not preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 15,
+    "recordId": "SYN-0107",
+    "displayScore": 50,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Business Services (not preferred); Title: Operations Manager (preferred); Company size: 40 employees (preferred)"
+  },
+  {
+    "rank": 16,
+    "recordId": "SYN-0147",
+    "displayScore": 50,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Fabrication (not preferred); Title: Operations Manager (preferred); Company size: 40 employees (preferred)"
+  },
+  {
+    "rank": 17,
+    "recordId": "SYN-0152",
+    "displayScore": 50,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Logistics (preferred); Title unknown; Company size: 120 employees (not preferred)"
+  },
+  {
+    "rank": 18,
+    "recordId": "SYN-0167",
+    "displayScore": 50,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Technology (not preferred); Title: Operations Manager (preferred); Company size: 40 employees (preferred)"
+  },
+  {
+    "rank": 19,
+    "recordId": "SYN-0177",
+    "displayScore": 50,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Logistics (preferred); Title: General Manager (not preferred); Company size unknown"
+  },
+  {
+    "rank": 20,
+    "recordId": "SYN-0187",
+    "displayScore": 50,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Retail (not preferred); Title: Operations Manager (preferred); Company size: 40 employees (preferred)"
+  },
+  {
+    "rank": 21,
+    "recordId": "SYN-0202",
+    "displayScore": 50,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Logistics (preferred); Title: Owner (not preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 22,
+    "recordId": "SYN-0207",
+    "displayScore": 50,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Business Services (not preferred); Title: Operations Manager (preferred); Company size: 40 employees (preferred)"
+  },
+  {
+    "rank": 23,
+    "recordId": "SYN-0247",
+    "displayScore": 50,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Fabrication (not preferred); Title: Operations Manager (preferred); Company size: 40 employees (preferred)"
+  },
+  {
+    "rank": 24,
+    "recordId": "SYN-0252",
+    "displayScore": 50,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Logistics (preferred); Title unknown; Company size: 120 employees (not preferred)"
+  },
+  {
+    "rank": 25,
+    "recordId": "SYN-0267",
+    "displayScore": 50,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Technology (not preferred); Title: Operations Manager (preferred); Company size: 40 employees (preferred)"
+  },
+  {
+    "rank": 26,
+    "recordId": "SYN-0277",
+    "displayScore": 50,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Logistics (preferred); Title: General Manager (not preferred); Company size unknown"
+  },
+  {
+    "rank": 27,
+    "recordId": "SYN-0287",
+    "displayScore": 50,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Retail (not preferred); Title: Operations Manager (preferred); Company size: 40 employees (preferred)"
+  },
+  {
+    "rank": 28,
+    "recordId": "SYN-0302",
+    "displayScore": 50,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Logistics (preferred); Title: Owner (not preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 29,
+    "recordId": "SYN-0307",
+    "displayScore": 50,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Business Services (not preferred); Title: Operations Manager (preferred); Company size: 40 employees (preferred)"
+  },
+  {
+    "rank": 30,
+    "recordId": "SYN-0347",
+    "displayScore": 50,
+    "reasonText": "Location: Tempe, AZ (required); Industry: Fabrication (not preferred); Title: Operations Manager (preferred); Company size: 40 employees (preferred)"
+  }
+]
