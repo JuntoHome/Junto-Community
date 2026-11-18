@@ -35,6 +35,17 @@ const SHOWN_FIELDS: readonly ShownField[] = [
 export const MISSING_SEPARATOR = ", ";
 
 /**
+ * What the results table's Contact column shows (TR-22), one entry per line: the email when the
+ * record has one; otherwise the phone and the website, each that is known. Empty when none is
+ * known, which is exactly when `missingFields()` lists Contact (if the file has those columns).
+ * Reference Solutions exports have no email column, so they show phone and website.
+ */
+export function contactLines(record: NormalizedRecord): string[] {
+  if (record.email.known) return [record.email.value];
+  return [record.phone, record.website].flatMap((text) => (text.known ? [text.value] : []));
+}
+
+/**
  * The labels of the shown fields this record has no value for, in `SHOWN_FIELDS` order: Name,
  * Title, Contact, Company size. Empty when it has them all.
  *
