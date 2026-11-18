@@ -9,7 +9,7 @@ The site is one Next.js application with two faces:
 
 Supabase provides the database, admin logins and file storage. Vercel hosts the site. There is no separate backend service.
 
-The current project is the **Data Axle Translator**: an admin tool that ranks a business contacts spreadsheet entirely in the browser. See [translator/README.md](translator/README.md).
+The current project is the **Data Axle Translator**: an admin tool that ranks a business contacts spreadsheet entirely in the browser. Its developer guide is [translator/README.md](translator/README.md).
 
 ## Major features
 
@@ -72,14 +72,14 @@ Read [DEVELOPMENT-SETUP.md](DEVELOPMENT-SETUP.md) before filling in `.env.local`
 2. [ARCHITECTURE.md](ARCHITECTURE.md)
 3. [DEVELOPMENT-SETUP.md](DEVELOPMENT-SETUP.md), then run the site
 4. [WAY-OF-WORKING.md](WAY-OF-WORKING.md) and [guides/CODING-STANDARDS.md](guides/CODING-STANDARDS.md)
-5. [../CLAUDE.md](../CLAUDE.md) and [translator/README.md](translator/README.md) if you are working on the Translator
+5. [../CLAUDE.md](../CLAUDE.md) and the Translator developer guide, [translator/README.md](translator/README.md), if you are working on the Translator
 6. [TASKS.md](TASKS.md) to pick up work
 
 ## Other documents in this folder
 
 | Path | What it is | Status |
 |---|---|---|
-| [translator/](translator/) | Translator spec (`.docx`), synthetic test workbooks, field mapping and expected results | Current |
+| [translator/](translator/) | The Translator developer guide ([README.md](translator/README.md): how to run it, data flow, field mapping, criteria schema, ranking rules, tests, extending it), the spec (`.docx`) and the synthetic test workbooks | Current |
 | [JCA_CMS_Plan.md](JCA_CMS_Plan.md) | Requirements, workflows and tickets CMS-01 to CMS-30 for the admin area (Oct 27, 2026) | Source record. Profile fields have since changed; see [REQUIREMENTS.md](REQUIREMENTS.md) |
 | [BUILD_SPEC.md](BUILD_SPEC.md) | The original Phase 1 site spec (Sept 2026) | Historical. Predates the admin area and the homepage redesign |
 | [design/](design/) | Approved Phase 1 mockups, desktop and mobile | Historical |
