@@ -7,6 +7,7 @@ import { normalizeCategory, normalizeEmployees, normalizeRecord, normalizeText }
 function record(values: Partial<TranslatorRecord> = {}): TranslatorRecord {
   return {
     recordId: "TST-0001",
+    idGenerated: false,
     company: null,
     city: null,
     state: null,

@@ -1,4 +1,3 @@
-import { generatedRecordId } from "../import/map-row";
 import type { LayoutMapping } from "../import/mappings/types";
 import { matchKey } from "./match-key";
 import { normalizeEmployees, type NormalizedRow } from "./normalize";
@@ -59,15 +58,6 @@ export const ROW_ISSUE_REASONS = {
 } as const;
 
 /**
- * Whether the parser generated this row's ID because the ID cell was blank or the column was
- * missing. `parseWorkbook()` gives spreadsheet row N the ID of data position N - 1 (row 2 is
- * ROW-0001), so a generated ID is exactly that one.
- */
-function hasGeneratedId(row: NormalizedRow): boolean {
-  return row.record.recordId === generatedRecordId(row.sourceRow - 1);
-}
-
-/**
  * An `invalid-employees` issue when the employees cell isn't blank but isn't a whole number.
  * TR-10 drops the "invalid" reason once a size range is read instead, so the employees value is
  * checked on its own here, with TR-10's own rule.
@@ -103,7 +93,8 @@ export function compareIssues(a: RowIssue, b: RowIssue): number {
  * - **Duplicate Record ID** (excluded): IDs are compared with `matchKey()`, so "SYN-0007" and
  *   " syn-0007 " are the same. The row with the lowest `sourceRow` is kept; every later one is excluded.
  * - **Generated ID** (warning): the ID cell was blank, so the parser gave the row a `ROW-0001`
- *   style ID. For the Reference Solutions layout, when no row has an IUSA Number (expected: the
+ *   style ID. Read from the parser's `record.idGenerated` flag, never guessed from the ID's text,
+ *   so a file's own ID that happens to look like `ROW-0016` isn't flagged. For the Reference Solutions layout, when no row has an IUSA Number (expected: the
  *   column is optional), this is one whole-file issue instead of one per row.
  *
  * Invariant: every row in `kept` has a unique Record ID, compared with `matchKey()`. Later steps
@@ -118,7 +109,7 @@ export function validateRows(rows: readonly NormalizedRow[], layout: LayoutMappi
   const excluded: NormalizedRow[] = [];
   const issues: RowIssue[] = [];
 
-  const everyIdGenerated = ordered.length > 0 && ordered.every(hasGeneratedId);
+  const everyIdGenerated = ordered.length > 0 && ordered.every((row) => row.record.idGenerated);
   const summarizeGeneratedIds = layout.id === "reference-solutions" && everyIdGenerated;
   if (summarizeGeneratedIds) {
     issues.push({
@@ -139,7 +130,7 @@ export function validateRows(rows: readonly NormalizedRow[], layout: LayoutMappi
     const employees = employeesIssue(row);
     if (employees) issues.push(employees);
 
-    if (!summarizeGeneratedIds && hasGeneratedId(row)) {
+    if (!summarizeGeneratedIds && row.record.idGenerated) {
       issues.push({
         sourceRow: row.sourceRow,
         recordId,

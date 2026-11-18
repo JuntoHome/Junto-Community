@@ -1,5 +1,7 @@
 # Junto Community Alliance website: knowledge transfer
 
+Snapshot as of November 11, 2026. For current status see [TASKS.md](TASKS.md), [FEATURES.md](FEATURES.md) and [translator/README.md](translator/README.md).
+
 A handover guide for a developer taking over this project. It describes the system as it is in the code on `main` (November 2026), and says where the code and the older documents disagree.
 
 It covers the business overview, architecture, repository structure, request flows, database, API and integrations, authentication and security, development workflow, known issues, and feature walkthroughs.

@@ -2,7 +2,14 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { toArrayBuffer } from "../__fixtures__/build-workbook";
 import { importRows, importWorkbook } from "../__fixtures__/import-pipeline";
-import { SAMPLE_PATH, syntheticRow, syntheticSheet } from "../__fixtures__/records";
+import {
+  rsBusiness,
+  rsSheet,
+  SAMPLE_PATH,
+  syntheticRow,
+  syntheticSheet,
+  withoutColumns,
+} from "../__fixtures__/records";
 import { ROW_ISSUE_REASONS, validateRows } from "./validate-rows";
 
 describe("invalid employee counts", () => {
@@ -120,6 +127,48 @@ describe("generated IDs", () => {
         code: "generated-id",
         severity: "warning",
         reason: "Record ID is blank, so this row was given the ID ROW-0002.",
+      },
+    ]);
+  });
+
+  /** Rows 2 to 17: TST-0001 to TST-0015, then row 17 with these cells. */
+  const sixteenRows = (row17: Parameters<typeof syntheticRow>[1]) =>
+    syntheticSheet([...Array.from({ length: 15 }, (_, i) => syntheticRow(i + 1)), syntheticRow(16, row17)]);
+
+  it("doesn't warn when a row's own ID only looks generated (ROW-0016 on row 17)", async () => {
+    const { validation } = await importRows(sixteenRows({ "Record ID": "ROW-0016" }));
+    expect(validation.kept[15].sourceRow).toBe(17);
+    expect(validation.kept[15].normalized.recordId).toBe("ROW-0016");
+    expect(validation.kept[15].record.idGenerated).toBe(false);
+    expect(validation.issues).toEqual([]);
+  });
+
+  it("warns when row 17's Record ID is blank, with the generated ID ROW-0016", async () => {
+    const { validation } = await importRows(sixteenRows({ "Record ID": null }));
+    expect(validation.kept[15].record.idGenerated).toBe(true);
+    expect(validation.issues).toEqual([
+      {
+        sourceRow: 17,
+        recordId: "ROW-0016",
+        code: "generated-id",
+        severity: "warning",
+        reason: ROW_ISSUE_REASONS.generatedId("Record ID", "ROW-0016"),
+      },
+    ]);
+  });
+
+  it("gives one whole-file issue for a Reference Solutions file with no IUSA Number column", async () => {
+    const { validation } = await importRows(
+      withoutColumns(rsSheet([rsBusiness(1), rsBusiness(2), rsBusiness(3)]), ["IUSA Number"]),
+    );
+    expect(validation.kept.map((row) => row.normalized.recordId)).toEqual(["ROW-0001", "ROW-0002", "ROW-0003"]);
+    expect(validation.issues).toEqual([
+      {
+        sourceRow: null,
+        recordId: null,
+        code: "generated-id",
+        severity: "warning",
+        reason: ROW_ISSUE_REASONS.generatedIdEveryRow("IUSA Number"),
       },
     ]);
   });
