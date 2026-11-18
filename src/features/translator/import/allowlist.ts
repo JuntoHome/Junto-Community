@@ -37,5 +37,10 @@ export const ALLOWED_WORKBOOKS: readonly AllowedWorkbook[] = [
     layout: "synthetic",
     note: "500 fictional records in the 9-column synthetic layout. Also served as the Load sample file from public/translator/.",
   },
-  // TR-35 adds the Reference Solutions layout synthetic file here.
+  {
+    sha256: "ebf0a966b5548fe683f91b94c2a44a6a5f33d4a3274ab3aa217e57e4e4185eeb",
+    fileName: "JCA_Synthetic_RS_Layout.xlsx",
+    layout: "reference-solutions",
+    note: "100 fictional rows in the real 396-column Reference Solutions layout, built by scripts/translator/make-rs-fixture.ts (TR-35). Also served as the Reference Solutions sample from public/translator/.",
+  },
 ];
