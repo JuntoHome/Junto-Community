@@ -98,7 +98,7 @@ Merged into `translator` (not yet on `main`, the live site). The evidence is the
 | ID | Title | Status | Links |
 |---|---|---|---|
 | TR-01 | Staging environment and project docs | Docs merged into `translator` (PR #36); Vercel staging alias and Preview variables pending with the project lead | [#1](https://github.com/JuntoHome/Junto-Community/issues/1), [PR #36](https://github.com/JuntoHome/Junto-Community/pull/36) |
-| TR-34 | Phase 1 walkthrough with Paul | In progress. Part A (before the meeting) in PR #73, open: `docs/translator/DEMO-SCRIPT.md` (25-minute demo script for Paul, with prep steps, known limits and a fallback) and `docs/translator/PHASE1-REVIEW.md` (22 decisions for Paul and the meeting notes template, answers empty). Docs only. Part B (after the meeting) fills in the review and drafts the follow-up issues. Paul's confirmation **not yet recorded** | [#34](https://github.com/JuntoHome/Junto-Community/issues/34), [PR #73](https://github.com/JuntoHome/Junto-Community/pull/73) |
+| TR-34 | Phase 1 walkthrough with Paul | In progress. Part A (before the meeting) merged into `translator` (PR #73): `docs/translator/DEMO-SCRIPT.md` (25-minute demo script for Paul, with prep steps, known limits and a fallback) and `docs/translator/PHASE1-REVIEW.md` (22 decisions for Paul and the meeting notes template, answers empty). Docs only. Part B (after the meeting) fills in the review and drafts the follow-up issues. Paul's confirmation **not yet recorded** | [#34](https://github.com/JuntoHome/Junto-Community/issues/34), [PR #73](https://github.com/JuntoHome/Junto-Community/pull/73) |
 
 ## Pending
 
