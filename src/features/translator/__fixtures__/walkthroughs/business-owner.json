@@ -1,0 +1,242 @@
+[
+  {
+    "rank": 1,
+    "recordId": "SYN-0001",
+    "displayScore": 100,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title: Owner (preferred); Company size: 25 employees (preferred)"
+  },
+  {
+    "rank": 2,
+    "recordId": "SYN-0101",
+    "displayScore": 86,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 3,
+    "recordId": "SYN-0201",
+    "displayScore": 86,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 4,
+    "recordId": "SYN-0301",
+    "displayScore": 86,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 5,
+    "recordId": "SYN-0401",
+    "displayScore": 86,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 6,
+    "recordId": "SYN-0006",
+    "displayScore": 64,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title: Operations Manager (not preferred); Company size: 25 employees (preferred)"
+  },
+  {
+    "rank": 7,
+    "recordId": "SYN-0011",
+    "displayScore": 64,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title unknown; Company size: 25 employees (preferred)"
+  },
+  {
+    "rank": 8,
+    "recordId": "SYN-0026",
+    "displayScore": 64,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title: Operations Manager (not preferred); Company size: 40 employees (preferred)"
+  },
+  {
+    "rank": 9,
+    "recordId": "SYN-0126",
+    "displayScore": 64,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title: Operations Manager (not preferred); Company size: 40 employees (preferred)"
+  },
+  {
+    "rank": 10,
+    "recordId": "SYN-0226",
+    "displayScore": 64,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title: Operations Manager (not preferred); Company size: 40 employees (preferred)"
+  },
+  {
+    "rank": 11,
+    "recordId": "SYN-0326",
+    "displayScore": 64,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title: Operations Manager (not preferred); Company size: 40 employees (preferred)"
+  },
+  {
+    "rank": 12,
+    "recordId": "SYN-0426",
+    "displayScore": 64,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title: Operations Manager (not preferred); Company size: 40 employees (preferred)"
+  },
+  {
+    "rank": 13,
+    "recordId": "SYN-0051",
+    "displayScore": 50,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title unknown; Company size: 120 employees (not preferred)"
+  },
+  {
+    "rank": 14,
+    "recordId": "SYN-0076",
+    "displayScore": 50,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title: General Manager (not preferred); Company size unknown"
+  },
+  {
+    "rank": 15,
+    "recordId": "SYN-0151",
+    "displayScore": 50,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title unknown; Company size: 120 employees (not preferred)"
+  },
+  {
+    "rank": 16,
+    "recordId": "SYN-0176",
+    "displayScore": 50,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title: General Manager (not preferred); Company size unknown"
+  },
+  {
+    "rank": 17,
+    "recordId": "SYN-0251",
+    "displayScore": 50,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title unknown; Company size: 120 employees (not preferred)"
+  },
+  {
+    "rank": 18,
+    "recordId": "SYN-0276",
+    "displayScore": 50,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title: General Manager (not preferred); Company size unknown"
+  },
+  {
+    "rank": 19,
+    "recordId": "SYN-0351",
+    "displayScore": 50,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title unknown; Company size: 120 employees (not preferred)"
+  },
+  {
+    "rank": 20,
+    "recordId": "SYN-0376",
+    "displayScore": 50,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title: General Manager (not preferred); Company size unknown"
+  },
+  {
+    "rank": 21,
+    "recordId": "SYN-0451",
+    "displayScore": 50,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title unknown; Company size: 120 employees (not preferred)"
+  },
+  {
+    "rank": 22,
+    "recordId": "SYN-0476",
+    "displayScore": 50,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Fabrication (preferred); Title: General Manager (not preferred); Company size unknown"
+  },
+  {
+    "rank": 23,
+    "recordId": "SYN-0021",
+    "displayScore": 36,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Technology (not preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 24,
+    "recordId": "SYN-0041",
+    "displayScore": 36,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Retail (not preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 25,
+    "recordId": "SYN-0061",
+    "displayScore": 36,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Business Services (not preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 26,
+    "recordId": "SYN-0081",
+    "displayScore": 36,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Logistics (not preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 27,
+    "recordId": "SYN-0121",
+    "displayScore": 36,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Technology (not preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 28,
+    "recordId": "SYN-0141",
+    "displayScore": 36,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Retail (not preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 29,
+    "recordId": "SYN-0161",
+    "displayScore": 36,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Business Services (not preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 30,
+    "recordId": "SYN-0181",
+    "displayScore": 36,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Logistics (not preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 31,
+    "recordId": "SYN-0221",
+    "displayScore": 36,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Technology (not preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 32,
+    "recordId": "SYN-0241",
+    "displayScore": 36,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Retail (not preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 33,
+    "recordId": "SYN-0261",
+    "displayScore": 36,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Business Services (not preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 34,
+    "recordId": "SYN-0281",
+    "displayScore": 36,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Logistics (not preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 35,
+    "recordId": "SYN-0321",
+    "displayScore": 36,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Technology (not preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 36,
+    "recordId": "SYN-0341",
+    "displayScore": 36,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Retail (not preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 37,
+    "recordId": "SYN-0361",
+    "displayScore": 36,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Business Services (not preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 38,
+    "recordId": "SYN-0381",
+    "displayScore": 36,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Logistics (not preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 39,
+    "recordId": "SYN-0421",
+    "displayScore": 36,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Technology (not preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)"
+  },
+  {
+    "rank": 40,
+    "recordId": "SYN-0441",
+    "displayScore": 36,
+    "reasonText": "Location: Phoenix, AZ (required); Industry: Retail (not preferred); Title: Owner (preferred); Company size: 8 employees (not preferred)"
+  }
+]
