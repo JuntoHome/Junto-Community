@@ -77,7 +77,7 @@ Run `typecheck`, `lint`, `build` and `test` before pushing ([WAY-OF-WORKING.md](
 
 ## Testing and debugging
 
-- Unit tests cover only the Translator's import and cleaning so far (`npm run test`). Check every change by hand too, locally and on the branch's preview.
+- Unit tests (`npm run test`) cover only the Translator; what they cover is in [WAY-OF-WORKING.md](WAY-OF-WORKING.md#testing). Check every change by hand too, locally and on the branch's preview.
 - On Windows, run the tests from a folder path with an uppercase drive letter (`C:\`), or every test fails ([TROUBLESHOOTING.md](TROUBLESHOOTING.md#local-development)).
 - Server logs are prefixed by feature (`[profiles]`, `[subscribe]`, `[login]`, `[reset]`, `[set-password]`, `[keep-alive]`). Locally they appear in the `npm run dev` terminal.
 - Calling the cron endpoint and checking database access from outside: [API-DOCUMENTATION.md](API-DOCUMENTATION.md).
