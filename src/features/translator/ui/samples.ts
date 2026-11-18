@@ -15,7 +15,6 @@ export const XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spr
 /**
  * One button per entry on the Upload step. The files are fictional, so they are served
  * from `public/translator/` without a login; don't link them from any public page.
- * TR-35 adds the Reference Solutions layout sample here.
  */
 export const SAMPLE_WORKBOOKS: readonly SampleWorkbook[] = [
   {
@@ -24,5 +23,12 @@ export const SAMPLE_WORKBOOKS: readonly SampleWorkbook[] = [
     // Byte-identical copy of docs/translator/JCA_Synthetic_Contacts.xlsx (same SHA-256; TR-07's file gate checks it).
     path: "/translator/JCA_Synthetic_Contacts.xlsx",
     fileName: "JCA_Synthetic_Contacts.xlsx",
+  },
+  {
+    id: "reference-solutions",
+    label: "Load Reference Solutions sample (100 fictional rows)",
+    // Byte-identical copy of docs/translator/JCA_Synthetic_RS_Layout.xlsx (TR-35; same SHA-256, checked by the file gate).
+    path: "/translator/JCA_Synthetic_RS_Layout.xlsx",
+    fileName: "JCA_Synthetic_RS_Layout.xlsx",
   },
 ];

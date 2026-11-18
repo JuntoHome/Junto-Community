@@ -37,8 +37,8 @@ Versions from [package.json](../package.json).
 | `zod` | ^4.6 | Validation and error messages | Each feature's `schema.ts` |
 | `server-only` | ^0.0.1 | Fails the build if server code reaches the browser | Top of every server module |
 | `@vercel/analytics` | ^2.0 | Page views on public pages | `site-shell.tsx` |
-| `exceljs` | ^4.4 | Reads Translator workbooks and writes the Excel export, in the browser; loaded only when a workbook is parsed or exported | `features/translator/import/parse.ts`, `features/translator/export/workbook.ts` |
-| `jszip` | ^3.10 | Opens the .xlsx ZIP to fix files ExcelJS can't read as written (already an ExcelJS dependency) | `features/translator/import/xlsx-compat.ts`; also `import/file-gate.test.ts` |
+| `exceljs` | ^4.4 | Reads Translator workbooks and writes the Excel export, in the browser; loaded only when a workbook is parsed or exported | `features/translator/import/parse.ts`, `features/translator/export/workbook.ts`; also `scripts/translator/make-rs-fixture.ts` (TR-35), which writes the Reference Solutions sample |
+| `jszip` | ^3.10 | Opens the .xlsx ZIP to fix files ExcelJS can't read as written (already an ExcelJS dependency) | `features/translator/import/xlsx-compat.ts`; also `import/file-gate.test.ts` and `scripts/translator/make-rs-fixture.ts` (fixed ZIP dates, so the sample rebuilds byte-identical) |
 | `tailwindcss` | 4 | Styling; design tokens in the `@theme` block of `globals.css` | Class names |
 | `typescript`, `eslint` | 5, 9 | Type checking and linting | `tsconfig.json`, `eslint.config.mjs` |
 | `vitest` | 4.1.12 (exact, dev only) | Unit tests, run in Node by `npm run test` (TR-29). Never bundled: app code imports no test or fixture. 4.x because Vitest 5 requires `@types/node` 22 or later and this project uses 20 | `vitest.config.ts`; `*.test.ts` beside the code; fixtures in `features/translator/__fixtures__/` |
@@ -161,8 +161,10 @@ src/
   proxy.ts              Redirects and session refresh.
 supabase/migrations/    The schema, applied by hand in filename order.
 supabase/templates/     Invite and reset email HTML, pasted into the Supabase dashboard.
+scripts/translator/     make-rs-fixture.ts: builds the Reference Solutions sample workbook (TR-35). Not part of the app.
 docs/                   This documentation, specs, mockups, QR code.
 public/email/           Images linked from sent emails. Don't rename.
+public/translator/      The two Translator sample workbooks, byte-identical copies of the ones in docs/translator/.
 ```
 
 ### Key files

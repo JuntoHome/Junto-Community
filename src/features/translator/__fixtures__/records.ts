@@ -18,6 +18,14 @@ export const PUBLIC_SAMPLE_PATH = fileURLToPath(
   new URL("../../../../public/translator/JCA_Synthetic_Contacts.xlsx", import.meta.url),
 );
 
+/** The committed Reference Solutions layout sample (TR-35): 100 fictional rows, built by scripts/translator/make-rs-fixture.ts. */
+export const RS_SAMPLE_PATH = fileURLToPath(new URL("../../../../docs/translator/JCA_Synthetic_RS_Layout.xlsx", import.meta.url));
+
+/** The served copy of the Reference Solutions sample. It must be byte-identical. */
+export const PUBLIC_RS_SAMPLE_PATH = fileURLToPath(
+  new URL("../../../../public/translator/JCA_Synthetic_RS_Layout.xlsx", import.meta.url),
+);
+
 /** The 9 headers of the synthetic layout, in the sample's column order. */
 export const SYNTHETIC_HEADERS = [
   "Record ID",

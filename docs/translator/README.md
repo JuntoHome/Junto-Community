@@ -13,9 +13,37 @@ Staging: `<URL pending>`
 | [JCA_Data_Axle_Translator_Specification.docx](JCA_Data_Axle_Translator_Specification.docx) | Full spec: workflow, ranking rules, walkthroughs, edge cases |
 | [JCA_Synthetic_Contacts.xlsx](JCA_Synthetic_Contacts.xlsx) | 500 fictional records, 9 columns, sheet `Contacts`. Used for the spec walkthroughs. SHA-256: `67a510867ed6c7273cfebabea5c6895e43bd2cae2c98395acd09146ba6ed580b` |
 | [JCA_Reference_Solutions_Exact_Headers_Jeel.xlsx](JCA_Reference_Solutions_Exact_Headers_Jeel.xlsx) | Headers only (no records) of a real Reference Solutions export: 396 columns in order, a numbered inventory, and source notes |
-| `JCA_Synthetic_RS_Layout.xlsx` | Added in TR-35: fictional records in the real 396-column layout |
+| [JCA_Synthetic_RS_Layout.xlsx](JCA_Synthetic_RS_Layout.xlsx) | 100 fictional rows in the real 396-column Reference Solutions layout, sheet `Synthetic Detail Export` (TR-35). See [The Reference Solutions sample](#the-reference-solutions-sample). SHA-256: `ebf0a966b5548fe683f91b94c2a44a6a5f33d4a3274ab3aa217e57e4e4185eeb` |
 
-A copy of `JCA_Synthetic_Contacts.xlsx` is served from `public/translator/JCA_Synthetic_Contacts.xlsx` for the "Load sample" button (TR-05). It must stay byte-identical, with the same SHA-256 as above, because the [file gate](#file-gate) checks that hash: if one copy changes, replace the other and update the hash here and in `allowlist.ts`. The copy is reachable without a login, which is acceptable only because the records are fictional. Don't link it from any public page or add it to the sitemap.
+Both samples are served from `public/translator/` for the Upload step's buttons: `JCA_Synthetic_Contacts.xlsx` for "Load sample (500 fictional records)" (TR-05) and `JCA_Synthetic_RS_Layout.xlsx` for "Load Reference Solutions sample (100 fictional rows)" (TR-35). Each copy must stay byte-identical to the one here, with the same SHA-256 as above, because the [file gate](#file-gate) checks that hash: if one copy changes, replace the other and update the hash here and in `allowlist.ts`. The copies are reachable without a login, which is acceptable only because the records are fictional. Don't link them from any public page or add them to the sitemap.
+
+### The Reference Solutions sample
+
+`JCA_Synthetic_RS_Layout.xlsx` proves the importer handles the real export format without real data (TR-35). It is built by `scripts/translator/make-rs-fixture.ts`; never edit it by hand.
+
+- **Rebuild:** `node scripts/translator/make-rs-fixture.ts` from the repository root. Needs Node 22.18 or newer, which runs TypeScript directly (the app itself still runs on Node 20.9). It writes the file to `docs/translator/` and `public/translator/` and prints the SHA-256. The output is byte-identical on every run and in every time zone (fixed dates in the file and the ZIP), so the hash only changes when the script changes. If it does, update the hash here, in `allowlist.ts` and in `import/file-gate.test.ts`.
+- **Headers:** row 1 is copied by the script, exactly and in order, from the "Export Headers" sheet of `JCA_Reference_Solutions_Exact_Headers_Jeel.xlsx`: 396 columns, the last one without a header. `rs-sample.test.ts` checks it against `__fixtures__/rs-headers.ts`, which was copied from the other sheet ("Header Inventory"), so the two copies agree.
+- **Values:** only the mapped columns are filled (IUSA Number, Company Name, Executive First Name, Executive Last Name, Executive Title, Professional Title, Address, City, State, ZIP Code, Phone Number Combined, Website, Primary SIC Description, Primary NAICS Description, Location Employee Size Actual, Location Employee Size Range, and Executive First Name, Last Name and Title 1 to 3). Every other column is empty. Everything is invented: companies `Synthetic Co 001` to `099`, contacts `Demo Person 001`, other executives `Demo Executive 001-1`, phones `(602) 555-0101` style (555-0100 to 555-0199 are reserved for fiction), websites `www.synthetic-co-001.example` (`.example` is reserved), addresses `101 Example Way`, IUSA Numbers `900000001` upward. No email (the layout has no email column). Industry (Primary SIC Description) uses the same five values as the synthetic workbook, so the same searches work; real SIC descriptions are more specific. ZIP codes are the city's main ZIP. **Unverified:** that no real business has one of these IUSA Numbers. They are attached to no real data either way.
+- **Layout:** business n is spreadsheet row n + 1 (rows 2 to 100), so a blank IUSA Number gives it `ROW-00nn`. Cities cycle Phoenix, Tempe, Mesa, Glendale; industries change every 4 rows (Fabrication, Logistics, Retail, Technology, Business Services); titles change every 20 rows (Owner, Operations Manager, General Manager, President, then Owner again), so each block of 20 has every city and industry pairing once. State is AZ throughout. Sizes cycle 25, 8, 60, 140, 15, 42, 310, each with its matching range (`20 to 49` for 25). Business n has n % 4 other executives (Vice President, Controller, Sales Manager in slots 1 to 3), so row 2 has 1, row 3 has 2, row 4 has 3 and row 5 has none.
+
+**Documented rows** (checked by `rs-sample.test.ts`; later tests may rely on them):
+
+| Case | Rows (Record ID) |
+|---|---|
+| Blank IUSA Number: generated ID and one `generated-id` warning each | 8 (`ROW-0007`), 17 (`ROW-0016`), 26 (`ROW-0025`, Phoenix), 35 (`ROW-0034`), 44 (`ROW-0043`), 53 (`ROW-0052`), 62 (`ROW-0061`, Phoenix, Fabrication), 71 (`ROW-0070`), 80 (`ROW-0079`), 89 (`ROW-0088`) |
+| Exact duplicate, grouped | 101 (`900000100`) repeats row 2 (`900000001`, Phoenix, Fabrication, Owner, 25 employees) |
+| Executive Title blank, title from Professional Title | 13 (`900000012`, Owner), 46 (`900000045`, Phoenix, General Manager) |
+| Title blank (both columns) | 10 (`900000009`, Phoenix), 31 (`900000030`), 52 (`900000051`), 73 (`900000072`) |
+| Employee count blank, size from the range | 19 (`900000018`, `10 to 19`), 42 (`900000041`, Phoenix, Fabrication, `20 to 49`), 48 (`900000047`, `1 to 4`), 67 (`900000066`, `1,000 to 4,999`), 82 (`900000081`, Phoenix, Fabrication, `100 to 249`). Against 10 to 99 employees, rows 19 and 42 fit; 48, 67 and 82 don't |
+| Both employee columns blank: Missing `Company size` | 59 (`900000058`) |
+| Phone blank, website only | 15 (`900000014`), 38 (`900000037`, Phoenix) |
+| Website blank, phone only | 23 (`900000022`), 54 (`900000053`, Phoenix) |
+| Phone and website blank: Missing `Contact` | 86 (`900000085`, Phoenix) |
+| Other executives: 3 | 4 (`900000003`): Demo Executive 003-1 (Vice President), 003-2 (Controller), 003-3 (Sales Manager) |
+| Other executives: slot 2 has no title | 3 (`900000002`): Demo Executive 002-1 (Vice President), Demo Executive 002-2 |
+| Other executives: slot 1 empty, slots 2 and 3 filled | 12 (`900000011`): Demo Executive 011-2 (Controller), Demo Executive 011-3 (Sales Manager) |
+
+**What it gives:** layout Reference Solutions; every field Found except Email (Not in this layout); 100 rows read, 1 duplicate grouped, 99 unique, 0 left out, 10 rows with warnings (the generated IDs). Pickers: City Glendale 24, Mesa 25, Phoenix 25, Tempe 25; Industry Business Services 19, Fabrication 20, Logistics 20, Retail 20, Technology 20; Title General Manager 19, Operations Manager 19, Owner 38, President 19. The Phoenix fabrication owners brief (`BUSINESS_OWNER_BRIEF`) gives 25 eligible and a 25-row shortlist: `900000001` 100 (with Duplicate IDs `900000100`), `900000081` 86, `900000041` 64, `ROW-0061` 64. The export has Phone and Website and an empty Email column.
 
 ## Upload limits
 
@@ -29,7 +57,7 @@ A copy of `JCA_Synthetic_Contacts.xlsx` is served from `public/translator/JCA_Sy
 During Phase 1 the Translator accepts only the workbooks we issued, so real contact data can't be processed by accident.
 
 - After the upload limits pass, the browser reads the file once and computes its SHA-256 hash (`crypto.subtle.digest`). If the hash isn't in the allowlist, the step stays on Upload and shows: "Only the JCA synthetic demo workbook can be used in this prototype. Use the Load sample button to try it."
-- The allowlist is `src/features/translator/import/allowlist.ts`, the only place hashes live. Today it has one entry, `JCA_Synthetic_Contacts.xlsx`. TR-35 adds the Reference Solutions layout file. The top comment there says how to compute a hash.
+- The allowlist is `src/features/translator/import/allowlist.ts`, the only place hashes live. It has two entries: `JCA_Synthetic_Contacts.xlsx` and `JCA_Synthetic_RS_Layout.xlsx` (TR-35). The top comment there says how to compute a hash.
 - Any change to the file changes its hash and blocks it, even opening it in Excel and saving it with no edits. To approve a changed file, add its new hash to the allowlist.
 - `crypto.subtle` works only on https or localhost. On plain http (for example the dev server opened from a LAN address) the gate refuses every file and says the page needs a secure connection. It never skips the check.
 - The hash is not logged or sent anywhere, even for refused files. The bytes read for the gate are kept in memory and handed to the parser (TR-08), so the file is read only once.
@@ -120,7 +148,7 @@ Right after a workbook is parsed, every row's record is normalized in the browse
 **Employees:**
 
 1. The `employees` value with commas and spaces removed must be digits only. `"25"`, `"1,200"` and `" 40 "` give 25, 1200 and 40 (`source: "actual"`). `"25.5"`, `"-3"`, `"about 20"` and `"N/A"` are unknown (`invalid`); blank is unknown (`blank`).
-2. Only when that is unknown and `employeeRange` has a value, the range is read instead (`source: "range"`, with `min` and `max`). Accepted: `"10 to 19"`, `"10-19"`, `"10 - 19"`, `"1,000 to 4,999"`, and open ranges `"10,000+"` and `"10,000 or more"` (`max` is infinity). Anything else (for example `"Unknown"`, or a min above the max) leaves the count unknown with the reason from step 1. **Unverified:** these formats are a guess. The Reference Solutions headers workbook has no data rows, so the exact range wording in real exports hasn't been seen.
+2. Only when that is unknown and `employeeRange` has a value, the range is read instead (`source: "range"`, with `min` and `max`). Accepted: `"10 to 19"`, `"10-19"`, `"10 - 19"`, `"1,000 to 4,999"`, and open ranges `"10,000+"` and `"10,000 or more"` (`max` is infinity). Anything else (for example `"Unknown"`, or a min above the max) leaves the count unknown with the reason from step 1. **Unverified:** these formats are a guess. The Reference Solutions headers workbook has no data rows, so the exact range wording in real exports hasn't been seen. The [Reference Solutions sample](#the-reference-solutions-sample) uses the `10 to 19` form, which is the same guess.
 3. A range that is read replaces an `invalid` actual count, and the `invalid` reason is not kept.
 
 `employeeRange` is also kept as its own text field for display.
@@ -682,7 +710,7 @@ The Translator keeps everything for one session only (TR-28). Code: `ui/translat
 
 Unit tests run with Vitest: `npm run test` (TR-29). They sit beside the code as `*.test.ts` and run in Node, with no browser, no network and no random data. How to run them: [WAY-OF-WORKING.md](../WAY-OF-WORKING.md#testing).
 
-- **Covered:** import and cleaning (TR-29). Upload checks, file gate, parsing, header checks, cell values, formula-like text, normalizing, row checks and duplicate grouping, plus TR-04's Reference Solutions fixture row. The three spec walkthroughs (TR-30, `ranking/walkthroughs.test.ts`), through the whole chain from the sample's bytes. Export and other edge cases come with TR-31.
+- **Covered:** import and cleaning (TR-29). Upload checks, file gate, parsing, header checks, cell values, formula-like text, normalizing, row checks and duplicate grouping, plus TR-04's Reference Solutions fixture row. The three spec walkthroughs (TR-30, `ranking/walkthroughs.test.ts`), through the whole chain from the sample's bytes. The [Reference Solutions sample](#the-reference-solutions-sample) (TR-35, `rs-sample.test.ts`): its 396 headers, that only mapped columns are filled and every value is invented, the import figures, every documented row, the Phoenix fabrication shortlist and the export's Phone, Website and empty Email. Export and other edge cases come with TR-31.
 - **Fixtures** live in `src/features/translator/__fixtures__/` and are built in code, never committed as binary workbooks, so every fixture can be read in review and a header change is a one-line diff:
   - `build-workbook.ts`: `buildXlsx({ sheets: [{ name, rows }] })` writes an `.xlsx` in memory with ExcelJS from plain arrays, with helpers for rich text, formula, hyperlink, error and date cells.
   - `records.ts`: invented rows and row builders for both layouts (`TST-` IDs, `Test Company 01` names, `.invalid` emails), and `seededShuffle(items, seed)`, a shuffle that gives the same order for the same seed.
@@ -691,8 +719,8 @@ Unit tests run with Vitest: `npm run test` (TR-29). They sit beside the code as 
   - `import-pipeline.ts`: runs parse, normalize, row checks and duplicate grouping in the wizard's order.
   - `pipeline.ts`: `runPipeline(buffer, brief, overrides?)` runs that import, then `summarizeImport()`, `rank()` and `buildCounts()`, and returns the import state, `records`, `rankResult`, `counts` and `mapping` (for the export builders). The real functions in the wizard's order, with no shortcuts.
   - `walkthroughs/`: the golden files, one per walkthrough (`business-owner.json`, `role-change.json`, `job-seeker.json`). Each is the full shortlist as `rank`, `recordId`, `displayScore` and `reasonText`, generated once from the sample, checked by hand against the [Expected results](#expected-results) and committed. The tests compare against them; there are no Vitest snapshots, so nothing can be accepted with `-u`. Changing a golden file needs a reason in the PR ([WAY-OF-WORKING.md](../WAY-OF-WORKING.md#testing)).
-- **Fixtures are never allowlisted.** Tests call `parseWorkbook()` directly, past the [file gate](#file-gate). `import/file-gate.test.ts` checks that the allowlist has exactly the expected entries, so adding one fails the tests until that list is changed on purpose (TR-35 will).
-- The real sample is read from `docs/translator/JCA_Synthetic_Contacts.xlsx` with `fs`, in tests only. Fixtures are invented: never copy rows from any real export into them.
+- **Fixtures are never allowlisted.** Tests call `parseWorkbook()` directly, past the [file gate](#file-gate). `import/file-gate.test.ts` checks that the allowlist has exactly the expected entries (the two samples), so adding one fails the tests until that list is changed on purpose.
+- The two committed samples are read from `docs/translator/` with `fs`, in tests only (`SAMPLE_PATH` and `RS_SAMPLE_PATH` in `records.ts`). Fixtures are invented: never copy rows from any real export into them.
 - App code never imports a test or a fixture, so neither reaches the build.
 - From the table below, the tests lock in the import figures (500 rows read, 0 issues, 499 unique with SYN-0500 grouped under SYN-0001), the altered copy rejected by the file gate, and the three walkthroughs (TR-30).
 
@@ -721,6 +749,8 @@ The first three rows (the spec walkthroughs) and the repeat row are locked in by
 | Any Excel export | Sheets `Shortlist`, then `Criteria` ([Sheet `Criteria`](#sheet-criteria)); Scoring version `1.0`, the same as `SCORING_VERSION`; Brief (JSON) parses back to `rankResult.brief` |
 | Title changed to Operations Manager in the criteria summary, then exported | Criteria sheet: `Prefer Fabrication, Operations Manager, 10 to 99 employees.` |
 | Altered copy of the workbook | Rejected by the file gate |
+| Reference Solutions sample (`JCA_Synthetic_RS_Layout.xlsx`), import | Accepted by the file gate; layout Reference Solutions; 100 read, 1 duplicate (`900000100` under `900000001`), 99 unique, 0 left out, 10 generated IDs (`ROW-0007` to `ROW-0088`, [documented rows](#the-reference-solutions-sample)) |
+| Reference Solutions sample, Phoenix fabrication owners brief | 25 eligible, 25 out, `900000001` first at 100. Export: Phone and Website filled, Email empty on every row |
 
 ## Phase 1 rules
 
