@@ -80,7 +80,7 @@ npm run build
 npm run test      # Vitest unit tests (TR-29)
 ```
 
-- Unit tests cover the Translator's import and cleaning (TR-29) and the three spec ranking walkthroughs (TR-30). Export and edge cases (TR-31) come next; everything else has no tests. There is no CI, so nothing runs them for you: run them before every commit, and still check each change by hand on the preview.
+- Unit tests cover the Translator's import and cleaning (TR-29), the three spec ranking walkthroughs (TR-30), the Reference Solutions sample (TR-35) and the spec edge cases, including formula safety in the export (TR-31). Everything else, the Translator's screens included, has no tests. There is no CI, so nothing runs them for you: run them before every commit, and still check each change by hand on the preview.
 - Tests sit beside the code as `*.test.ts`. `npm run test:watch` re-runs them on save. Translator fixtures and their rules: [translator/README.md](translator/README.md#tests).
 - Translator tests must lock in the expected results in [translator/README.md](translator/README.md#expected-results) and [../CLAUDE.md](../CLAUDE.md).
 - The walkthrough golden files (`src/features/translator/__fixtures__/walkthroughs/*.json`) are reviewed by hand, not regenerated. If a change makes them fail, don't edit them to fit: find out why first. Change one only on purpose, and say in the PR description which rows changed and why.

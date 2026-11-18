@@ -4,7 +4,7 @@ import { type ReactNode, useId, useState } from "react";
 import { buttonClasses } from "@/components/ui/button";
 import type { MappingRow } from "../import/describe-mapping";
 import type { ShortlistRow } from "../ranking";
-import { MISSING_SEPARATOR, missingFields } from "../ranking/missing";
+import { contactLines, MISSING_SEPARATOR, missingFields } from "../ranking/missing";
 import { REASON_TEXT } from "../ranking/reasons";
 import type { Text } from "../normalize/types";
 
@@ -93,8 +93,7 @@ type RowView = {
 function rowView(row: ShortlistRow, mapping: readonly MappingRow[]): RowView {
   const { record } = row;
   const r = record.normalized;
-  const email = known(r.email);
-  const contact = email !== null ? [email] : [...linesOf(r.phone), ...linesOf(r.website)];
+  const contact = contactLines(r);
 
   const executives = r.otherExecutives.flatMap((e) => {
     const line = [e.name, e.title].filter((part) => part !== null).join(", ");

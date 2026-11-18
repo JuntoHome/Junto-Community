@@ -524,7 +524,7 @@ Under it, a closed `<details>` "Why rows were filtered out" lists one line per `
 
 ## Results table
 
-The shortlist on the Results step (TR-22). Code: `ui/results-table.tsx`, inside `ui/results-step.tsx`, with `missingFields()` in `ranking/missing.ts`.
+The shortlist on the Results step (TR-22). Code: `ui/results-table.tsx`, inside `ui/results-step.tsx`, with `missingFields()` and `contactLines()` (the Contact fallback below, moved out of the table in TR-31 so it can be tested) in `ranking/missing.ts`.
 
 **Above the table:** the [counts summary](#counts-summary) (which replaced "Showing 40 of 100 matches."), an **Edit criteria** button that scrolls to the [criteria summary](#criteria-summary) and moves focus to its "Your criteria" heading, and [Pin by Record ID](#pin-and-omit). **Below it:** "Omitted by you (N)" with Restore. An empty shortlist shows the [no-results helper](#no-results-helper) instead of the table.
 
@@ -710,7 +710,7 @@ The Translator keeps everything for one session only (TR-28). Code: `ui/translat
 
 Unit tests run with Vitest: `npm run test` (TR-29). They sit beside the code as `*.test.ts` and run in Node, with no browser, no network and no random data. How to run them: [WAY-OF-WORKING.md](../WAY-OF-WORKING.md#testing).
 
-- **Covered:** import and cleaning (TR-29). Upload checks, file gate, parsing, header checks, cell values, formula-like text, normalizing, row checks and duplicate grouping, plus TR-04's Reference Solutions fixture row. The three spec walkthroughs (TR-30, `ranking/walkthroughs.test.ts`), through the whole chain from the sample's bytes. The [Reference Solutions sample](#the-reference-solutions-sample) (TR-35, `rs-sample.test.ts`): its 396 headers, that only mapped columns are filled and every value is invented, the import figures, every documented row, the Phoenix fabrication shortlist and the export's Phone, Website and empty Email. Export and other edge cases come with TR-31.
+- **Covered:** import and cleaning (TR-29). Upload checks, file gate, parsing, header checks, cell values, formula-like text, normalizing, row checks and duplicate grouping, plus TR-04's Reference Solutions fixture row. The three spec walkthroughs (TR-30, `ranking/walkthroughs.test.ts`), through the whole chain from the sample's bytes. The [Reference Solutions sample](#the-reference-solutions-sample) (TR-35, `rs-sample.test.ts`): its 396 headers, that only mapped columns are filled and every value is invented, the import figures, every documented row, the Phoenix fabrication shortlist and the export's Phone, Website and empty Email. The spec edge cases (TR-31, `edge-cases.test.ts`), each from a real file: a city not in the workbook (`no-value`, `No records are in Flagstaff. Try another city.`, Edit location), a required title with blank titles, the upload path through `loadWorkbook()` from a `File` (the sample and the Reference Solutions sample accepted; a copy with one cell changed and a copy re-saved with no edits refused by the file gate before parsing; a file over 2 MB refused at the size check), the Reference Solutions sample end to end (generated IDs and their warnings, other executives through to the export, no email and when Contact is missing, range-only sizes and the range fit rule, the job seeker brief with reasons from each record's own values, the Contact fallback), pins the ranking refuses (an excluded row, a grouped duplicate), and formula-like text in the export (every text cell a literal string with the Text format, no formula in the file, `assertNoFormulas()` throwing on a planted formula).
 - **Fixtures** live in `src/features/translator/__fixtures__/` and are built in code, never committed as binary workbooks, so every fixture can be read in review and a header change is a one-line diff:
   - `build-workbook.ts`: `buildXlsx({ sheets: [{ name, rows }] })` writes an `.xlsx` in memory with ExcelJS from plain arrays, with helpers for rich text, formula, hyperlink, error and date cells.
   - `records.ts`: invented rows and row builders for both layouts (`TST-` IDs, `Test Company 01` names, `.invalid` emails), and `seededShuffle(items, seed)`, a shuffle that gives the same order for the same seed.
@@ -722,11 +722,11 @@ Unit tests run with Vitest: `npm run test` (TR-29). They sit beside the code as 
 - **Fixtures are never allowlisted.** Tests call `parseWorkbook()` directly, past the [file gate](#file-gate). `import/file-gate.test.ts` checks that the allowlist has exactly the expected entries (the two samples), so adding one fails the tests until that list is changed on purpose.
 - The two committed samples are read from `docs/translator/` with `fs`, in tests only (`SAMPLE_PATH` and `RS_SAMPLE_PATH` in `records.ts`). Fixtures are invented: never copy rows from any real export into them.
 - App code never imports a test or a fixture, so neither reaches the build.
-- From the table below, the tests lock in the import figures (500 rows read, 0 issues, 499 unique with SYN-0500 grouped under SYN-0001), the altered copy rejected by the file gate, and the three walkthroughs (TR-30).
+- From the table below, the tests lock in the import figures (500 rows read, 0 issues, 499 unique with SYN-0500 grouped under SYN-0001), the altered copy rejected by the file gate, the three walkthroughs (TR-30), the Reference Solutions sample rows (TR-35) and the edge case rows (TR-31: city not in the workbook, required title, altered and re-saved copies).
 
 ## Expected results
 
-The first three rows (the spec walkthroughs) and the repeat row are locked in by `ranking/walkthroughs.test.ts` and the golden files in `src/features/translator/__fixtures__/walkthroughs/` ([Tests](#tests)). Scores in "Scores of the 100 eligible" are unrounded scores rounded to 2 decimals; the others are display scores.
+The first three rows (the spec walkthroughs) and the repeat row are locked in by `ranking/walkthroughs.test.ts` and the golden files in `src/features/translator/__fixtures__/walkthroughs/` ([Tests](#tests)). City not in the workbook, required title, the altered and re-saved copies and the Reference Solutions rows are locked in by `edge-cases.test.ts` (TR-31) and `rs-sample.test.ts` (TR-35). Scores in "Scores of the 100 eligible" are unrounded scores rounded to 2 decimals; the others are display scores.
 
 | Scenario | Expected |
 |---|---|
@@ -749,6 +749,7 @@ The first three rows (the spec walkthroughs) and the repeat row are locked in by
 | Any Excel export | Sheets `Shortlist`, then `Criteria` ([Sheet `Criteria`](#sheet-criteria)); Scoring version `1.0`, the same as `SCORING_VERSION`; Brief (JSON) parses back to `rankResult.brief` |
 | Title changed to Operations Manager in the criteria summary, then exported | Criteria sheet: `Prefer Fabrication, Operations Manager, 10 to 99 employees.` |
 | Altered copy of the workbook | Rejected by the file gate |
+| Copy opened and saved again with no edits | Rejected by the file gate, like any changed file |
 | Reference Solutions sample (`JCA_Synthetic_RS_Layout.xlsx`), import | Accepted by the file gate; layout Reference Solutions; 100 read, 1 duplicate (`900000100` under `900000001`), 99 unique, 0 left out, 10 generated IDs (`ROW-0007` to `ROW-0088`, [documented rows](#the-reference-solutions-sample)) |
 | Reference Solutions sample, Phoenix fabrication owners brief | 25 eligible, 25 out, `900000001` first at 100. Export: Phone and Website filled, Email empty on every row |
 

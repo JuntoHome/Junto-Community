@@ -4,10 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ExportSource } from "../export/criteria-rows";
 import { type CriteriaForm, EMPTY_CRITERIA_FORM } from "../criteria/from-form";
 import type { SearchBrief } from "../criteria/schema";
-import { checkWorkbookFile, type WorkbookFileInput } from "../import/check-file";
+import type { WorkbookFileInput } from "../import/check-file";
 import { describeMapping } from "../import/describe-mapping";
-import { checkAllowlist, FILE_GATE_MESSAGES, type GatedWorkbook } from "../import/file-gate";
-import type { ParseResult } from "../import/parse";
+import type { GatedWorkbook } from "../import/file-gate";
+import { loadWorkbook } from "../import/load";
 import { groupDuplicates } from "../normalize/duplicates";
 import { normalizeWorkbook } from "../normalize/normalize";
 import { type ImportState, summarizeImport } from "../normalize/summary";
@@ -35,9 +35,6 @@ import { isStepAvailable, STEPS, type StepId } from "./steps";
  * issue from both steps, sorted by row then code.
  */
 type LoadedWorkbook = GatedWorkbook & ImportState;
-
-/** Shown when the parser's code can't be downloaded. */
-const PARSER_UNAVAILABLE = "The Translator couldn't finish loading. Check your connection, reload the page and try again.";
 
 /** What a workbook input holds, as a list: one File, a FileList or an array. */
 function toFiles(input: WorkbookFileInput): readonly File[] {
@@ -117,57 +114,26 @@ export function TranslatorWizard({
   }
 
   /**
-   * Checks the size and type first, then reads the file once, runs the file gate on those bytes
-   * and parses them; on a problem it stays on Upload and shows why.
+   * Loads the workbook with `loadWorkbook()` (size and type checks, one read, the file gate,
+   * the parser), then cleans, checks and groups its rows. On a problem it stays on Upload and
+   * shows why.
    */
   async function checkAndLoad(input: WorkbookFileInput) {
     const thisAttempt = ++attempt.current;
     // Cleared first so the same message is announced again if the next file has the same problem.
     setFileError(null);
-    const check = await checkWorkbookFile(input);
-    if (thisAttempt !== attempt.current) return;
-    if (!check.ok) {
-      setFileError(check.message);
+    const isCurrent = () => thisAttempt === attempt.current;
+    const loaded = await loadWorkbook(input, isCurrent);
+    // Logged even if a newer choice has started, as an unexpected failure is worth knowing about.
+    if (loaded && !loaded.ok && loaded.log) logTranslatorError(loaded.log);
+    if (!loaded || !isCurrent()) return;
+    if (!loaded.ok) {
+      setFileError(loaded.message);
       return;
     }
-    const file = check.file;
-    // The only full read of the file. The size check above caps it at 2 MB.
-    let buffer: ArrayBuffer;
-    try {
-      buffer = await file.arrayBuffer();
-    } catch {
-      // The browser couldn't read it (for example, the file changed on disk after it was chosen).
-      logTranslatorError("file-unreadable");
-      if (thisAttempt === attempt.current) setFileError(FILE_GATE_MESSAGES.unreadable);
-      return;
-    }
-    if (thisAttempt !== attempt.current) return;
-    const gate = await checkAllowlist(buffer);
-    if (thisAttempt !== attempt.current) return;
-    if (!gate.ok) {
-      setFileError(gate.message);
-      return;
-    }
-    // The layout comes from the headers, never from gate.entry.layout.
-    let parsed: ParseResult;
-    try {
-      // Loaded on first use, so the workbook library isn't part of the page's initial download.
-      const { parseWorkbook } = await import("../import/parse");
-      parsed = await parseWorkbook(buffer);
-    } catch {
-      // parseWorkbook never throws, so only the download of its code can fail here.
-      logTranslatorError("parser-unavailable");
-      if (thisAttempt === attempt.current) setFileError(PARSER_UNAVAILABLE);
-      return;
-    }
-    if (thisAttempt !== attempt.current) return;
-    if (!parsed.ok) {
-      // The hint, when there is one, goes on its own line under the message.
-      setFileError(parsed.hint ? `${parsed.message}\n${parsed.hint}` : parsed.message);
-      return;
-    }
+    const { file, buffer, entry, parsed } = loaded.workbook;
     // Values are cleaned for matching here; the originals stay on each row for display and export.
-    const normalized = normalizeWorkbook(parsed.workbook);
+    const normalized = normalizeWorkbook(parsed);
     // Then rows with problems are flagged; duplicate Record IDs are left out of `kept`.
     const validation = validateRows(normalized.rows, normalized.layout);
     // Then exact duplicates among the kept rows are folded into the earliest one; look-alikes are flagged.
@@ -175,7 +141,7 @@ export function TranslatorWizard({
     const issues = [...validation.issues, ...duplicateIssues].sort(compareIssues);
     // `buffer` is kept read-only: only the gate and the parser above ever read it (TR-27).
     // The session is new (a second workbook starts a new one), so later steps have nothing to reset.
-    setWorkbook({ file, buffer, entry: gate.entry, parsed: normalized, validation, records, duplicateCount, issues });
+    setWorkbook({ file, buffer, entry, parsed: normalized, validation, records, duplicateCount, issues });
     setDone(new Set<StepId>(["upload"]));
     focusHeading.current = true;
     setCurrent("preview");
