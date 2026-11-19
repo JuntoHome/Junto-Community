@@ -218,7 +218,7 @@ export function ResultsStep({
         records={records}
         brief={results?.brief ?? pendingBrief}
         form={pendingForm}
-        confirmed={results !== null}
+        afterRanking={results !== null}
         onSave={onSave}
         onConfirm={() => {
           focusResults.current = true;
