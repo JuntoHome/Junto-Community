@@ -681,20 +681,20 @@ The shortlist on the Results step (TR-22). Code: `ui/results-table.tsx`, inside 
 
 **Above the table:** the [counts summary](#counts-summary), an **Edit criteria** button that scrolls to the [criteria summary](#criteria-summary) and moves focus to its "Your criteria" heading, and [Pin by Record ID](#pin-and-omit). **Below it:** "Omitted by you (N)" with Restore, then **Continue to export**. An empty shortlist shows the [no-results helper](#no-results-helper) instead of the table.
 
-**Columns**, one row per business:
+**Columns**, one row per business (TR-36 moved Contact and Missing into Details, so Why and Actions are always visible):
 
 | Column | Shows |
 |---|---|
-| Rank | `rank`, and a `Pinned by user` badge for a pinned row |
+| Rank | `rank`, and under it a `Pinned by user` badge for a pinned row |
 | Company | The company name |
 | Location | `City, ST`, or the one part that is known |
 | Name | The main contact's name |
 | Title | The main contact's title |
-| Contact | See the fallback order below |
 | Score | `displayScore` (rounded) |
 | Why | The row's [`reasons`](#match-reasons), one per line, exactly as ranking wrote them |
-| Missing | `missingFields()` joined with ", ", or `None` |
-| Actions | Pin or Unpin, Omit, Details |
+| Actions | Pin or Unpin, Omit, Details, stacked |
+
+**In Details, not in the table:** Contact (see the fallback order below) and Missing (`missingFields()` joined with ", ", or `None`). The phone cards still show both in the card itself.
 
 A value the row doesn't have shows `Unknown`, in a muted style but as real text, so it doesn't rely on colour.
 
@@ -711,15 +711,25 @@ A value the row doesn't have shows `Unknown`, in a muted style but as real text,
 
 **Details** (in the table, a button that opens a row under that row, with `aria-expanded` and `aria-controls`; on a card, a `<details>`), showing only what has a value:
 
+- In the table only, first: Contact and Missing, always shown (`Unknown` or `None` when empty)
 - Other executives, one `Name, Title` per line, all of them
 - Industry (NAICS): the NAICS description
 - Employee range
 - Address: address and ZIP
 - Where the row is in the file: `Row 2 in your file`, plus `Also in your file as SYN-0500 (row 501)` when exact duplicates were [grouped](#duplicate-grouping) into it
 
-**Desktop and phone.** From the `md` breakpoint up the shortlist is a `<table>` with a visually hidden caption "Your shortlist", `<th scope="col">` headers and the company as each row's header. Below `md` it is a list of cards with the same data: rank, company and score at the top, then location, name, title, contact, reasons and missing, then Details, then Pin and Omit. Both are built from one view of each row, so they can't differ. Both are rendered and CSS hides one; a hidden one (`display: none`) is left out of the accessibility tree. At most 100 rows, so the extra markup is small.
+**Desktop and phone.** From the `md` breakpoint up the shortlist is a `<table>` with a visually hidden caption "Your shortlist", `<th scope="col">` headers and the company as each row's header. Below `md` it is a list of cards with the same data: rank, company and score at the top, then location, name, title, contact, reasons and missing, then Details, then Pin and Omit (the cards keep Contact and Missing in the card body; only the table moved them into Details). Both are built from one view of each row, so they can't differ. Both are rendered and CSS hides one; a hidden one (`display: none`) is left out of the accessibility tree. At most 100 rows, so the extra markup is small.
 
-**Width.** At 400 px and 375 px nothing scrolls the page sideways: long values (emails, websites) wrap. On wider screens the table scrolls inside its own box when it is wider than the page; the box is focusable, so keyboard users can scroll it, and an open Details row stays at the box's left edge. The 10 columns are wider than the admin content area even at 1280 px, so on the admin page the right-hand columns (Why, Missing, Actions) are reached by scrolling that box.
+**Width.** At 400 px and 375 px nothing scrolls the page sideways: long values (emails, websites) wrap.
+
+**The fit rule (TR-36): at a 1280 px window and wider, the table fits its box with no sideways scrolling**, so every column, Why and Actions included, is visible at first glance. How:
+
+- The table uses a fixed layout (`table-fixed`) with a `<colgroup>`, so one long value wraps instead of widening the table.
+- Every column but Why has a set width, just wide enough for its header and an ordinary word (a city, "Operations", the "Pinned" badge, the Details button), so ordinary words don't break in the middle: Rank `w-20`, Company `w-26`, Location `w-26`, Name `w-24`, Title `w-26`, Score `w-18`, Actions `w-28`. Why has no width, so it gets the rest, the most of any column: 316 px (32%) at 1440 px and wider (the admin content area stops growing there), 172 px (20%) at 1280 px, where each reason wraps onto two lines.
+- Text cells wrap (`wrap-break-word`); Contact in Details uses `wrap-anywhere`, so a long website breaks anywhere. Only a single word wider than its column (a very long company name word, a website) breaks in the middle.
+- The table has `min-w-208` (832 px), which keeps Why at least 160 px wide. The box is 844 px at a 1280 px window, so the table fits there; below that (1024 px, 768 px) the table scrolls inside its own box. The box is focusable, so keyboard users can scroll it, and an open Details row stays at the box's left edge. The page itself never scrolls sideways.
+
+To check: on the Results step, in DevTools, `const w = document.querySelector('table')?.parentElement; [w.scrollWidth, w.clientWidth, w.scrollWidth <= w.clientWidth]` returns `true` at 1280 px and wider. If a column is added, re-check this at 1280 px; the column widths leave no room to spare there.
 
 **Accessibility.** Every button is at least 44 px high and names its record for screen readers ("Omit SYN-0001"). Focus after Pin, Unpin, Omit and Restore follows [Pin and omit](#pin-and-omit).
 
