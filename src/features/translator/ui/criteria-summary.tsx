@@ -25,7 +25,10 @@ import {
 // Every string the summary shows. Plain language, no em-dashes.
 const TEXT = {
   heading: "Your criteria",
+  // Before Confirm and rank.
   intro: "Check these before ranking. Change any item here: a change applies only when you save it.",
+  // Once results show, when a Save re-ranks straight away.
+  introAfterRanking: "Your shortlist uses these criteria. Change any item here: the list updates when you save it.",
   confirmHint: "Nothing is ranked until you confirm.",
   confirm: "Confirm and rank",
   change: "Change",
@@ -156,7 +159,7 @@ export function CriteriaSummary({
   records,
   brief,
   form,
-  confirmed,
+  afterRanking,
   onSave,
   onConfirm,
 }: {
@@ -164,8 +167,11 @@ export function CriteriaSummary({
   records: readonly GroupedRecord[];
   brief: SearchBrief;
   form: CriteriaForm;
-  /** Whether results are showing. A Save then re-ranks, and Confirm and rank is hidden. */
-  confirmed: boolean;
+  /**
+   * Whether results are showing. Required, so every caller says which. A Save then re-ranks,
+   * Confirm and rank is hidden, and the intro says the shortlist uses these criteria.
+   */
+  afterRanking: boolean;
   onSave: (brief: SearchBrief, form: CriteriaForm) => void;
   onConfirm: () => void;
 }) {
@@ -242,7 +248,7 @@ export function CriteriaSummary({
       return;
     }
     onSave(result.brief, editing.draft);
-    setAnnouncement((a) => ({ text: confirmed ? TEXT.updatedAndRefreshed : TEXT.updated, count: a.count + 1 }));
+    setAnnouncement((a) => ({ text: afterRanking ? TEXT.updatedAndRefreshed : TEXT.updated, count: a.count + 1 }));
     close(editing.id);
   }
 
@@ -257,7 +263,7 @@ export function CriteriaSummary({
         >
           {TEXT.heading}
         </h3>
-        <p className="text-muted">{TEXT.intro}</p>
+        <p className="text-muted">{afterRanking ? TEXT.introAfterRanking : TEXT.intro}</p>
       </div>
 
       <ul className="flex flex-col divide-y divide-sand rounded-xl border border-sand">
@@ -312,7 +318,7 @@ export function CriteriaSummary({
         })}
       </ul>
 
-      {!confirmed && (
+      {!afterRanking && (
         <div className="flex flex-col items-start gap-3">
           <p className="text-muted">{TEXT.confirmHint}</p>
           <button type="button" onClick={onConfirm} className={buttonClasses("navy", "md", "cursor-pointer")}>

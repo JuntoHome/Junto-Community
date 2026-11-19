@@ -2,7 +2,7 @@
 
 The project's task status in one place. GitHub issues are the source of truth for Translator work; this file summarises them. Update it when a ticket changes state.
 
-**As of:** Nov 18, 2026.
+**As of:** Nov 19, 2026.
 
 **Sources:** GitHub issues #1 to #35 (milestone "Data Axle Translator Phase 1"), [JCA_CMS_Plan.md](JCA_CMS_Plan.md) for CMS tickets, and the commit history for completion evidence.
 
@@ -100,6 +100,7 @@ Merged into `translator` (not yet on `main`, the live site). The evidence is the
 | TR-01 | Staging environment and project docs | Docs merged into `translator` (PR #36); Vercel staging alias and Preview variables pending with the project lead | [#1](https://github.com/JuntoHome/Junto-Community/issues/1), [PR #36](https://github.com/JuntoHome/Junto-Community/pull/36) |
 | TR-34 | Phase 1 walkthrough with Paul | In progress. Part A (before the meeting) merged into `translator` (PR #73): `docs/translator/DEMO-SCRIPT.md` (25-minute demo script for Paul, with prep steps, known limits and a fallback) and `docs/translator/PHASE1-REVIEW.md` (22 decisions for Paul and the meeting notes template, answers empty). Docs only. Part B (after the meeting) fills in the review and drafts the follow-up issues. Paul's confirmation **not yet recorded** | [#34](https://github.com/JuntoHome/Junto-Community/issues/34), [PR #73](https://github.com/JuntoHome/Junto-Community/pull/73) |
 | TR-32 | Manual QA on staging | In progress. `docs/translator/QA-CHECKLIST.md` (the checklist: 11 sections with expected results, bug report and results comment templates) in review. Every step that can run without staging, Safari or a phone was pre-checked locally on the `/dev-translator` page in headless Chrome, and both exports opened in desktop Excel; no bugs found. The run on staging (Chrome, Safari, a phone, Google Sheets) needs a person with Vercel and admin access, and its results comment on #32 is **not yet posted** | [#32](https://github.com/JuntoHome/Junto-Community/issues/32) |
+| TR-37 | Criteria box on Results says "Check these before ranking" | In review (PR #79). `CriteriaSummary`'s required `confirmed` prop renamed `afterRanking`; once results show, the intro reads "Your shortlist uses these criteria. Change any item here: the list updates when you save it." The original text stays before Confirm and rank. Checked locally on the `/dev-translator` page in headless Chrome with the sample: both texts, Save re-ranks straight away (SYN-0006 first, no confirm). Branch preview **Unverified** (behind Vercel login) | [#78](https://github.com/JuntoHome/Junto-Community/issues/78), [PR #79](https://github.com/JuntoHome/Junto-Community/pull/79) |
 
 ## Pending
 
