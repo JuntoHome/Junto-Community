@@ -30,7 +30,7 @@ Do this the day before, and again 15 minutes before the call.
 4. **Make the refused file for part 8:** copy `JCA_Synthetic_Contacts.xlsx` (from `docs/translator/`) to your desktop as `Sample_resaved.xlsx`, open the copy in Excel, change nothing, save and close. Keep it on the desktop. It is still fictional data, just a different file now.
 5. **Prepare the fallback material:** download the business owner and role change exports, and take screenshots of the Preview step, the top of the Results step, SYN-0001's Details row, the Export step and both sheets of the download. Fictional data only: make sure nothing else is visible in the screenshots.
 6. **Tidy the screen you will share:** close email, chat and other tabs, and turn off notifications. Staging is logged in to the live admin area.
-7. **Width:** the results table has 10 columns and is wider than the admin page, so the Why, Missing and Actions columns are reached by scrolling inside the table. A wide window, or browser zoom at 80 to 90%, keeps the Why column in view.
+7. **Width:** at a 1280 px window or wider the results table fits the admin page, so the Why and Actions columns are visible without scrolling (TR-36). Contact and Missing are in each row's Details. On a narrower window the table scrolls inside its own box.
 
 > **Staging uses the live database.** The Translator itself saves nothing, but the rest of the admin area on staging is live. Don't open profile editing, and don't use the subscribe form, during the demo.
 
@@ -88,7 +88,7 @@ The scenario: a business owner in Phoenix wants fabrication companies, ideally r
 6. **Click** "Confirm and rank".
    **Paul should see** "From your file to your shortlist": 500 rows read from your file, 0 rows left out because of problems in the file, 1 duplicate grouped, 499 unique records, 0 removed by your Leave out rules, 399 didn't meet your must-haves (0 only because a value was blank), **100 match your criteria**, 60 more matches not shown (list size 40), **40 in your shortlist and export**.
    **Say:** "Every row is accounted for, from the 500 in the file to the 40 on the list. 100 businesses are in Phoenix; we show the best 40."
-7. **Point at row 1** of the table (scroll the table sideways for the Why column).
+7. **Point at row 1** of the table and its Why column.
    **Paul should see:** rank 1, **SYN-0001**, Synthetic Company 0001, Phoenix, AZ, score **100**, Missing "None", and four reasons: "Location: Phoenix, AZ (required)", "Industry: Fabrication (preferred)", "Title: Owner (preferred)", "Company size: 25 employees (preferred)".
    **Say:** "It's first because it matches everything we asked for, and it says so in its own words. Rows 2 to 5 score 86: they match fabrication and owner but not the company size, and their reasons show that. The score is plain arithmetic, not AI: the same file and the same choices always give the same list."
 8. **Click** "Details" on SYN-0001.
@@ -152,7 +152,7 @@ Only if "Load Reference Solutions sample" worked when you checked it before the 
    **Paul should see:** Layout Reference Solutions, sheet "Synthetic Detail Export", Rows read 100, Duplicates grouped 1, Unique records 99, Rows with warnings 10.
    **Say:** "Real Data Axle exports from Reference Solutions have 396 columns. This is a fictional file built in exactly that shape, to prove the tool reads it. The 10 warnings are rows with no ID number, so the tool gave them a stand-in ID such as ROW-0007 and says so."
 2. Run the business owner criteria from part 2 (Phoenix, AZ; Fabrication, Owner, 10 to 99; 40).
-   **Paul should see:** 25 match, 25 in the shortlist, ID 900000001 first at 100. The Contact column shows a phone number and a website.
+   **Paul should see:** 25 match, 25 in the shortlist, ID 900000001 first at 100. Details on row 1 shows a phone number and a website under Contact.
    **Say:** "Real exports have no email column, so the list shows phone and website instead. One thing we couldn't check without real data is how real exports word employee ranges." (Question 13.)
 
 ## 8. Safety (1 min)

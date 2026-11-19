@@ -162,20 +162,39 @@ function Missing({ missing }: { missing: readonly string[] }) {
   return missing.length === 0 ? <>{TEXT.none}</> : <>{missing.join(MISSING_SEPARATOR)}</>;
 }
 
-function PinnedBadge() {
+/** `wrap`: the badge may break onto more lines, for the table's narrow Rank column. */
+function PinnedBadge({ wrap = false }: { wrap?: boolean }) {
   return (
-    <span className="inline-block rounded-md bg-navy px-2 py-0.5 text-sm font-semibold whitespace-nowrap text-white">
+    <span
+      className={`inline-block rounded-md bg-navy px-2 py-0.5 text-sm font-semibold text-white ${wrap ? "wrap-break-word" : "whitespace-nowrap"}`}
+    >
       {REASON_TEXT.pinned}
     </span>
   );
 }
 
-/** A row's Details: the extra items that have a value, then where the row is in the file. */
-function DetailsContent({ view }: { view: RowView }) {
+/**
+ * A row's Details: the extra items that have a value, then where the row is in the file. The
+ * table has no Contact or Missing column (TR-36), so its Details start with those two
+ * (`withContactAndMissing`); a card shows them in its body instead.
+ */
+function DetailsContent({ view, withContactAndMissing = false }: { view: RowView; withContactAndMissing?: boolean }) {
   return (
     <div className="flex flex-col gap-3">
-      {view.details.length > 0 && (
+      {(withContactAndMissing || view.details.length > 0) && (
         <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[auto_1fr]">
+          {withContactAndMissing && (
+            <>
+              <dt className="font-semibold text-navy">{TEXT.columns.contact}</dt>
+              <dd className="min-w-0 wrap-anywhere text-ink">
+                <Lines lines={view.contact} fallback={<Unknown />} />
+              </dd>
+              <dt className="font-semibold text-navy">{TEXT.columns.missing}</dt>
+              <dd className="min-w-0 wrap-break-word text-ink">
+                <Missing missing={view.missing} />
+              </dd>
+            </>
+          )}
           {view.details.map((item) => (
             <div key={item.label} className="contents">
               <dt className="font-semibold text-navy">{item.label}</dt>
@@ -234,8 +253,32 @@ function PinOmitButtons({
   );
 }
 
-const th = "px-3 py-3 text-sm font-bold tracking-[0.08em] text-slate uppercase";
-const td = "px-3 py-3 align-top";
+/**
+ * The table's columns, in order, with their widths for the fixed table layout (TR-36). The fixed
+ * layout makes the table keep to its box: one long value wraps instead of widening it. Contact
+ * and Missing are in each row's Details instead, so Why and Actions fit without sideways
+ * scrolling from 1280px up.
+ *
+ * Every column but Why has a set width, just wide enough for its header and an ordinary word
+ * (a city, "Synthetic", "Operations", the "Pinned" badge, the Details button), so words don't
+ * break in the middle. Why has no width, so it gets the rest: the most of any column.
+ *
+ * The table's `min-w-208` (832px) keeps Why at least 160px wide. The box is wider than that
+ * from 1280px up (844px there), so the table fits; on narrower screens it scrolls inside its box.
+ */
+const TABLE_COLUMNS = [
+  { key: "rank", width: "w-20" },
+  { key: "company", width: "w-26" },
+  { key: "location", width: "w-26" },
+  { key: "name", width: "w-24" },
+  { key: "title", width: "w-26" },
+  { key: "score", width: "w-18" },
+  { key: "why", width: "" },
+  { key: "actions", width: "w-28" },
+] as const satisfies readonly { key: keyof typeof TEXT.columns; width: string }[];
+
+const th = "px-2 py-3 text-sm font-bold tracking-[0.08em] text-slate uppercase";
+const td = "px-2 py-3 align-top";
 
 /**
  * The shortlist (TR-22): a table from `md` up and stacked cards below it, both built from the
@@ -274,7 +317,8 @@ export function ResultsTable({
   return (
     <>
       {/*
-        Desktop: a table that scrolls inside its own box when it is wider than the page.
+        Desktop: a table that fits its box from 1280px up (see TABLE_COLUMNS) and, below that,
+        scrolls inside its own box, so it never widens the page.
         `relative` keeps the buttons' screen reader text (absolutely positioned) inside the box,
         so it can't widen the page.
       */}
@@ -284,15 +328,20 @@ export function ResultsTable({
         tabIndex={0}
         className="relative hidden overflow-x-auto rounded-xl border border-sand [contain:inline-size] md:block"
       >
-        <table className="w-full min-w-240 text-left text-base">
+        <table className="w-full min-w-208 table-fixed text-left text-base">
           <caption id={captionId} className="sr-only">
             {TEXT.caption}
           </caption>
+          <colgroup>
+            {TABLE_COLUMNS.map((column) => (
+              <col key={column.key} className={column.width} />
+            ))}
+          </colgroup>
           <thead className="border-b border-sand bg-ivory">
             <tr>
-              {Object.values(TEXT.columns).map((label) => (
-                <th key={label} scope="col" className={th}>
-                  {label}
+              {TABLE_COLUMNS.map((column) => (
+                <th key={column.key} scope="col" className={th}>
+                  {TEXT.columns[column.key]}
                 </th>
               ))}
             </tr>
@@ -308,30 +357,24 @@ export function ResultsTable({
                   <td className={`${td} text-ink`}>
                     <div className="flex flex-col items-start gap-1">
                       <span className="font-semibold">{view.rank}</span>
-                      {view.pinned && <PinnedBadge />}
+                      {view.pinned && <PinnedBadge wrap />}
                     </div>
                   </td>
-                  <th scope="row" className={`${td} min-w-36 font-semibold wrap-break-word text-navy`}>
+                  <th scope="row" className={`${td} font-semibold wrap-break-word text-navy`}>
                     <Value value={view.company} />
                   </th>
-                  <td className={`${td} whitespace-nowrap text-ink`}>
+                  <td className={`${td} wrap-break-word text-ink`}>
                     <Value value={view.location} />
                   </td>
-                  <td className={`${td} min-w-28 wrap-break-word text-ink`}>
+                  <td className={`${td} wrap-break-word text-ink`}>
                     <Value value={view.name} />
                   </td>
-                  <td className={`${td} min-w-28 wrap-break-word text-ink`}>
+                  <td className={`${td} wrap-break-word text-ink`}>
                     <Value value={view.title} />
                   </td>
-                  <td className={`${td} wrap-break-word text-ink`}>
-                    <Lines lines={view.contact} fallback={<Unknown />} />
-                  </td>
                   <td className={`${td} font-semibold text-ink`}>{view.score}</td>
-                  <td className={`${td} min-w-64 text-[15px] text-ink`}>
+                  <td className={`${td} text-[15px] wrap-break-word text-ink`}>
                     <Lines lines={view.reasons} fallback={null} />
-                  </td>
-                  <td className={`${td} min-w-28 text-ink`}>
-                    <Missing missing={view.missing} />
                   </td>
                   <td className={td}>
                     <div className="flex flex-col items-stretch gap-2">
@@ -350,10 +393,10 @@ export function ResultsTable({
                   </td>
                 </tr>
                 <tr id={detailsId} hidden={!isOpen} className="bg-ivory">
-                  <td colSpan={Object.keys(TEXT.columns).length} className="px-3 py-4">
+                  <td colSpan={TABLE_COLUMNS.length} className="px-3 py-4">
                     {/* Sticky, so it shows at the box's left edge even when the table is scrolled sideways. */}
                     <div className="sticky left-3 max-w-xl">
-                      <DetailsContent view={view} />
+                      <DetailsContent view={view} withContactAndMissing />
                     </div>
                   </td>
                 </tr>
