@@ -48,7 +48,7 @@ A review as of November 2026. Nothing here has been fixed unless it says so. Ite
 | # | Concern | Detail |
 |---|---|---|
 | 1 | Outdated dependencies with advisories | See the first table |
-| 2 | Rate limiting is best effort | In-memory per serverless instance; keyed on `x-forwarded-for`. Real brute-force protection depends on Supabase Auth's own limits |
+| 2 | Rate limiting is best effort | In-memory per serverless instance; keyed on `x-forwarded-for`. Real brute-force protection depends on Supabase Auth's own limits. The Translator's AI route (`/api/translator/ai`, TR-39) uses the same limiter, 30 requests per 10 minutes per admin user id: also per instance, so an admin whose calls reach several instances can make more. It is a cost guard, not a hard cap |
 | 3 | No multi-factor authentication | A single password protects the ability to publish to the public site |
 | 4 | No security headers | `next.config.ts` sets no Content-Security-Policy or frame-ancestors rule, so the admin could be framed by another site |
 | 5 | Session cookies may be readable by scripts | `server.ts` passes no cookie options, and `@supabase/ssr` does not default to `HttpOnly`. Check in browser dev tools. No script-injection path was found, which limits the risk |

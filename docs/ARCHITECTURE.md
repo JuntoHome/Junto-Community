@@ -18,11 +18,13 @@ How the system is built: its parts, how they connect, where code lives, and how 
                          │   requireAdmin() ─── cookie session ───▶ │   Auth ──────┼───┼─▶ Resend SMTP
                          │                                          │   Storage    │   │
   Vercel Cron (hourly) ─▶│  /api/cron/keep-alive ── service role ─▶ └──────────────┘   │
+                         │                                                             │
+  Admin ──fetch (JSON)──▶│  proxy.ts ─▶ /api/translator/ai ─ getAdmin() ─▶ OpenAI API ─┼─▶ OpenAI
                          └─────────────────────────────────────────────────────────────┘
   Visitor ──"Register"──▶ Eventbrite (a link only)
 ```
 
-One Next.js application does everything. Server Actions are the backend; Supabase is the database, identity provider and file store. The Data Axle Translator adds a browser-only path that never reaches the server; its Phase 2 will add one server route for AI calls (see [The Translator](#the-translator)).
+One Next.js application does everything. Server Actions are the backend; Supabase is the database, identity provider and file store. The Data Axle Translator adds a browser-only path that never reaches the server; its Phase 2 adds one server route for AI calls, `/api/translator/ai` (see [The Translator](#the-translator)).
 
 ## Technology stack
 
@@ -86,7 +88,7 @@ src/features/<feature>/
   *.tsx           UI
 ```
 
-[src/proxy.ts](../src/proxy.ts) is Next.js 16's middleware. It redirects `/bi101` casings to `/BI101`, lowercases profile slugs, and refreshes the admin session cookie on `/admin` and `/preview`. It is **not** the access check; that is `requireAdmin()` (see [AUTHENTICATION.md](AUTHENTICATION.md)).
+[src/proxy.ts](../src/proxy.ts) is Next.js 16's middleware. It redirects `/bi101` casings to `/BI101`, lowercases profile slugs, and refreshes the admin session cookie on `/admin`, `/preview` and the Translator's AI route `/api/translator/ai` (the redirects never apply to those). It is **not** the access check; that is `requireAdmin()` in pages and actions, and `getAdmin()` in the AI route (see [AUTHENTICATION.md](AUTHENTICATION.md)).
 
 ### Two content pipelines
 
@@ -140,7 +142,8 @@ src/
     admin/              The CMS: its own layout, not indexed.
       login/, forgot-password/, set-password/   Open to logged-out visitors.
       (protected)/      Everything else. The layout checks for an admin; each page and action also calls requireAdmin().
-    api/cron/keep-alive/  The only HTTP endpoint.
+    api/cron/keep-alive/  The hourly Supabase keep-alive (Vercel Cron).
+    api/translator/ai/  The Translator's AI route (Phase 2, admins only). Thin: the work is in features/translator/ai/.
   content/              Code content as typed TypeScript data (site, events, people, pages, reviews).
   lib/content/          The content API (index.ts), ContentSource interface, local source, content types.
   components/
@@ -153,10 +156,10 @@ src/
     subscribe/          Mailing list: schema, action, repository, notification email, form.
     admin-auth/         Login, logout, forgot and set password.
     profiles/           "Who Can Help?": public and admin queries, form, actions, repository, logo storage.
-    translator/         Data Axle Translator: import/, normalize/, criteria/, ranking/, export/, ui/ (see The Translator below).
+    translator/         Data Axle Translator: import/, normalize/, criteria/, ranking/, export/, ai/, ui/ (see The Translator below).
   lib/
     auth.ts             getAdmin(), requireAdmin().
-    rate-limit.ts       In-memory per-IP attempt limit.
+    rate-limit.ts       In-memory attempt limit (per IP for login and subscribe, per admin for the AI route).
     supabase/           The three clients, config, and the session refresh used by proxy.ts.
     seo.ts              Page metadata and Event JSON-LD.
   proxy.ts              Redirects and session refresh.
@@ -173,7 +176,7 @@ public/translator/      The two Translator sample workbooks, byte-identical copi
 | File | Responsibility | Careful |
 |---|---|---|
 | `src/proxy.ts` | Redirects and session refresh | Has a `matcher`; new gated or redirected URLs must be added to it |
-| `src/lib/auth.ts` | `getAdmin()`, `requireAdmin()` | Call `requireAdmin()` first in every admin page and action |
+| `src/lib/auth.ts` | `getAdmin()`, `requireAdmin()` | Call `requireAdmin()` first in every admin page and action. The AI route calls `getAdmin()` so it can return `401` JSON |
 | `src/lib/content/types.ts` | The code-content model | The contract between content and components |
 | `src/lib/rate-limit.ts` | In-memory per-IP limiter | Per serverless instance, so best effort only |
 | `src/components/ui/rich-text.tsx` | Mini-Markdown renderer for both pipelines | Builds React elements and allows only http(s), mailto and tel links; keep that if replacing it |
@@ -229,6 +232,18 @@ Built at deploy time. `page.tsx` calls `getPage("home")` → `lib/content` → `
 
 In the database, the single `UPDATE` passes through RLS (`is_admin()`), the audit trigger, the unique slug index and the completeness constraint. How refusals are reported: [API-DOCUMENTATION.md](API-DOCUMENTATION.md#errors-from-the-database).
 
+### Translator AI call: `POST /api/translator/ai`
+
+`proxy.ts` refreshes the admin session first. `route.ts` builds the real dependencies and calls `handleAiRequest()` in `features/translator/ai/handle-request.ts`:
+
+1. `getAdmin()`: none gives `401` JSON (not a redirect, so the browser's `fetch` can read it).
+2. A foreign `Origin` gives `403`. AI switched off (`aiEnabled()`) gives `503`.
+3. Body: JSON only, 100 KB at most, checked with `aiRequestSchema`; then the message limits (`413`).
+4. Rate limit: 30 requests per 10 minutes per admin (`429`).
+5. The capability (`interview.ts` or `intro.ts`) calls OpenAI through `client.ts`, with a 20-second limit (`504` on timeout, `502` on any other failure).
+
+Nothing is stored and nothing is logged except `translator_ai_<code>`. Statuses and messages: [API-DOCUMENTATION.md](API-DOCUMENTATION.md#post-apitranslatorai).
+
 ### Error handling
 
 | Tier | Mechanism | User sees |
@@ -245,8 +260,8 @@ There is no `error.tsx` for the public site.
 The Data Axle Translator (Phase 1) is an admin tool at `/admin/translator` that turns a business contacts workbook into a ranked, explained shortlist and an Excel download. Its architecture differs from the rest of the app:
 
 - **Browser only.** Parsing, cleaning, ranking and export run in the browser. No rows go to a Server Action, Supabase, browser storage or the logs, and all state lives in one React component for one session.
-- **Phase 2 route (not built yet).** Chat with AI will call one admin-only route, `/api/translator/ai`, which receives only the file summary and the intro fields of one chosen business, never full rows, and stores and logs nothing. Details: [translator/README.md](translator/README.md#phase-2).
-- **Folders** in `src/features/translator/`: `import/` (file checks, hash gate, parse, layout mappings), `normalize/` (clean, check, group duplicates), `criteria/` (the one `SearchBrief` schema), `ranking/` (filter, score, sort, reasons, pin and omit), `export/` (the `.xlsx`) are plain TypeScript with no React; `ui/` holds the components.
+- **Phase 2 route (built in TR-39, chat UI not built yet).** Chat with AI calls one admin-only route, `/api/translator/ai`, which receives only the file summary and the intro fields of one chosen business, never full rows, and stores and logs nothing. Its AI instructions are placeholders until TR-41 and TR-48. Flow: [Translator AI call](#translator-ai-call-post-apitranslatorai). Details: [translator/README.md](translator/README.md#the-ai-route).
+- **Folders** in `src/features/translator/`: `import/` (file checks, hash gate, parse, layout mappings), `normalize/` (clean, check, group duplicates), `criteria/` (the one `SearchBrief` schema), `ranking/` (filter, score, sort, reasons, pin and omit), `export/` (the `.xlsx`) are plain TypeScript with no React; `ai/` (Phase 2) holds the AI route's logic, and its `client.ts` is the only server-only file; `ui/` holds the components.
 
 ```text
 workbook ─▶ import/ ─▶ normalize/ ─▶ ranking/ (with the criteria/ SearchBrief) ─▶ ui/ results ─▶ export/ Excel

@@ -20,7 +20,7 @@ Every setting the app depends on: environment variables, and the settings that e
 
 `BUILT_AT` is set by `next.config.ts` at build time; don't set it yourself.
 
-The Translator's Phase 1 uses no environment variables. The three Phase 2 variables were added in TR-38; no code reads them yet. They will be read only in `src/features/translator/ai/client.ts` ([translator/PHASE2-CODE-GUIDE.md](../translator/PHASE2-CODE-GUIDE.md)). Chat with AI shows only when `OPENAI_API_KEY` is set and `TRANSLATOR_AI` is not `"off"`.
+The Translator's Phase 1 uses no environment variables. The three Phase 2 variables were added in TR-38. Since TR-39 they are read only in `src/features/translator/ai/client.ts`, by the AI route `/api/translator/ai` ([translator/PHASE2-CODE-GUIDE.md](../translator/PHASE2-CODE-GUIDE.md)). Chat with AI shows only when `OPENAI_API_KEY` is set and `TRANSLATOR_AI` is not `"off"`.
 
 ### What happens when one is missing
 
@@ -30,7 +30,7 @@ The Translator's Phase 1 uses no environment variables. The three Phase 2 variab
 | `SUPABASE_SERVICE_ROLE_KEY` | Subscribe shows "Something went wrong on our end"; reset requests silently send nothing; cron returns 500 |
 | `RESEND_API_KEY` | Signups save; no notification email |
 | `CRON_SECRET` | Cron returns 500 "Not configured" |
-| `OPENAI_API_KEY` | Chat with AI is not shown in the Translator; the form works as before (once Phase 2 is built) |
+| `OPENAI_API_KEY` | `/api/translator/ai` answers `503` ("The AI assistant is not available right now. Use the form instead."). Once the chat UI is built, Chat with AI is not shown and the form works as before |
 
 ## Per environment
 
@@ -47,7 +47,7 @@ The three Translator Phase 2 variables (`OPENAI_API_KEY`, `OPENAI_MODEL`, `TRANS
 ## Rules
 
 - `SUPABASE_SERVICE_ROLE_KEY` is server-only. It is read only in `src/lib/supabase/admin.ts`, which starts with `import "server-only"`. Never prefix it with `NEXT_PUBLIC_`.
-- `OPENAI_API_KEY` is server-only. It will be read only in `src/features/translator/ai/client.ts`, which starts with `import "server-only"`. Never put it in client code and never prefix it, `OPENAI_MODEL` or `TRANSLATOR_AI` with `NEXT_PUBLIC_`.
+- `OPENAI_API_KEY` is server-only. It is read only in `src/features/translator/ai/client.ts`, which starts with `import "server-only"`. Never put it in client code and never prefix it, `OPENAI_MODEL` or `TRANSLATOR_AI` with `NEXT_PUBLIC_`.
 - Anything prefixed `NEXT_PUBLIC_` is bundled into the browser. Only the Supabase URL and publishable key belong there.
 - Secrets live only in `.env.local` and Vercel, never in the repo, issues, pull requests or emails.
 

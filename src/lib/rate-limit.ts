@@ -9,8 +9,10 @@ const hits = new Map<string, number[]>();
  * Best-effort, per-instance rate limit. Serverless instances do not share
  * memory, so this only slows down simple abuse. Swap for a shared store
  * (e.g. Upstash, Vercel KV) if the form starts getting spammed.
+ * `maxAttempts` per 10 minutes per key: 5 by default (login, reset, subscribe); the
+ * Translator AI route allows 30 per admin.
  */
-export function isRateLimited(key: string, now = Date.now()) {
+export function isRateLimited(key: string, maxAttempts = MAX_ATTEMPTS, now = Date.now()) {
   const recent = (hits.get(key) ?? []).filter((t) => now - t < WINDOW_MS);
   recent.push(now);
   hits.set(key, recent);
@@ -21,7 +23,7 @@ export function isRateLimited(key: string, now = Date.now()) {
     }
   }
 
-  return recent.length > MAX_ATTEMPTS;
+  return recent.length > maxAttempts;
 }
 
 /** The visitor's IP from Vercel's forwarding headers, used as the rate-limit key. */

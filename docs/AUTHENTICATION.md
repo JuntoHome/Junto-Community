@@ -78,12 +78,13 @@ Invite and reset links are built from Supabase's **Site URL**, so they always op
 |---|---|---|
 | Route layout | `admin/(protected)/layout.tsx` | Direct links while logged out |
 | Page and action | `requireAdmin()` at the top of each | Client-side navigation and direct action calls |
+| Translator AI route | `getAdmin()` first in `/api/translator/ai`, `401` JSON when null | A `fetch` while logged out or not an admin. `requireAdmin()` would redirect, so the `fetch` would get the login page's HTML |
 | Database | RLS with `private.is_admin()` | Anyone calling the Supabase API directly |
 | Build | `import "server-only"` | Server code or the service key reaching the browser |
 
 Rules for new code:
 
-- Every admin page and every admin Server Action calls `await requireAdmin()` first.
+- Every admin page and every admin Server Action calls `await requireAdmin()` first. An admin-only route handler called with `fetch` calls `getAdmin()` first and returns `401` JSON instead, and its path goes in the `proxy.ts` matcher so the session is refreshed.
 - Admin code uses `src/lib/supabase/server.ts` so RLS applies. Never use the service-role client (`admin.ts`) for admin features.
 - `SUPABASE_SERVICE_ROLE_KEY` is never prefixed with `NEXT_PUBLIC_`.
 
