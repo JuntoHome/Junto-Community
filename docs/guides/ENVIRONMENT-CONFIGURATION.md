@@ -14,10 +14,13 @@ Every setting the app depends on: environment variables, and the settings that e
 | `RESEND_FROM_EMAIL` | No | Optional | Sender on a domain verified in Resend. Defaults to `notifications@juntocommunity.org` | |
 | `CRON_SECRET` | No | In Vercel, yes | Protects `/api/cron/keep-alive`. Any long random string; any string locally | Generate one |
 | `GOOGLE_SITE_VERIFICATION` | No | Optional | Google Search Console HTML-tag verification (the `content` value only) | Search Console |
+| `OPENAI_API_KEY` | **Never** | Optional | Translator Phase 2: the key for the AI calls made by `/api/translator/ai`. Without it, Chat with AI is not shown and the form works as before | OpenAI dashboard → API keys |
+| `OPENAI_MODEL` | No | Optional | Translator Phase 2: the model to use. Defaults to `gpt-4o-mini` when empty. Check the model is current before release (**Unverified**) | An OpenAI model name |
+| `TRANSLATOR_AI` | No | Optional | Translator Phase 2: set to `off` to hide Chat with AI even when the key is set. Any other value, or empty, leaves it on | `off`, or leave empty |
 
 `BUILT_AT` is set by `next.config.ts` at build time; don't set it yourself.
 
-The Translator uses no environment variables.
+The Translator's Phase 1 uses no environment variables. The three Phase 2 variables were added in TR-38; no code reads them yet. They will be read only in `src/features/translator/ai/client.ts` ([translator/PHASE2-CODE-GUIDE.md](../translator/PHASE2-CODE-GUIDE.md)). Chat with AI shows only when `OPENAI_API_KEY` is set and `TRANSLATOR_AI` is not `"off"`.
 
 ### What happens when one is missing
 
@@ -27,6 +30,7 @@ The Translator uses no environment variables.
 | `SUPABASE_SERVICE_ROLE_KEY` | Subscribe shows "Something went wrong on our end"; reset requests silently send nothing; cron returns 500 |
 | `RESEND_API_KEY` | Signups save; no notification email |
 | `CRON_SECRET` | Cron returns 500 "Not configured" |
+| `OPENAI_API_KEY` | Chat with AI is not shown in the Translator; the form works as before (once Phase 2 is built) |
 
 ## Per environment
 
@@ -38,9 +42,12 @@ The Translator uses no environment variables.
 
 Set every variable for **both** Production and Preview. Vercel applies changes to new deployments only; redeploy after changing one.
 
+The three Translator Phase 2 variables (`OPENAI_API_KEY`, `OPENAI_MODEL`, `TRANSLATOR_AI`) are server only and go in both Production and Preview. Keep `TRANSLATOR_AI=off` in Production until Phase 2 is approved.
+
 ## Rules
 
 - `SUPABASE_SERVICE_ROLE_KEY` is server-only. It is read only in `src/lib/supabase/admin.ts`, which starts with `import "server-only"`. Never prefix it with `NEXT_PUBLIC_`.
+- `OPENAI_API_KEY` is server-only. It will be read only in `src/features/translator/ai/client.ts`, which starts with `import "server-only"`. Never put it in client code and never prefix it, `OPENAI_MODEL` or `TRANSLATOR_AI` with `NEXT_PUBLIC_`.
 - Anything prefixed `NEXT_PUBLIC_` is bundled into the browser. Only the Supabase URL and publishable key belong there.
 - Secrets live only in `.env.local` and Vercel, never in the repo, issues, pull requests or emails.
 

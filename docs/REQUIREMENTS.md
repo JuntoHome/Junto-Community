@@ -89,9 +89,9 @@ Not built. The requirements are the 35 GitHub issues (each with steps and accept
 | Rule | Detail |
 |---|---|
 | Synthetic data only | No Data Axle connection. Never upload, copy or commit real records |
-| Browser only | Rows are never sent to the server, stored or logged |
+| Browser only | Rows are never sent to the server, stored or logged. Phase 2 exception: the file summary and the intro fields of one chosen business may go to `/api/translator/ai` ([translator/README.md](translator/README.md#what-is-sent-to-the-ai)) |
 | One criteria object | The form fills a `SearchBrief`; Phase 2 AI fills the same shape |
-| Deterministic ranking | No AI in Phase 1; same file and brief give the same order and reasons |
+| Deterministic ranking | No AI in Phase 1; same file and brief give the same order and reasons. In Phase 2 the AI never ranks, scores, filters or sorts |
 | Pure modules | No React outside `ui/` |
 | Admin only | `/admin/translator`, not in the public menu or sitemap |
 
@@ -122,7 +122,7 @@ On Nov 3, 2026 the profile structure was changed to follow Paul's draft (commit 
 | Accessibility | Keyboard usable, contrast 4.5:1, labelled fields, touch targets 44 px | Both | Designed for; not audited |
 | Maintainability | New content types reuse the same patterns | CMS plan | Met for profiles |
 | Cost | No new paid services | CMS plan | Met |
-| Privacy | Translator rows never leave the browser | CLAUDE.md | To be built |
+| Privacy | Translator rows never leave the browser (full rows never do in Phase 2 either) | CLAUDE.md | To be built |
 
 ## Business rules
 
@@ -137,7 +137,7 @@ These must not be broken.
 7. No em-dashes in site copy (client preference).
 8. No new paid services. The project runs on free tiers.
 9. Every Register button goes to Eventbrite; the site does not handle registration.
-10. Translator: synthetic data only, and processing only in the browser.
+10. Translator: synthetic data only, and processing only in the browser (Phase 2 adds two exceptions, see [translator/README.md](translator/README.md#rules)).
 
 ## User roles and permissions
 
@@ -178,4 +178,4 @@ These must not be broken.
 | Content for Maricopa SBDC, Arizona Commerce Authority and Local First Arizona | Paul | CMS plan question 6 |
 | Staging URL for the `translator` branch | Project lead (Vercel) | TR-01 |
 | Scope and timing of the four planned admin modules | Paul | `plannedModules` in `src/components/admin/modules.ts` |
-| Translator Phase 2 (AI that fills the `SearchBrief`) | Not scheduled | [translator/README.md](translator/README.md) |
+| Translator Phase 2 (AI that fills the `SearchBrief`) | Rules and setup done (TR-38); AI code not built | [translator/README.md](translator/README.md#phase-2) |

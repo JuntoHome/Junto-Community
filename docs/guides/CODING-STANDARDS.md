@@ -91,6 +91,12 @@ Additional rules for `src/features/translator/` (from [CLAUDE.md](../../CLAUDE.m
 
 - `import/`, `normalize/`, `criteria/`, `ranking/`, `export/` contain no React and no I/O beyond what the browser gives them. UI lives in `ui/`.
 - One criteria shape: `SearchBrief` in `criteria/schema.ts`. Don't create a second one.
-- Ranking is plain, deterministic code: same input, same order and reasons.
-- Data stays in memory in the browser: no Server Actions, Supabase, localStorage, cookies or logging for rows.
+- Ranking is plain, deterministic code: same input, same order and reasons. The Phase 2 AI never ranks, scores, filters or sorts.
+- Data stays in memory in the browser: no Server Actions, Supabase, localStorage, cookies or logging for rows. Phase 2 has two exceptions, and only to our own route `/api/translator/ai`: the file summary and the intro fields of one chosen business. Never full rows, never stored, never logged.
 - Use only synthetic test data.
+
+Phase 2 (Chat with AI, not built yet) adds two layers. Layout, layers, patterns and the "never do" list are in [translator/PHASE2-CODE-GUIDE.md](../translator/PHASE2-CODE-GUIDE.md); follow it for every Phase 2 ticket.
+
+- `ai/`: pure logic like the Phase 1 modules, with no React, no network and no `process.env`. The one exception is `ai/client.ts`, which starts with `import "server-only"` and is the only file that imports `openai` and reads the environment.
+- `ui/chat/`: React only, no business rules. It never imports `ai/client.ts` or `openai`.
+- The route `src/app/api/translator/ai/route.ts` is the only server entry point. It checks the admin with `getAdmin()` and answers `401` as JSON, because `requireAdmin()` redirects.

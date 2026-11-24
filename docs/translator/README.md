@@ -5,7 +5,7 @@ The developer guide for the Data Axle Translator. This file owns every Translato
 ## Contents
 
 1. [What it is](#what-it-is)
-2. [Phase 1 rules](#phase-1-rules)
+2. [Rules](#rules)
 3. [Quick start](#quick-start)
 4. [Folder map](#folder-map)
 5. [Data flow](#data-flow): [Upload limits](#upload-limits), [File gate](#file-gate), [Reading the workbook](#reading-the-workbook), [Cleaning values](#cleaning-values), [Row checks](#row-checks), [Duplicate grouping](#duplicate-grouping), [Pending and confirmed briefs](#pending-and-confirmed-briefs), [Session and Start over](#session-and-start-over)
@@ -17,7 +17,7 @@ The developer guide for the Data Axle Translator. This file owns every Translato
 11. [Tests](#tests)
 12. [Expected results](#expected-results)
 13. [How to add a new input format](#how-to-add-a-new-input-format)
-14. [How Phase 2 AI will plug in](#how-phase-2-ai-will-plug-in)
+14. [Phase 2](#phase-2): [Flow](#flow), [What is sent to the AI](#what-is-sent-to-the-ai), [How the brief plugs in](#how-the-brief-plugs-in), [Where the code will live](#where-the-code-will-live), [Switching it on](#switching-it-on), [Open items](#open-items)
 15. [How to change scoring](#how-to-change-scoring)
 16. [Troubleshooting](#troubleshooting)
 17. [Known limitations](#known-limitations)
@@ -25,21 +25,28 @@ The developer guide for the Data Axle Translator. This file owns every Translato
 
 ## What it is
 
-The Data Axle Translator is a tool in the JCA admin area that lets a library patron upload a business contacts spreadsheet, describe a target in plain terms (for example "Phoenix fabrication owners"), and download a ranked, explained shortlist as an Excel file. Typical users are business owners looking for customers and job seekers looking for employers; in Phase 1 the JCA team runs it for them from the admin area. Phase 1 covers upload, preview, a criteria form, deterministic ranking, results and Excel export, with synthetic data only and no AI. Page: `/admin/translator` (`src/app/admin/(protected)/translator/page.tsx`), behind the admin login, not in the public menu or sitemap. Work is tracked in GitHub issues TR-01 to TR-35 (milestone "Data Axle Translator Phase 1"); status is in [TASKS.md](../TASKS.md).
+The Data Axle Translator is a tool in the JCA admin area that lets a library patron upload a business contacts spreadsheet, describe a target in plain terms (for example "Phoenix fabrication owners"), and download a ranked, explained shortlist as an Excel file. Typical users are business owners looking for customers and job seekers looking for employers; in Phase 1 the JCA team runs it for them from the admin area. Phase 1 covers upload, preview, a criteria form, deterministic ranking, results and Excel export, with synthetic data only and no AI. Phase 2 will add a Chat with AI option that fills the same criteria; its rules are set but none of it is built ([Phase 2](#phase-2)). Page: `/admin/translator` (`src/app/admin/(protected)/translator/page.tsx`), behind the admin login, not in the public menu or sitemap. Work is tracked in GitHub issues TR-01 to TR-35 (milestone "Data Axle Translator Phase 1"); status is in [TASKS.md](../TASKS.md).
 
 Staging: `<URL pending>`
 
 > **Database warning:** staging shares the production Supabase project. Logging in to the admin area, editing profiles or using the subscribe form on staging changes live data (a staging signup creates a real subscriber and emails the team). The Translator itself stores nothing, but the rest of the site on staging is live. The same is true locally with the shared keys ([DEVELOPMENT-SETUP.md](../DEVELOPMENT-SETUP.md#database-connection)).
 
-## Phase 1 rules
+## Rules
 
-- **Synthetic data only.** No Data Axle connection. Never upload, copy, paste or commit real Data Axle or Reference Solutions records, not even one row.
-- **Browser only.** Parsing, cleaning, ranking and export all run in the browser. Rows are never sent to the server, stored (Supabase, localStorage, cookies) or logged. They last for one session: Start over or a refresh clears them ([Session and Start over](#session-and-start-over)).
+One list for both phases. Two rules change in Phase 2, and each says how. Phase 2 is not built yet ([Phase 2](#phase-2)).
+
+- **Synthetic data only.** No Data Axle connection. Never upload, copy, paste or commit real Data Axle or Reference Solutions records, not even one row. Unchanged in Phase 2: the [file gate](#file-gate) stays and real exports remain out of scope.
+- **Browser only, with two Phase 2 exceptions.** Parsing, cleaning, ranking and export all run in the browser. Rows are never sent to the server, stored (Supabase, localStorage, cookies) or logged. They last for one session: Start over or a refresh clears them ([Session and Start over](#session-and-start-over)).
+  - *Phase 1:* nothing leaves the browser.
+  - *Phase 2:* only two things may leave the browser, and only to our own server route `/api/translator/ai`: the file summary, for the interview, and the intro fields of one chosen business, for the intro draft. Never full rows. Never stored. Never logged, and that covers summaries, chat text and AI replies too ([What is sent to the AI](#what-is-sent-to-the-ai)).
 - **Independent modules.** Code lives in `src/features/translator/`: `import/`, `normalize/`, `criteria/`, `ranking/`, `export/` (no React) and `ui/` ([Folder map](#folder-map)).
 - **Two input layouts, one set of fields.** The 9-column synthetic workbook and the 396-column Reference Solutions export are read through mapping configs ([Field mapping](#field-mapping)).
 - **One row per business.** Record ID is the IUSA Number, or `ROW-0001` style when blank. Industry is the Primary SIC Description. Real exports have no email; phone and website are the contact fallbacks.
 - **One criteria object.** The form fills a `SearchBrief` ([Criteria schema](#criteria-schema)); the Phase 2 AI will fill the same object.
-- **Deterministic ranking, no AI.** The same file and the same brief always give the same order and reasons.
+- **Deterministic ranking.** Ranking is plain code. The same file and the same brief always give the same order and reasons.
+  - *Phase 1:* no AI anywhere.
+  - *Phase 2:* the AI never ranks, scores, filters or sorts. It only proposes a `SearchBrief` and drafts intro text.
+- **The OpenAI API key is server env only** (Phase 2). Never in client code, never `NEXT_PUBLIC_`.
 
 ## Quick start
 
@@ -94,7 +101,7 @@ criteria form ─▶ toBrief() ─▶ pending brief ─▶ Confirm and rank ─�
                        all in the browser; Start over throws it all away
 ```
 
-Every step runs in the browser. The pure functions live in `import/` to `export/`; `ui/translator-wizard.tsx` calls them and holds the results in React state.
+Every step runs in the browser. This is Phase 1 as built; Phase 2 will add two calls to a server route, described in [Phase 2](#phase-2). The pure functions live in `import/` to `export/`; `ui/translator-wizard.tsx` calls them and holds the results in React state.
 
 1. **Choose a workbook.** Every workbook enters through `handleWorkbook(input)` in `ui/translator-wizard.tsx`. The sample buttons (`ui/sample-buttons.tsx`, configured in `ui/samples.ts`) fetch a bundled file from `public/translator/` and turn it into a `File`; the file picker and drop zone (`ui/file-upload.tsx`) pass what the user chose. All take the same path, so there is no sample-only shortcut. If a workbook is already loaded, `handleWorkbook` starts a new session with the new files ([Session and Start over](#session-and-start-over)); otherwise `checkAndLoad()` calls `loadWorkbook(input, isCurrent)` (`import/load.ts`), which runs steps 2 to 4 and returns the gated file and the parsed workbook, or the step that refused the file with the message to show and, for an unexpected failure, the code the wizard logs. `isCurrent` lets it stop between steps once a newer file has been chosen, so a slow file never replaces it. On any problem the wizard stays on Upload and shows the message.
 2. **Check.** `checkWorkbookFile()` (`import/check-file.ts`): one file, not empty, at most 2 MB, `.xlsx` name, ZIP signature. Details: [Upload limits](#upload-limits).
@@ -128,7 +135,7 @@ Every step runs in the browser. The pure functions live in `import/` to `export/
 
 ### File gate
 
-During Phase 1 the Translator accepts only the workbooks we issued, so real contact data can't be processed by accident.
+During Phase 1 and Phase 2 the Translator accepts only the workbooks we issued, so real contact data can't be processed by accident.
 
 - After the upload limits pass, the browser reads the file once and computes its SHA-256 hash (`crypto.subtle.digest`, in `sha256Hex()`). If the hash isn't in the allowlist, the step stays on Upload and shows: "Only the JCA synthetic demo workbook can be used in this prototype. Use the Load sample button to try it."
 - The allowlist is `src/features/translator/import/allowlist.ts`, the only place hashes live. It has two entries: `JCA_Synthetic_Contacts.xlsx` and `JCA_Synthetic_RS_Layout.xlsx` (TR-35). The top comment there says how to compute a hash.
@@ -246,7 +253,7 @@ The wizard holds two briefs (TR-16), so a brief is always confirmed before it is
 
 The Translator keeps everything for one session only (TR-28). Code: `ui/translator-session.tsx`, `ui/start-over.tsx`, `ui/log-error.ts`.
 
-- **Session-only data.** The file, its bytes, the parsed rows, the criteria form, both briefs, the pins and omits, the results and the export status live only in the wizard's React state. Nothing is written to `localStorage`, `sessionStorage`, IndexedDB, cookies or the Cache API, nothing goes in the URL, and nothing is sent to the server. Refreshing or closing the page starts fresh on Upload. Going back to the tab may restore the page from the browser's back/forward cache; that is the same session in the same tab, and still nothing is written anywhere. There is no "leave page" warning.
+- **Session-only data.** The file, its bytes, the parsed rows, the criteria form, both briefs, the pins and omits, the results and the export status live only in the wizard's React state. Nothing is written to `localStorage`, `sessionStorage`, IndexedDB, cookies or the Cache API, nothing goes in the URL, and nothing is sent to the server (Phase 2 will add two exceptions, see [What is sent to the AI](#what-is-sent-to-the-ai)). Refreshing or closing the page starts fresh on Upload. Going back to the tab may restore the page from the browser's back/forward cache; that is the same session in the same tab, and still nothing is written anywhere. There is no "leave page" warning.
 - **Start over.** A **Start over** button sits under the step indicator once a workbook is loaded (Preview, Criteria, Results and Export, and Upload when it is reopened with a file loaded). Before results exist it clears straight away. Once results exist it first asks, on the page: `Start over?` / `This clears your file, criteria and shortlist. Download your file first if you need it.` with **Clear everything** and **Cancel** (Escape also cancels, and focus goes back to Start over). After clearing, the wizard is on Upload with nothing loaded, focus is on the Upload heading, and a live region announces `Everything was cleared.`
 - **How it clears.** `TranslatorSession` renders `<TranslatorWizard key={sessionKey} />` and Start over changes the key, so React throws the whole wizard away and mounts a new one. Nothing is cleared by hand, so state added later is cleared too. Keep every piece of Translator state inside the wizard (or its children). The session also owns the live region that announces "Everything was cleared.", so it survives the remount.
 - **A new workbook is a new session.** Choosing another file (upload, drop or Load sample) while a workbook is loaded starts a new session with that file, the same remount: the session passes the chosen files to the new wizard, which loads them on mount. So no criteria, brief, pins, omits or results from the old file carry over. If the new file is refused, the Upload step shows why and nothing from the old file is kept. An empty drop does nothing.
@@ -298,7 +305,7 @@ Each mapping in `src/features/translator/import/mappings/` has two header lists 
 
 ## Criteria schema
 
-One object describes a search: the `SearchBrief`, defined by `searchBriefSchema` in `src/features/translator/criteria/schema.ts` (zod). The form produces it through `toBrief()`; the Phase 2 AI will produce the same object ([How Phase 2 AI will plug in](#how-phase-2-ai-will-plug-in)). Values are only trimmed by the schema; matching case and spelling is the normalize step's job. The module is pure, so it runs in the browser and on the server.
+One object describes a search: the `SearchBrief`, defined by `searchBriefSchema` in `src/features/translator/criteria/schema.ts` (zod). The form produces it through `toBrief()`; the Phase 2 AI will produce the same object ([Phase 2](#phase-2)). Values are only trimmed by the schema; matching case and spelling is the normalize step's job. The module is pure, so it runs in the browser and on the server.
 
 **Fields.** The brief is a strict object: an unknown key is an error that names it.
 
@@ -965,20 +972,80 @@ A new layout is mostly config, but a few places name the existing layouts. Work 
 6. **Tests.** A mapping unit test (`import/map-row.test.ts`: a fixture row in `__fixtures__/` and the record it must give), a parse and detect test (`import/parse.test.ts`, with the signature clash test from step 2), and an end-to-end edge case (`edge-cases.test.ts`, from the sample through `loadWorkbook()` and `runPipeline()`).
 7. **Docs.** Update [Field mapping](#field-mapping), [Files in this folder](#files-in-this-folder) (with the sample's hash and what it contains) and `docs/CHANGELOG.md`.
 
-**Real Reference Solutions files are out of scope for Phase 1.** The Reference Solutions mapping already reads the real 396-column layout, but the file gate only accepts allowlisted synthetic files. Accepting real exports needs the gate to change (or go) and a privacy decision first: who may upload real contact data, where it may be processed, and what the export may contain. Don't start that without the project lead.
+**Real Reference Solutions files are out of scope for Phase 1 and Phase 2.** The Reference Solutions mapping already reads the real 396-column layout, but the file gate only accepts allowlisted synthetic files. Accepting real exports needs the gate to change (or go) and a privacy decision first: who may upload real contact data, where it may be processed, and what the export may contain. Don't start that without the project lead.
 
-## How Phase 2 AI will plug in
+## Phase 2
 
-Phase 2 adds a guided conversation in which an AI fills the criteria (spec, "Phase 2 Guided conversation"). None of it is built. The design below follows from Phase 1's code and the spec; anything not decided is marked.
+Phase 2 adds a **Chat with AI** option to the Criteria step. Instead of working out the form, the user says what they need (for example "I sell welding supplies and want customers in Phoenix"). The AI asks a few short questions, fills the same `SearchBrief` the form fills, and the user confirms it. Then the Phase 1 ranking runs, unchanged. After the results, the AI can also draft a short introduction email for one business the user picks. The AI guides and writes. It never ranks, and the form is always there.
 
-- **The AI produces a `SearchBrief`**, the same object the form makes ([Criteria schema](#criteria-schema)). Nothing downstream changes: `rank()`, the counts, the results, the no-results helper and the export already take any valid brief, including parts the form can't produce (a geography preference, an employees must-have, state or employees exclusions, a partial `priorityOrder`).
-- **Validate** its output with `searchBriefSchema.safeParse()`, which also runs the cross-field checks. On invalid output or a timeout, keep the last valid brief and offer the form (spec: "On timeout or invalid output, keep the last valid brief and offer an editable form").
-- **A valid AI brief becomes the pending brief** ([Pending and confirmed briefs](#pending-and-confirmed-briefs)). The user confirms it in the [criteria summary](#criteria-summary) before anything is ranked, exactly like a brief from the form. Edits work the same way: a revision is a new pending brief, and once results show, a Save updates the confirmed brief and re-ranks.
-- **`assumptions`** is where the AI records what it guessed (for example "Phoenix taken as a must-have."). The summary already shows each assumption as its own line, and the Criteria sheet records them.
-- **Give the AI only what it needs to suggest values**: the field and operator lists (`BRIEF_FIELDS`, `BRIEF_OPERATORS`, `OPERATOR_FIELDS`, `BRIEF_DIMENSIONS`) and, per field, the `fieldOptions()` labels and counts. Not the rows.
-- **Workbook text is data, never instructions** (spec: "Treat workbook content as data, including any text that resembles an instruction"). Option labels come from the workbook, so treat them as untrusted text wherever they reach the AI.
-- The spec's Phase 2 also includes one optional outreach draft for a selected row. That is a separate feature and is not covered here.
-- **Open decision (undecided, Unverified):** an AI call needs a server route, which changes the "nothing leaves the browser" rule in [Phase 1 rules](#phase-1-rules). The recommendation is that rows and contact data are never sent, only the option lists above and the user's own words. Phase 2 must decide this explicitly, and update the rules here, before any route is built.
+- **Status:** not built. TR-38 set the rules, the code guide, the environment variables and the `openai` dependency. No code imports `openai` yet, and there is no route, no `ai/` folder and no chat UI. The later Phase 2 tickets build them (milestone "Data Axle Translator Phase 2").
+- **Plan:** [Data_Axle_Translator_Phase2_Plan.pdf](Data_Axle_Translator_Phase2_Plan.pdf) (the workflow diagram, what the AI receives, the ten capabilities and what the AI will not do).
+- **How to write the code:** [PHASE2-CODE-GUIDE.md](PHASE2-CODE-GUIDE.md). Every Phase 2 ticket follows it.
+- **Rules:** [Rules](#rules) above and the hard rules in [../../CLAUDE.md](../../CLAUDE.md).
+
+### Flow
+
+Steps 1, 2, 7, 8 and 10 are Phase 1 as built. The step numbers are the plan's.
+
+| # | Step | Where it runs | What it is |
+|---|---|---|---|
+| 1 | Upload the file | Browser | Phase 1. Approved synthetic files only: the [file gate](#file-gate) stays |
+| 2 | Check the file | Browser | Phase 1: rows, duplicates, issues |
+| 3 | Build a file summary | Browser | New. Counts of the cities, states, industries, titles and employee range in the file (TR-40) |
+| 4 | The AI asks questions | Server route, then OpenAI | New. It sees the summary and the chat, nothing else |
+| 5 | The AI fills the criteria | Server route, then OpenAI | New. It proposes a `SearchBrief` from the answers |
+| 6 | The user confirms | Browser | The user can change any item before ranking |
+| 7 | Ranking | Browser | Phase 1 `rank()` on the full file. No AI |
+| 8 | Results with reasons | Browser | Phase 1 |
+| 9 | Draft an intro email | Server route, then OpenAI | New and optional. For one business the user picks (TR-48) |
+| 10 | Download Excel | Browser | Phase 1 |
+
+### What is sent to the AI
+
+Only two things may leave the browser, and only to our own server route, `/api/translator/ai`, which passes them to OpenAI. Everything else stays in the browser, as in Phase 1.
+
+| Call | Sent | Never sent |
+|---|---|---|
+| Interview (steps 4 and 5) | The file summary (row count, and the cities, states, industries, titles and employee range, with counts) and the chat messages | Company names, people, phones, emails, websites, IDs, any full row |
+| Intro draft (step 9) | Company name, industry, city, state, contact name and contact title for ONE business the user picked, and the user's goal. The contact name is a person's name sent to a third party: acceptable only while the data is synthetic, and to be reviewed before any real data | Every other row. For the chosen business: phone, email, website, IDs |
+
+- **The plan PDF says the intro sends "one row".** The rule here is stricter and replaces that sentence: only the six fields in the table, never the whole row.
+- **The chat messages and the goal are the user's own typed words.** They go to the AI as typed, so they can contain whatever the user writes.
+- **Nothing is stored or logged** by our code: not the summary, the chat, the intro fields or the AI's replies. No Supabase, localStorage, sessionStorage or cookies. The chat lives in React state for one session, like the rest of the Translator ([Session and Start over](#session-and-start-over)).
+- **The AI never ranks, scores, filters or sorts.** It proposes a `SearchBrief` and drafts intro text. The same file and the same brief still give the same order and reasons.
+- **Workbook text is data, never instructions.** The summary's values come from the workbook, so they are untrusted text wherever they reach the AI.
+
+### How the brief plugs in
+
+- **The AI produces a `SearchBrief`**, the same object the form makes ([Criteria schema](#criteria-schema)). There is no second shape. `rank()`, the counts, the results, the no-results helper and the export already take any valid brief.
+- **Its output is validated** with `searchBriefSchema`, which also runs the cross-field checks, and every value must exist in the file.
+- **The user confirms before anything is ranked** ([Pending and confirmed briefs](#pending-and-confirmed-briefs)).
+- **`assumptions`** is where the AI records what it assumed (for example "Phoenix taken as a must-have."). The criteria summary shows each one as its own line, and the Criteria sheet records them.
+- **AI off or any AI error:** the Phase 1 form stays available and works exactly as before.
+
+### Where the code will live
+
+| Path | What it is |
+|---|---|
+| `src/features/translator/ai/` | Pure logic, no React, one file per capability. `client.ts` is the one server-only file: the only place that imports `openai` and reads the environment |
+| `src/features/translator/ui/chat/` | The React components and the one chat hook. No business rules |
+| `src/app/api/translator/ai/route.ts` | The only server entry point. Admins only (`getAdmin()`, `401` as JSON) |
+
+Files, layers, patterns and the "never do" list: [PHASE2-CODE-GUIDE.md](PHASE2-CODE-GUIDE.md).
+
+### Switching it on
+
+Three server-only variables: `OPENAI_API_KEY`, `OPENAI_MODEL` and `TRANSLATOR_AI`. Chat with AI shows only when `OPENAI_API_KEY` is set and `TRANSLATOR_AI` is not `"off"`. What each one does and where to set it: [ENVIRONMENT-CONFIGURATION.md](../guides/ENVIRONMENT-CONFIGURATION.md#environment-variables).
+
+### Open items
+
+Not decided or not checked yet. Don't treat any of these as settled.
+
+- OpenAI is a paid service. Approved for Phase 2 in the plan PDF: **Unverified**. The plan doesn't name OpenAI or any provider, and says nothing about cost. The project rule "No new paid services" ([WAY-OF-WORKING.md](../WAY-OF-WORKING.md#rules), rule 4) still stands until the project lead decides.
+- The model, `gpt-4o-mini`, comes from the TR-38 issue and is set through `OPENAI_MODEL`. Check the model is current before release: **Unverified**.
+- OpenAI's data handling (how long it keeps what is sent, and whether it is used for training) must be checked against OpenAI's current API terms before real users: **Unverified**.
+- Paul's answers to questions 14 (AI calls through our server) and 19 (the intro draft) in [PHASE1-REVIEW.md](PHASE1-REVIEW.md) are not recorded yet.
+- Real exports stay out of scope. The file gate and the synthetic-only rule are unchanged in Phase 2.
 
 ## How to change scoring
 
@@ -1079,6 +1146,8 @@ The Translator's limitations and accepted risks are owned by [KNOWN-ISSUES.md](.
 |---|---|
 | [README.md](README.md) | This developer guide |
 | [DEMO-SCRIPT.md](DEMO-SCRIPT.md) | The 25-minute Phase 1 demo for Paul (TR-34): what to click, say and expect, prep steps, known limits and a fallback |
+| [Data_Axle_Translator_Phase2_Plan.pdf](Data_Axle_Translator_Phase2_Plan.pdf) | The Phase 2 plan (Nov 22, 2026): how the AI will help, the 10-step workflow, what the AI receives, its ten capabilities and what it will not do. Where it says the intro sends "one row", the six-field rule in [What is sent to the AI](#what-is-sent-to-the-ai) replaces it |
+| [PHASE2-CODE-GUIDE.md](PHASE2-CODE-GUIDE.md) | How to write the Phase 2 code (TR-38): folder layout, layers, the capability and route patterns, and the "never do" list |
 | [PHASE1-REVIEW.md](PHASE1-REVIEW.md) | Decisions for Paul from the Phase 1 walkthrough (TR-34) and the meeting notes. Answers stay empty until the meeting notes fill them |
 | [JCA_Data_Axle_Translator_Specification.docx](JCA_Data_Axle_Translator_Specification.docx) | Full spec: workflow, ranking rules, walkthroughs, edge cases, phases |
 | [JCA_Synthetic_Contacts.xlsx](JCA_Synthetic_Contacts.xlsx) | 500 fictional records, 9 columns, sheet `Contacts`. Used for the spec walkthroughs. SHA-256: `67a510867ed6c7273cfebabea5c6895e43bd2cae2c98395acd09146ba6ed580b` |

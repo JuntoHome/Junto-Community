@@ -79,7 +79,7 @@ Menu "Who Can Help?" ─▶ /who-can-help (published profiles in admin order) �
 /admin/translator ─▶ upload workbook ─▶ preview ─▶ criteria form ─▶ ranked results ─▶ Excel export
 ```
 
-Everything in the Translator happens in the browser; no rows reach the server.
+Everything in the Translator happens in the browser; no rows reach the server. Phase 2 (Chat with AI, not built yet) will send only a file summary and the intro fields of one chosen business to our own server route ([translator/README.md](translator/README.md#phase-2)).
 
 The detailed version of each workflow is in [FEATURES.md](FEATURES.md).
 

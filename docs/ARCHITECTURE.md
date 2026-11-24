@@ -22,7 +22,7 @@ How the system is built: its parts, how they connect, where code lives, and how 
   Visitor ──"Register"──▶ Eventbrite (a link only)
 ```
 
-One Next.js application does everything. Server Actions are the backend; Supabase is the database, identity provider and file store. The Data Axle Translator adds a browser-only path that never reaches the server (see [The Translator](#the-translator)).
+One Next.js application does everything. Server Actions are the backend; Supabase is the database, identity provider and file store. The Data Axle Translator adds a browser-only path that never reaches the server; its Phase 2 will add one server route for AI calls (see [The Translator](#the-translator)).
 
 ## Technology stack
 
@@ -39,6 +39,7 @@ Versions from [package.json](../package.json).
 | `@vercel/analytics` | ^2.0 | Page views on public pages | `site-shell.tsx` |
 | `exceljs` | ^4.4 | Reads Translator workbooks and writes the Excel export, in the browser; loaded only when a workbook is parsed or exported | `features/translator/import/parse.ts`, `features/translator/export/workbook.ts`; also `scripts/translator/make-rs-fixture.ts` (TR-35), which writes the Reference Solutions sample |
 | `jszip` | ^3.10 | Opens the .xlsx ZIP to fix files ExcelJS can't read as written (already an ExcelJS dependency) | `features/translator/import/xlsx-compat.ts`; also `import/file-gate.test.ts` and `scripts/translator/make-rs-fixture.ts` (fixed ZIP dates, so the sample rebuilds byte-identical) |
+| `openai` | 7.63.0 (exact) | The OpenAI SDK for the Translator's Phase 2 AI calls (interview and intro draft), on the server only. Added in TR-38; no code imports it yet | `features/translator/ai/client.ts` only (to be built) |
 | `tailwindcss` | 4 | Styling; design tokens in the `@theme` block of `globals.css` | Class names |
 | `typescript`, `eslint` | 5, 9 | Type checking and linting | `tsconfig.json`, `eslint.config.mjs` |
 | `vitest` | 4.1.12 (exact, dev only) | Unit tests, run in Node by `npm run test` (TR-29). Never bundled: app code imports no test or fixture. 4.x because Vitest 5 requires `@types/node` 22 or later and this project uses 20 | `vitest.config.ts`; `*.test.ts` beside the code; fixtures in `features/translator/__fixtures__/` |
@@ -244,11 +245,12 @@ There is no `error.tsx` for the public site.
 The Data Axle Translator (Phase 1) is an admin tool at `/admin/translator` that turns a business contacts workbook into a ranked, explained shortlist and an Excel download. Its architecture differs from the rest of the app:
 
 - **Browser only.** Parsing, cleaning, ranking and export run in the browser. No rows go to a Server Action, Supabase, browser storage or the logs, and all state lives in one React component for one session.
+- **Phase 2 route (not built yet).** Chat with AI will call one admin-only route, `/api/translator/ai`, which receives only the file summary and the intro fields of one chosen business, never full rows, and stores and logs nothing. Details: [translator/README.md](translator/README.md#phase-2).
 - **Folders** in `src/features/translator/`: `import/` (file checks, hash gate, parse, layout mappings), `normalize/` (clean, check, group duplicates), `criteria/` (the one `SearchBrief` schema), `ranking/` (filter, score, sort, reasons, pin and omit), `export/` (the `.xlsx`) are plain TypeScript with no React; `ui/` holds the components.
 
 ```text
 workbook ─▶ import/ ─▶ normalize/ ─▶ ranking/ (with the criteria/ SearchBrief) ─▶ ui/ results ─▶ export/ Excel
-                                all in the browser
+                                all in the browser (Phase 1)
 ```
 
 Everything else (the step-by-step data flow, field mapping, schema, ranking rules, tests, how to add an input format or change scoring) is in the developer guide, [translator/README.md](translator/README.md). Ticket status: [TASKS.md](TASKS.md).

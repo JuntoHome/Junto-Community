@@ -30,18 +30,20 @@ Before every commit or PR: `build`, `typecheck`, `lint` and `test` must pass.
 
 ## Data Axle Translator (current project)
 
-Tasks are GitHub issues TR-01 to TR-35 (milestone "Data Axle Translator Phase 1"). Each has steps and acceptance criteria. Follow them; ask before going beyond scope. Background, field mapping, ranking rules and expected results: `docs/translator/README.md`.
+Tasks are GitHub issues TR-01 to TR-35 (milestone "Data Axle Translator Phase 1") and, from TR-38, the Phase 2 issues (milestone "Data Axle Translator Phase 2": Chat with AI). Each has steps and acceptance criteria. Follow them; ask before going beyond scope. Background, field mapping, ranking rules and expected results: `docs/translator/README.md`. Every Phase 2 ticket also follows `docs/translator/PHASE2-CODE-GUIDE.md`.
 
 **Hard rules**
 
 1. **Synthetic data only.** Never upload, copy, paste or commit real Data Axle / Reference Solutions records, even one row. Use `docs/translator/JCA_Synthetic_Contacts.xlsx` or the synthetic real-layout file from TR-35.
-2. **Browser only.** Workbooks are parsed, ranked and exported in the browser. Do not send rows to the server, store them in Supabase, localStorage or cookies, or log them (`console.log` included).
+2. **Browser only, with two Phase 2 exceptions.** Workbooks are parsed, ranked and exported in the browser. Only two things may leave the browser, and only to our own server route `/api/translator/ai`: the **file summary** (TR-40), for the interview, and the **intro fields** of one chosen business (TR-48), for the intro draft. The user's own typed chat messages and goal travel with them. Never send full rows. Never store anything in Supabase, localStorage or cookies. Never log rows, summaries, chat text or AI replies (`console.log` included).
 3. **One criteria object.** The form produces a `SearchBrief` (`src/features/translator/criteria/schema.ts`). Phase 2's AI will produce the same object. Do not create a second shape.
-4. **Ranking is plain, deterministic code.** No AI in Phase 1. Same file + same brief = same order and reasons.
+4. **Ranking is plain, deterministic code.** The AI never ranks, scores, filters or sorts. It only proposes a `SearchBrief` and drafts intro text. Same file + same brief = same order and reasons.
 5. **Keep modules pure.** `import/`, `normalize/`, `criteria/`, `ranking/`, `export/` contain no React. UI lives in `ui/`.
 6. Page: `/admin/translator` (`src/app/admin/(protected)/translator/page.tsx`). Not in the public menu or sitemap.
+7. **The OpenAI API key is server env only.** It lives only in server environment variables. Never in client code, never `NEXT_PUBLIC_`.
+8. **The file gate and synthetic-only data stay in force in Phase 2.** Real exports remain out of scope.
 
-**Code layout:** `src/features/translator/{import,normalize,criteria,ranking,export,ui}/`
+**Code layout:** `src/features/translator/{import,normalize,criteria,ranking,export,ui}/`. Phase 2 adds `ai/` and `ui/chat/`: layout, layers and patterns are in `docs/translator/PHASE2-CODE-GUIDE.md`.
 
 **Expected results (tests must lock these in):**
 

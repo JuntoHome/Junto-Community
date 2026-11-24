@@ -66,7 +66,7 @@ Reviewers check at least:
 
 - The change matches the issue's acceptance criteria and nothing more.
 - Admin pages and actions call `requireAdmin()` first; admin code uses the server client.
-- Translator code keeps data in the browser and React out of the pure modules.
+- Translator code keeps data in the browser (apart from the two Phase 2 exceptions in rule 7 below) and React out of the pure modules.
 - No secrets, no real Data Axle data, no em-dashes in copy.
 
 ## Testing
@@ -102,7 +102,7 @@ New migration file, never edit an applied one, apply before deploying code that 
 4. No new paid services. Ask before adding a dependency.
 5. Never commit secrets. Never prefix the service-role key with `NEXT_PUBLIC_`.
 6. Every admin page and admin action calls `await requireAdmin()` first.
-7. Translator: synthetic data only; processing only in the browser; one `SearchBrief`; deterministic ranking; no React outside `ui/`.
+7. Translator: synthetic data only; processing only in the browser; one `SearchBrief`; deterministic ranking; no React outside `ui/`. One exception in Phase 2: the file summary and the intro fields of one chosen business may go to our own route `/api/translator/ai`, never full rows, never stored, never logged. The AI never ranks. Rules: [../CLAUDE.md](../CLAUDE.md); how to write the code: [translator/PHASE2-CODE-GUIDE.md](translator/PHASE2-CODE-GUIDE.md).
 8. Remember that local and preview environments write to the production database.
 9. User messages are plain language: say what went wrong and how to fix it.
 

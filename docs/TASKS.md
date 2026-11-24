@@ -2,7 +2,7 @@
 
 The project's task status in one place. GitHub issues are the source of truth for Translator work; this file summarises them. Update it when a ticket changes state.
 
-**As of:** Nov 19, 2026.
+**As of:** Nov 24, 2026.
 
 **Sources:** GitHub issues #1 to #35 (milestone "Data Axle Translator Phase 1"), [JCA_CMS_Plan.md](JCA_CMS_Plan.md) for CMS tickets, and the commit history for completion evidence.
 
@@ -97,6 +97,7 @@ Merged into `translator` (not yet on `main`, the live site). The evidence is the
 
 | ID | Title | Status | Links |
 |---|---|---|---|
+| TR-38 | Phase 2 rules, docs and AI environment setup | In review. First Phase 2 ticket (milestone "Data Axle Translator Phase 2"). Docs, env and dependency only, no AI code: `CLAUDE.md` hard rules 2 and 4 changed and rules 7 and 8 added; new `docs/translator/PHASE2-CODE-GUIDE.md`; the plan PDF added; the Translator README's "Phase 2" section and one "Rules" list; `OPENAI_API_KEY`, `OPENAI_MODEL` and `TRANSLATOR_AI` in `.env.example` (empty) and the environment guide; `openai` 7.63.0 installed (exact), imported nowhere yet. Paid-service approval, the model and OpenAI's data terms are **Unverified** ([translator/README.md](translator/README.md#open-items)). Vercel variables pending with the project lead | [#81](https://github.com/JuntoHome/Junto-Community/issues/81), [branch `tr-38-phase2-rules`](https://github.com/JuntoHome/Junto-Community/compare/translator...tr-38-phase2-rules) |
 | TR-36 | Results table: Why column visible without sideways scrolling | In review (PR #80). `ui/results-table.tsx` only, layout only: fixed table layout with a `colgroup` (set widths for every column but Why, which gets the rest), cells wrap instead of widening, Contact and Missing moved into each row's Details (step 3 of the ticket; steps 1 and 2 alone left four columns about 41 to 56 px wide at 1280 px). Main row: Rank, Company, Location, Name, Title, Score, Why, Actions. Phone cards unchanged. Measured locally in headless Chrome on a harness with the admin page's widths: table fits its box at 1280 px (844 of 844) and 1440 px and 1920 px (988 of 988); at 1024 px and 768 px it scrolls inside its box (832 in 620 and 636), no page scroll. Ranking unchanged (SYN-0001 first at 100; SYN-0006 with Operations Manager). Branch preview **Unverified** (behind Vercel login) | [#77](https://github.com/JuntoHome/Junto-Community/issues/77), [PR #80](https://github.com/JuntoHome/Junto-Community/pull/80) |
 | TR-01 | Staging environment and project docs | Docs merged into `translator` (PR #36); Vercel staging alias and Preview variables pending with the project lead | [#1](https://github.com/JuntoHome/Junto-Community/issues/1), [PR #36](https://github.com/JuntoHome/Junto-Community/pull/36) |
 | TR-34 | Phase 1 walkthrough with Paul | In progress. Part A (before the meeting) merged into `translator` (PR #73): `docs/translator/DEMO-SCRIPT.md` (25-minute demo script for Paul, with prep steps, known limits and a fallback) and `docs/translator/PHASE1-REVIEW.md` (22 decisions for Paul and the meeting notes template, answers empty). Docs only. Part B (after the meeting) fills in the review and drafts the follow-up issues. Paul's confirmation **not yet recorded** | [#34](https://github.com/JuntoHome/Junto-Community/issues/34), [PR #73](https://github.com/JuntoHome/Junto-Community/pull/73) |
@@ -105,7 +106,7 @@ Merged into `translator` (not yet on `main`, the live site). The evidence is the
 
 ## Pending
 
-None. Every Translator ticket is completed or in progress.
+None for Phase 1: every Phase 1 Translator ticket is completed or in progress. The Phase 2 tickets after TR-38 (milestone "Data Axle Translator Phase 2" on GitHub) are not started and are not listed here yet.
 
 ## Blocked
 
