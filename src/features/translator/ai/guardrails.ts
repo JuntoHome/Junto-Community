@@ -2,13 +2,23 @@
  * Capability: limits that keep an AI call safe.
  * - `withTimeout()`: a promise's value, or a fallback when it takes too long.
  * - `sanitizeSummaryValue()`: one workbook value made safe for the file summary, or null to drop it.
+ * - `cleanAiText()` and `cutText()`: AI text made fit to show (no em-dashes, one space, a length cap).
  * Privacy: `withTimeout()` handles no content. `sanitizeSummaryValue()` drops values that look
  * like contact data, so a column holding the wrong data can't leak an email, phone or website.
  * This module is pure (no React, no I/O).
  */
 
-/** How long one AI call may take, in milliseconds. The OpenAI client uses the same limit. */
-export const AI_TIMEOUT_MS = 20_000;
+/**
+ * How long one AI call (one attempt) may take, in milliseconds. The OpenAI client uses the same
+ * limit, and each capability wraps every attempt in `withTimeout()` with it (TR-42).
+ */
+export const AI_ATTEMPT_TIMEOUT_MS = 12_000;
+
+/**
+ * How long one request to the route may take, retry included, in milliseconds. Two attempts
+ * (12 + 12 s) fit inside it. The route's `maxDuration` (30 s) leaves room for the rest.
+ */
+export const AI_REQUEST_TIMEOUT_MS = 25_000;
 
 /** Longest value the file summary may hold, in characters (UTF-16 code units, as zod counts them). */
 export const MAX_SUMMARY_VALUE_CHARS = 80;
@@ -46,10 +56,32 @@ export function sanitizeSummaryValue(text: string): string | null {
     .replace(/\s+/g, " ")
     .trim();
   if (clean === "" || looksLikeContactData(clean)) return null;
-  let cut = clean.slice(0, MAX_SUMMARY_VALUE_CHARS);
+  return cutText(clean, MAX_SUMMARY_VALUE_CHARS);
+}
+
+/**
+ * `text` cut to at most `max` characters (UTF-16 code units), without splitting an emoji or
+ * other two-unit character, and trimmed at the end.
+ */
+export function cutText(text: string, max: number): string {
+  let cut = text.slice(0, max);
   // A high surrogate at the end is half of a two-unit character: leave it out.
   if (/[\ud800-\udbff]$/.test(cut)) cut = cut.slice(0, -1);
   return cut.trimEnd();
+}
+
+/** Spaces, tabs and other whitespace except a line break. */
+const INLINE_SPACE = "[^\\S\\n]";
+const DASH_WITH_SPACES = new RegExp(`${INLINE_SPACE}*[—–]${INLINE_SPACE}*`, "g");
+const INLINE_SPACES = new RegExp(`${INLINE_SPACE}+`, "g");
+
+/**
+ * AI text made fit to show (TR-42): each em-dash or en-dash, with the spaces around it, becomes
+ * ", "; runs of spaces become one space (line breaks are kept); the ends are trimmed. The
+ * prompt already asks for no em-dashes; this makes sure.
+ */
+export function cleanAiText(text: string): string {
+  return text.replace(DASH_WITH_SPACES, ", ").replace(INLINE_SPACES, " ").trim();
 }
 
 /**

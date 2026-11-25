@@ -9,6 +9,8 @@ import { isRateLimited } from "@/lib/rate-limit";
 // Keeps nothing between calls and logs only `translator_ai_<code>`.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Two 12-second attempts inside a 25-second request budget (ai/guardrails.ts), plus room to reply.
+export const maxDuration = 30;
 
 export function POST(request: Request) {
   return handleAiRequest(request, {

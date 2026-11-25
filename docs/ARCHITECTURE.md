@@ -240,7 +240,7 @@ In the database, the single `UPDATE` passes through RLS (`is_admin()`), the audi
 2. A foreign `Origin` gives `403`. AI switched off (`aiEnabled()`) gives `503`.
 3. Body: JSON only, 100 KB at most, checked with `aiRequestSchema`; then the message limits (`413`).
 4. Rate limit: 30 requests per 10 minutes per admin (`429`).
-5. The capability (`interview.ts` or `intro.ts`) calls OpenAI through `client.ts`, with a 20-second limit (`504` on timeout, `502` on any other failure).
+5. The capability (`interview.ts` or `intro.ts`) calls OpenAI through `client.ts`, with 12 seconds per attempt and 25 seconds for the whole request (`504` on timeout, `502` on any other failure). The interview asks for structured output, checks the reply with `parseInterviewReply()` (`validate.ts`: the brief schema and every value in the file) and retries once if the reply isn't in the format (TR-42).
 
 Nothing is stored and nothing is logged except `translator_ai_<code>`. Statuses and messages: [API-DOCUMENTATION.md](API-DOCUMENTATION.md#post-apitranslatorai).
 
@@ -260,7 +260,7 @@ There is no `error.tsx` for the public site.
 The Data Axle Translator (Phase 1) is an admin tool at `/admin/translator` that turns a business contacts workbook into a ranked, explained shortlist and an Excel download. Its architecture differs from the rest of the app:
 
 - **Browser only.** Parsing, cleaning, ranking and export run in the browser. No rows go to a Server Action, Supabase, browser storage or the logs, and all state lives in one React component for one session.
-- **Phase 2 route (built in TR-39, chat UI not built yet).** Chat with AI calls one admin-only route, `/api/translator/ai`, which receives only the file summary and the intro fields of one chosen business, never full rows, and stores and logs nothing. Its AI instructions are placeholders until TR-41 and TR-48. Flow: [Translator AI call](#translator-ai-call-post-apitranslatorai). Details: [translator/README.md](translator/README.md#the-ai-route).
+- **Phase 2 route (built in TR-39, chat UI not built yet).** Chat with AI calls one admin-only route, `/api/translator/ai`, which receives only the file summary and the intro fields of one chosen business, never full rows, and stores and logs nothing. The interview uses the real instructions (TR-41) and every proposal is checked against the brief schema and the file before it is returned (TR-42); the intro fields are sent from TR-48. Flow: [Translator AI call](#translator-ai-call-post-apitranslatorai). Details: [translator/README.md](translator/README.md#the-ai-route).
 - **Folders** in `src/features/translator/`: `import/` (file checks, hash gate, parse, layout mappings), `normalize/` (clean, check, group duplicates), `criteria/` (the one `SearchBrief` schema), `ranking/` (filter, score, sort, reasons, pin and omit), `export/` (the `.xlsx`) are plain TypeScript with no React; `ai/` (Phase 2) holds the AI route's logic, and its `client.ts` is the only server-only file; `ui/` holds the components.
 
 ```text

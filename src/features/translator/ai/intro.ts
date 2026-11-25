@@ -4,6 +4,7 @@
  * Output: the draft text, or the code of the failed call.
  * Privacy: receives only the intro fields of one business and the user's own words. Never rows.
  */
+import { AI_ATTEMPT_TIMEOUT_MS, withTimeout } from "./guardrails";
 import { buildIntroInstructions } from "./instructions";
 import type { AiCall, IntroFields, IntroResult } from "./types";
 
@@ -14,11 +15,12 @@ export async function runIntroDraft(
   input: { intro: IntroFields; goal: string },
   callAi: AiCall, // real client in the route, fake in tests
 ): Promise<IntroResult> {
-  const raw = await callAi({
-    instructions: buildIntroInstructions(),
-    messages: [{ role: "user", content: input.goal }],
-    format: "text",
-  });
+  // One attempt, no retry, limited like each interview attempt (12 s).
+  const raw = await withTimeout(
+    callAi({ instructions: buildIntroInstructions(), messages: [{ role: "user", content: input.goal }], format: "text" }),
+    AI_ATTEMPT_TIMEOUT_MS,
+    () => ({ ok: false, code: "timeout" }) as const,
+  );
   if (!raw.ok) return { ok: false, code: raw.code };
   return { ok: true, kind: "intro", draft: raw.value };
 }

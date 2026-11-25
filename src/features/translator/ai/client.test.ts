@@ -69,15 +69,40 @@ describe("createOpenAiCall", () => {
     vi.stubEnv("OPENAI_MODEL", "gpt-test");
   });
 
-  it("sends one request with a 20-second timeout, no retries and store: false", async () => {
+  it("sends one request with a 12-second timeout, no retries and store: false", async () => {
     sdk.create.mockResolvedValue({ output_text: "  Hi there.  " });
     await expect(createOpenAiCall()(CALL)).resolves.toEqual({ ok: true, value: "Hi there." });
-    expect(sdk.options).toEqual([{ apiKey: "sk-test", timeout: 20_000, maxRetries: 0 }]);
+    expect(sdk.options).toEqual([{ apiKey: "sk-test", timeout: 12_000, maxRetries: 0 }]);
     expect(sdk.create).toHaveBeenCalledWith({
       model: "gpt-test",
       instructions: "Reply briefly.",
       input: [{ role: "user", content: "Hello" }],
       store: false,
+    });
+  });
+
+  it("asks for strict structured output with the given schema", async () => {
+    sdk.create.mockResolvedValue({ output_text: '{"message":"Hi","proposal":null}' });
+    const schema = { type: "object", properties: {}, required: [], additionalProperties: false };
+    const result = await createOpenAiCall()({ ...CALL, format: { name: "interview_reply", schema } });
+    expect(result).toEqual({ ok: true, value: '{"message":"Hi","proposal":null}' });
+    expect(sdk.create).toHaveBeenCalledWith({
+      model: "gpt-test",
+      instructions: "Reply briefly.",
+      input: [{ role: "user", content: "Hello" }],
+      store: false,
+      text: { format: { type: "json_schema", name: "interview_reply", schema, strict: true } },
+    });
+  });
+
+  it("maps a refusal to empty", async () => {
+    sdk.create.mockResolvedValue({
+      output_text: "",
+      output: [{ type: "message", content: [{ type: "refusal", refusal: "I can't help with that." }] }],
+    });
+    await expect(createOpenAiCall()({ ...CALL, format: { name: "interview_reply", schema: {} } })).resolves.toEqual({
+      ok: false,
+      code: "empty",
     });
   });
 
