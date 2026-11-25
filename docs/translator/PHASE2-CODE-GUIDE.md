@@ -2,7 +2,7 @@
 
 How to write the Translator's Phase 2 code (Chat with AI). Every Phase 2 ticket follows this guide.
 
-- **Status:** in progress. TR-38 set the rules, this guide, the environment variables and the `openai` dependency. TR-39 built the route and the files it needs: `types.ts`, `request-schema.ts`, `client.ts`, `guardrails.ts`, `handle-request.ts`, and placeholder `interview.ts` and `intro.ts`. TR-40 added `summary.ts` and `sanitizeSummaryValue()` in `guardrails.ts`. TR-41 added `instructions.ts`. TR-42 added `schema.ts` and `validate.ts`, made `interview.ts` real, and added `cleanAiText()` and `cutText()` to `guardrails.ts`. The other files below are created by later tickets.
+- **Status:** in progress. TR-38 set the rules, this guide, the environment variables and the `openai` dependency. TR-39 built the route and the files it needs: `types.ts`, `request-schema.ts`, `client.ts`, `guardrails.ts`, `handle-request.ts`, and placeholder `interview.ts` and `intro.ts`. TR-40 added `summary.ts` and `sanitizeSummaryValue()` in `guardrails.ts`. TR-41 added `instructions.ts`. TR-42 added `schema.ts` and `validate.ts`, made `interview.ts` real, and added `cleanAiText()` and `cutText()` to `guardrails.ts`. TR-43 made the admin page pass `aiEnabled` to the Criteria step (the chooser is in `ui/`, no new `ai/` files). The other files below are created by later tickets.
 - **Rules:** the hard rules are in [../../CLAUDE.md](../../CLAUDE.md). What Phase 2 is, its flow and what is sent to the AI: [README.md](README.md#phase-2).
 - **Source:** the code guide in issue #81 (TR-38), with the corrections listed in [Changes from the issue's guide](#changes-from-the-issues-guide).
 
@@ -12,7 +12,7 @@ How to write the Translator's Phase 2 code (Chat with AI). Every Phase 2 ticket 
 src/
   app/
     admin/(protected)/translator/
-      page.tsx            # Phase 1 page. Phase 2: reads aiEnabled() and passes a boolean prop to the UI.
+      page.tsx            # Calls aiEnabled() and passes the boolean to TranslatorSession (TR-43).
     api/translator/ai/
       route.ts            # ONLY server entry point. Thin: builds the real deps and calls handleAiRequest().
   features/translator/
@@ -73,6 +73,8 @@ Rules:
   - `createOpenAiCall()`: the real `AiCall` the route passes to the capabilities.
 - The variables are described in [ENVIRONMENT-CONFIGURATION.md](../guides/ENVIRONMENT-CONFIGURATION.md#environment-variables).
 - **Showing the button.** The UI can't call `aiEnabled()`, because it can't import `client.ts`. The admin page is a Server Component, so it may import `aiEnabled` from `client.ts`, call it, and pass the result to the UI as a boolean prop. The key itself never goes in a prop.
+  - Built in TR-43: `page.tsx` renders `<TranslatorSession aiEnabled={aiEnabled()} />`, and the prop goes through `TranslatorWizard` to the Criteria step. The page is dynamic (`requireAdmin()` reads cookies), so the value is read on every request.
+  - **No second env helper.** Issue #86 asked for `isTranslatorAiEnabled()`; it was not added, because `aiEnabled()` already does exactly that and two copies would drift. Reuse `aiEnabled()` wherever the on/off state is needed on the server.
 - **12 seconds per attempt, 25 per request (TR-42).** The SDK client gets `timeout: AI_ATTEMPT_TIMEOUT_MS` (12 s) and `maxRetries: 0`. The SDK retries twice by default, which would blow the budget. Each capability wraps every attempt in `withTimeout(..., AI_ATTEMPT_TIMEOUT_MS)`, and `handle-request.ts` wraps the whole capability, the interview's one retry included, in `withTimeout(..., AI_REQUEST_TIMEOUT_MS)` (25 s), so the limits hold even if the SDK misbehaves, and tests can check them with fake timers. The route exports `maxDuration = 30` for Vercel.
 - **Structured output (TR-42).** `AiCall`'s `format` is `"text"` or `{ name: "interview_reply"; schema }`. For the second, `client.ts` sends `text: { format: { type: "json_schema", name, schema, strict: true } }` in the Responses API it already uses. A refusal (a `refusal` part instead of text) or an empty reply gives `{ ok: false, code: "empty" }`.
 - **Nothing stored at OpenAI either.** Calls use the Responses API with `store: false`.
@@ -202,7 +204,7 @@ Notes on the pattern:
 - Components only render and forward events. No validation, no prompt text, no fetch logic inside components.
 - `use-chat-session.ts` owns state and the `fetch("/api/translator/ai")` call.
 - State lives in React only. No localStorage, sessionStorage, cookies, URL params with content.
-- The UI learns whether the AI is on from a boolean prop passed down from the admin page (section 2). It never reads an environment variable.
+- The UI learns whether the AI is on from a boolean prop (`aiEnabled`) passed down from the admin page (section 2, TR-43). It never reads an environment variable.
 - Show the route's `error` text as it is. The status only matters for `401` (the session ended: offer a way to log in again).
 
 ## 6. When the AI is off or fails
@@ -242,3 +244,4 @@ Where this guide differs from the code guide in issue #81, and why.
 | 6 | `json()` and `readJsonWithLimit()` weren't defined anywhere | TR-39 put them in `ai/handle-request.ts` (the route stays thin), with a 100 KB body limit as a named constant (section 4) |
 | 7 | "Never log" didn't cover errors | OpenAI errors are caught and only `translator_ai_<code>` is logged (section 2) |
 | 8 | Nothing said what happens when the AI is off or fails | The Phase 1 form stays available and works exactly as before (section 6) |
+| 9 | Issue #86 (TR-43) asked for a new `isTranslatorAiEnabled()` reading `process.env` | Not added: the page reuses `aiEnabled()` from `client.ts`, so one function holds the rule and only `client.ts` reads the environment (section 2) |

@@ -20,7 +20,7 @@ Every setting the app depends on: environment variables, and the settings that e
 
 `BUILT_AT` is set by `next.config.ts` at build time; don't set it yourself.
 
-The Translator's Phase 1 uses no environment variables. The three Phase 2 variables were added in TR-38. Since TR-39 they are read only in `src/features/translator/ai/client.ts`, by the AI route `/api/translator/ai` ([translator/PHASE2-CODE-GUIDE.md](../translator/PHASE2-CODE-GUIDE.md)). Chat with AI shows only when `OPENAI_API_KEY` is set and `TRANSLATOR_AI` is not `"off"`.
+The Translator's Phase 1 uses no environment variables. The three Phase 2 variables were added in TR-38. Since TR-39 they are read only in `src/features/translator/ai/client.ts`, used by the AI route `/api/translator/ai` and, since TR-43, by the `/admin/translator` page, which passes `aiEnabled()` to the UI as a boolean ([translator/PHASE2-CODE-GUIDE.md](../translator/PHASE2-CODE-GUIDE.md)). Chat with AI shows only when `OPENAI_API_KEY` is set and `TRANSLATOR_AI` is not `"off"`.
 
 ### What happens when one is missing
 
@@ -30,7 +30,7 @@ The Translator's Phase 1 uses no environment variables. The three Phase 2 variab
 | `SUPABASE_SERVICE_ROLE_KEY` | Subscribe shows "Something went wrong on our end"; reset requests silently send nothing; cron returns 500 |
 | `RESEND_API_KEY` | Signups save; no notification email |
 | `CRON_SECRET` | Cron returns 500 "Not configured" |
-| `OPENAI_API_KEY` | `/api/translator/ai` answers `503` ("The AI assistant is not available right now. Use the form instead."). Once the chat UI is built, Chat with AI is not shown and the form works as before |
+| `OPENAI_API_KEY` | `/api/translator/ai` answers `503` ("The AI assistant is not available right now. Use the form instead."). The Criteria step shows no Chat with AI choice and the form works as before (TR-43) |
 
 ## Per environment
 

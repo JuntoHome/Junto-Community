@@ -18,6 +18,8 @@ import {
   PickedPreferenceField,
   useCriteriaOptions,
 } from "./criteria-controls";
+import { CHOOSER_TEXT, CriteriaChooser, SwitchLink } from "./criteria-chooser";
+import { type CriteriaMode, MODE_ANNOUNCEMENT } from "./criteria-mode";
 
 // The strings only this step shows. The controls' own are in criteria-controls.tsx. Plain language, no em-dashes.
 const TEXT = {
@@ -40,8 +42,94 @@ const MORE_FIELDS = ["industry", "title"] as const satisfies readonly MustHaveFi
 
 const sectionHeading = "font-serif text-xl font-bold text-navy";
 
+type CriteriaFormProps = {
+  records: readonly GroupedRecord[];
+  form: CriteriaForm;
+  onFormChange: (form: CriteriaForm) => void;
+  onContinue: (brief: SearchBrief, form: CriteriaForm) => void;
+};
+
 /**
- * The Criteria step (TR-14, TR-15): the goal, must-haves, preferences with an optional
+ * The Criteria step (TR-43). With the AI on, it starts with the chooser: Chat with AI or the
+ * form. The user can switch between them at any time; the form's values live in the wizard, so
+ * switching never clears them. With the AI off, the form shows directly, exactly as in Phase 1,
+ * with no chooser and no link to the chat.
+ *
+ * The wizard holds `mode`, so going back to Criteria from Results shows the mode already chosen,
+ * and Start over or a new workbook resets it. After a choice or a switch, focus moves to the
+ * heading of what opened (the chat's heading, or the step's heading for the form) and
+ * `onAnnounce` tells screen readers which one it is.
+ */
+export function CriteriaStep({
+  aiEnabled,
+  mode,
+  onModeChange,
+  onAnnounce,
+  focusStepHeading,
+  ...formProps
+}: CriteriaFormProps & {
+  aiEnabled: boolean;
+  mode: CriteriaMode;
+  onModeChange: (mode: CriteriaMode) => void;
+  /** Says the text in the page's live region. */
+  onAnnounce: (text: string) => void;
+  /** Moves focus to the step's "Criteria" heading, the heading above the form. */
+  focusStepHeading: () => void;
+}) {
+  const chatHeadingRef = useRef<HTMLHeadingElement>(null);
+  // Counts choices and switches, so focus moves after one but not when the step first shows.
+  const [switches, setSwitches] = useState(0);
+  useEffect(() => {
+    if (switches === 0) return;
+    if (mode === "chat") chatHeadingRef.current?.focus();
+    else if (mode === "form") focusStepHeading();
+    // Only after a switch: `mode` changes in the same render, `focusStepHeading` never matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [switches]);
+
+  function switchTo(next: Exclude<CriteriaMode, "choose">) {
+    onModeChange(next);
+    setSwitches((n) => n + 1);
+    onAnnounce(MODE_ANNOUNCEMENT[next]);
+  }
+
+  // The AI off always means the form, whatever the mode says.
+  if (!aiEnabled || mode === "form") {
+    return (
+      <>
+        {aiEnabled && (
+          <div className="mt-3">
+            <SwitchLink onClick={() => switchTo("chat")}>{CHOOSER_TEXT.useChat}</SwitchLink>
+          </div>
+        )}
+        <CriteriaFormPanel {...formProps} />
+      </>
+    );
+  }
+
+  if (mode === "choose") {
+    return <CriteriaChooser onChat={() => switchTo("chat")} onForm={() => switchTo("form")} />;
+  }
+
+  // TODO(TR-44): replace this placeholder with the chat panel (ui/chat/chat-panel.tsx).
+  return (
+    <section aria-labelledby="criteria-chat-heading" className="mt-5 flex flex-col items-start gap-3 text-base">
+      <h3
+        id="criteria-chat-heading"
+        ref={chatHeadingRef}
+        tabIndex={-1}
+        className={`${sectionHeading} focus:outline-none`}
+      >
+        {CHOOSER_TEXT.chatHeading}
+      </h3>
+      <div className="w-full rounded-xl border border-sand bg-ivory p-5 text-muted">{CHOOSER_TEXT.chatComingSoon}</div>
+      <SwitchLink onClick={() => switchTo("form")}>{CHOOSER_TEXT.useForm}</SwitchLink>
+    </section>
+  );
+}
+
+/**
+ * The Criteria form (TR-14, TR-15): the goal, must-haves, preferences with an optional
  * importance order, exclusions and list size. The pickers offer the values found in `records`,
  * with counts. On Continue the form becomes a SearchBrief through `toBrief()`; nothing is
  * posted. The form's state is held by the wizard, so it survives leaving the step, and each
@@ -51,17 +139,7 @@ const sectionHeading = "font-serif text-xl font-bold text-navy";
  * There is no geography preference here on purpose: the issue doesn't ask for one, and city
  * and state are must-haves. The schema and ranking (TR-18) still support it for Phase 2's AI.
  */
-export function CriteriaStep({
-  records,
-  form,
-  onFormChange,
-  onContinue,
-}: {
-  records: readonly GroupedRecord[];
-  form: CriteriaForm;
-  onFormChange: (form: CriteriaForm) => void;
-  onContinue: (brief: SearchBrief, form: CriteriaForm) => void;
-}) {
+function CriteriaFormPanel({ records, form, onFormChange, onContinue }: CriteriaFormProps) {
   const options = useCriteriaOptions(records);
   const [errors, setErrors] = useState<CriteriaFormErrors>({});
 

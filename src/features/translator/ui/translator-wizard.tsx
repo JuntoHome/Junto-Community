@@ -15,6 +15,7 @@ import { compareIssues, validateRows } from "../normalize/validate-rows";
 import { rank } from "../ranking";
 import { buildCounts } from "../ranking/counts";
 import { NO_OVERRIDES, type Overrides, pinContext } from "../ranking/overrides";
+import { type CriteriaMode, initialCriteriaMode } from "./criteria-mode";
 import { CriteriaStep } from "./criteria-step";
 import { ExportStep } from "./export-step";
 import { FileUpload } from "./file-upload";
@@ -49,11 +50,15 @@ function toFiles(input: WorkbookFileInput): readonly File[] {
  * state goes at once; don't keep Translator data anywhere else.
  */
 export function TranslatorWizard({
+  aiEnabled,
   initialFiles,
   focusOnMount,
   onStartOver,
   onNewFiles,
+  onAnnounce,
 }: {
+  /** Chat with AI may run (`aiEnabled()` on the server page). Off: the form shows directly, as in Phase 1. */
+  aiEnabled: boolean;
   /** Files chosen in the previous session, loaded as soon as this one starts. */
   initialFiles: readonly File[] | null;
   /** After Start over: move focus to the Upload heading on mount. */
@@ -62,6 +67,8 @@ export function TranslatorWizard({
   onStartOver: () => void;
   /** Another workbook was chosen while one is loaded: start a new session with it. */
   onNewFiles: (files: readonly File[]) => void;
+  /** Says the text in the session's live region. */
+  onAnnounce: (text: string) => void;
 }) {
   const [current, setCurrent] = useState<StepId>("upload");
   // Later tickets mark each step done as its work is built.
@@ -75,6 +82,9 @@ export function TranslatorWizard({
   const [fileError, setFileError] = useState<string | null>(null);
   // What the Criteria step's form holds, kept here so going back to Criteria shows the same choices.
   const [criteriaForm, setCriteriaForm] = useState<CriteriaForm>(EMPTY_CRITERIA_FORM);
+  // How the Criteria step is filled in (TR-43): the chooser, the chat or the form. Kept here, so
+  // going back to Criteria shows the mode already chosen and the remount resets it.
+  const [criteriaMode, setCriteriaMode] = useState<CriteriaMode>(() => initialCriteriaMode(aiEnabled));
   // The brief waiting to be ranked: set by Continue on Criteria and by a Save in the criteria
   // summary (TR-16), with the form that produced it, so the summary's editors start from that form.
   const [pendingBrief, setPendingBrief] = useState<SearchBrief | null>(null);
@@ -247,6 +257,11 @@ export function TranslatorWizard({
           />
         ) : step.id === "criteria" && workbook ? (
           <CriteriaStep
+            aiEnabled={aiEnabled}
+            mode={criteriaMode}
+            onModeChange={setCriteriaMode}
+            onAnnounce={onAnnounce}
+            focusStepHeading={() => headingRef.current?.focus()}
             records={workbook.records}
             form={criteriaForm}
             onFormChange={setCriteriaForm}
