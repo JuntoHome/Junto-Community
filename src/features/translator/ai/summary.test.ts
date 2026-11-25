@@ -278,6 +278,11 @@ describe("fileSummarySchema", () => {
     expect(fileSummarySchema.safeParse(valid()).success).toBe(true);
   });
 
+  it("accepts a value with 6 digits", () => {
+    const summary = { ...valid(), titles: [{ value: "Route 66 Team 2024", count: 1 }] };
+    expect(fileSummarySchema.safeParse(summary).success).toBe(true);
+  });
+
   it.each([
     ["an extra rows key", { ...valid(), rows: [] }],
     ["an extra key in a list item", { ...valid(), titles: [{ value: "Owner", count: 1, company: "X" }] }],
@@ -287,6 +292,11 @@ describe("fileSummarySchema", () => {
     ["101 values", { ...valid(), cities: Array.from({ length: 101 }, (_, i) => ({ value: `City ${i}`, count: 1 })) }],
     ["an 81-character value", { ...valid(), titles: [{ value: "a".repeat(81), count: 1 }] }],
     ["an empty value", { ...valid(), titles: [{ value: "", count: 1 }] }],
+    ["an email value", { ...valid(), titles: [{ value: "jane@example.invalid", count: 1 }] }],
+    ["a phone value", { ...valid(), cities: [{ value: "602 555 0100", count: 1 }] }],
+    ["a website value", { ...valid(), industries: [{ value: "WWW.example.invalid", count: 1 }] }],
+    ["a URL value", { ...valid(), states: [{ value: "https://example.invalid", count: 1 }] }],
+    ["a value with 7 digits", { ...valid(), titles: [{ value: "Unit 12 Suite 34 Box 567", count: 1 }] }],
     ["a count of 0", { ...valid(), titles: [{ value: "Owner", count: 0 }] }],
     ["a fractional count", { ...valid(), titles: [{ value: "Owner", count: 1.5 }] }],
     ["an unknown layout", { ...valid(), layout: "other" }],

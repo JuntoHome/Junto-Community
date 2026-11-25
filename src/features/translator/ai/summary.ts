@@ -15,7 +15,8 @@
  * It must never contain: company names, person names, phones, emails, websites, record IDs,
  * addresses, ZIP codes, NAICS text, other executives, or any other field of a row. Every listed
  * value goes through `sanitizeSummaryValue()`, which drops anything that looks like an email,
- * phone or website. The schema is strict, so the route refuses a summary with any extra key.
+ * phone or website. The schema is strict, so the route refuses a summary with any extra key,
+ * and it repeats the contact check, so the route refuses a contact-looking value too.
  *
  * This module is pure (zod only, no React, no I/O).
  */
@@ -23,7 +24,7 @@ import { z } from "zod";
 import { fieldOptions } from "../normalize/field-options";
 import type { NormalizedRow } from "../normalize/normalize";
 import type { CategoryField } from "../normalize/types";
-import { MAX_SUMMARY_VALUE_CHARS, sanitizeSummaryValue } from "./guardrails";
+import { looksLikeContactData, MAX_SUMMARY_VALUE_CHARS, sanitizeSummaryValue } from "./guardrails";
 
 /** Most values one list may hold. */
 export const MAX_SUMMARY_VALUES = 100;
@@ -31,7 +32,13 @@ export const MAX_SUMMARY_VALUES = 100;
 const count = z.number().int();
 
 const summaryValueSchema = z.strictObject({
-  value: z.string().min(1).max(MAX_SUMMARY_VALUE_CHARS),
+  // The contact check repeats the browser's (sanitizeSummaryValue), so the route refuses an
+  // email, phone or website even if the browser let one through.
+  value: z
+    .string()
+    .min(1)
+    .max(MAX_SUMMARY_VALUE_CHARS)
+    .refine((value) => !looksLikeContactData(value)),
   count: count.min(1),
 });
 

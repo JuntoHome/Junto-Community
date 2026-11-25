@@ -19,8 +19,12 @@ export const MAX_SUMMARY_VALUE_CHARS = 80;
  */
 const CONTROL_OR_LINE_BREAK = /[\u0000-\u001f\u007f-\u009f]/g;
 
-/** Signs of contact data: an email, a website, or a phone number (7 or more digits in all). */
-const looksLikeContact = (text: string) =>
+/**
+ * True when `text` looks like contact data: it contains `@`, `http` or `www.` (any case), or 7
+ * or more digits in all. `sanitizeSummaryValue()` drops such values in the browser, and
+ * `fileSummarySchema` refuses them on the server, so both use this one rule.
+ */
+export const looksLikeContactData = (text: string) =>
   text.includes("@") ||
   /http|www\./i.test(text) ||
   (text.match(/[0-9]/g)?.length ?? 0) >= 7;
@@ -41,7 +45,7 @@ export function sanitizeSummaryValue(text: string): string | null {
     .replace(CONTROL_OR_LINE_BREAK, " ")
     .replace(/\s+/g, " ")
     .trim();
-  if (clean === "" || looksLikeContact(clean)) return null;
+  if (clean === "" || looksLikeContactData(clean)) return null;
   let cut = clean.slice(0, MAX_SUMMARY_VALUE_CHARS);
   // A high surrogate at the end is half of a two-unit character: leave it out.
   if (/[\ud800-\udbff]$/.test(cut)) cut = cut.slice(0, -1);

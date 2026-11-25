@@ -49,10 +49,10 @@ type FileSummary = {                       // fileSummarySchema in ai/summary.ts
   employees: { min: number | null; max: number | null; withValue: number; blank: number };
   truncated: { cities: boolean; states: boolean; industries: boolean; titles: boolean };
 };
-type SummaryValue = { value: string; count: number };   // value 1 to 80 characters, count a whole number, 1 or more
+type SummaryValue = { value: string; count: number };   // value 1 to 80 characters, not contact-looking; count a whole number, 1 or more
 ```
 
-- `summary` is the file summary built in the browser by `buildFileSummary()`: what it holds, how it is sorted and which values are dropped are in [translator/README.md](translator/README.md#the-file-summary). The schema is **strict at every level**: an extra key anywhere (for example `rows`), a missing list or flag, a list over 100 items, a value that is empty or over 80 characters, a count below 1 or not whole, `min`, `max`, `withValue` or `blank` not a whole number (`withValue` and `blank` 0 or more), or an unknown `layout` gives `400`. The largest valid summary (4 lists of 100 values of 80 characters) is about 40 KB, well under the body limit.
+- `summary` is the file summary built in the browser by `buildFileSummary()`: what it holds, how it is sorted and which values are dropped are in [translator/README.md](translator/README.md#the-file-summary). The schema is **strict at every level**: an extra key anywhere (for example `rows`), a missing list or flag, a list over 100 items, a value that is empty or over 80 characters, a value that looks like contact data (contains `@`, `http` or `www.` in any case, or 7 or more digits in all; the browser drops these, so one arriving means something went wrong), a count below 1 or not whole, `min`, `max`, `withValue` or `blank` not a whole number (`withValue` and `blank` 0 or more), or an unknown `layout` gives `400`. The largest valid summary (4 lists of 100 values of 80 characters) is about 40 KB, well under the body limit.
 - `intro` is any JSON object for now. TR-48 (intro fields) defines it.
 - `messages`: 1 to 30. Each `content` has text in it (it is trimmed).
 - `currentBrief`, when given, must be a valid `SearchBrief` ([translator/README.md](translator/README.md#criteria-schema)).

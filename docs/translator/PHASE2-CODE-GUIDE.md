@@ -80,7 +80,7 @@ Rules:
 ### The file summary (`ai/summary.ts`)
 
 - **`FileSummary` is defined once,** in `summary.ts`, as `z.infer<typeof fileSummarySchema>`. `types.ts` only re-exports it, and `request-schema.ts` uses the same `fileSummarySchema` for the interview's `summary`. Never write the shape out by hand anywhere else: change the schema and the type follows.
-- **The schema is strict** (`z.strictObject` at every level). It is the server-side privacy wall: a summary with any extra key, such as `rows`, gets a `400`.
+- **The schema is strict** (`z.strictObject` at every level). It is the server-side privacy wall: a summary with any extra key, such as `rows`, gets a `400`. Each value is also refused when `looksLikeContactData()` (`guardrails.ts`) is true, the same rule `sanitizeSummaryValue()` uses to drop values in the browser, so the two can't drift apart.
 - **`truncated` has a `states` flag** as well as `cities`, `industries` and `titles`. Issue #83's type had no `states` flag, but states are capped at 100 too, and without a flag a bad file could lose values silently. Later tickets use the schema, not the issue's type.
 - **No `Infinity`.** `employees.min` and `max` use finite bounds only, because `JSON.stringify(Infinity)` is `null`.
 - **It reuses `fieldOptions()`** for the four lists and never recounts. What the summary holds, its caps, sorting and dropped values: [README.md](README.md#the-file-summary).

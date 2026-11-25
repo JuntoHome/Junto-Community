@@ -123,6 +123,14 @@ describe("handleAiRequest: what it accepts", () => {
       }),
     ],
     [
+      "a summary value that looks like an email",
+      post({ ...INTERVIEW, summary: { ...EXAMPLE_SUMMARY, titles: [{ value: "jane@example.invalid", count: 1 }] } }),
+    ],
+    [
+      "a summary value that looks like a phone number",
+      post({ ...INTERVIEW, summary: { ...EXAMPLE_SUMMARY, cities: [{ value: "602 555 0100", count: 1 }] } }),
+    ],
+    [
       "a summary value of 81 characters",
       post({ ...INTERVIEW, summary: { ...EXAMPLE_SUMMARY, titles: [{ value: "a".repeat(81), count: 1 }] } }),
     ],
