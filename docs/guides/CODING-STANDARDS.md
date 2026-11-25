@@ -58,6 +58,7 @@ src/features/<feature>/
 
 - Prefix server logs with the feature: `[profiles]`, `[subscribe]`, `[login]`, `[reset]`, `[set-password]`, `[keep-alive]`.
 - Log errors, not personal data. Never log Translator rows (no `console.log` of workbook data at all).
+- The Translator logs fixed codes only: `[translator] <code>` in the browser (`logTranslatorError()`), and `translator_ai_<code>` in the AI route (`ai/handle-request.ts`). Never a message, a value or an error's text.
 
 ## Database access
 
@@ -95,8 +96,8 @@ Additional rules for `src/features/translator/` (from [CLAUDE.md](../../CLAUDE.m
 - Data stays in memory in the browser: no Server Actions, Supabase, localStorage, cookies or logging for rows. Phase 2 has two exceptions, and only to our own route `/api/translator/ai`: the file summary and the intro fields of one chosen business. Never full rows, never stored, never logged.
 - Use only synthetic test data.
 
-Phase 2 (Chat with AI, not built yet) adds two layers. Layout, layers, patterns and the "never do" list are in [translator/PHASE2-CODE-GUIDE.md](../translator/PHASE2-CODE-GUIDE.md); follow it for every Phase 2 ticket.
+Phase 2 (Chat with AI, in progress: the route is built, TR-39) adds two layers. Layout, layers, patterns and the "never do" list are in [translator/PHASE2-CODE-GUIDE.md](../translator/PHASE2-CODE-GUIDE.md); follow it for every Phase 2 ticket.
 
 - `ai/`: pure logic like the Phase 1 modules, with no React, no network and no `process.env`. The one exception is `ai/client.ts`, which starts with `import "server-only"` and is the only file that imports `openai` and reads the environment.
 - `ui/chat/`: React only, no business rules. It never imports `ai/client.ts` or `openai`.
-- The route `src/app/api/translator/ai/route.ts` is the only server entry point. It checks the admin with `getAdmin()` and answers `401` as JSON, because `requireAdmin()` redirects.
+- The route `src/app/api/translator/ai/route.ts` is the only server entry point. It checks the admin with `getAdmin()` and answers `401` as JSON, because `requireAdmin()` redirects. Its work is in `ai/handle-request.ts`, with its dependencies passed in.

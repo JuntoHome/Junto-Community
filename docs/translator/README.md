@@ -17,7 +17,7 @@ The developer guide for the Data Axle Translator. This file owns every Translato
 11. [Tests](#tests)
 12. [Expected results](#expected-results)
 13. [How to add a new input format](#how-to-add-a-new-input-format)
-14. [Phase 2](#phase-2): [Flow](#flow), [What is sent to the AI](#what-is-sent-to-the-ai), [How the brief plugs in](#how-the-brief-plugs-in), [Where the code will live](#where-the-code-will-live), [Switching it on](#switching-it-on), [Open items](#open-items)
+14. [Phase 2](#phase-2): [Flow](#flow), [What is sent to the AI](#what-is-sent-to-the-ai), [How the brief plugs in](#how-the-brief-plugs-in), [The AI route](#the-ai-route), [Where the code will live](#where-the-code-will-live), [Switching it on](#switching-it-on), [Open items](#open-items)
 15. [How to change scoring](#how-to-change-scoring)
 16. [Troubleshooting](#troubleshooting)
 17. [Known limitations](#known-limitations)
@@ -25,7 +25,7 @@ The developer guide for the Data Axle Translator. This file owns every Translato
 
 ## What it is
 
-The Data Axle Translator is a tool in the JCA admin area that lets a library patron upload a business contacts spreadsheet, describe a target in plain terms (for example "Phoenix fabrication owners"), and download a ranked, explained shortlist as an Excel file. Typical users are business owners looking for customers and job seekers looking for employers; in Phase 1 the JCA team runs it for them from the admin area. Phase 1 covers upload, preview, a criteria form, deterministic ranking, results and Excel export, with synthetic data only and no AI. Phase 2 will add a Chat with AI option that fills the same criteria; its rules are set but none of it is built ([Phase 2](#phase-2)). Page: `/admin/translator` (`src/app/admin/(protected)/translator/page.tsx`), behind the admin login, not in the public menu or sitemap. Work is tracked in GitHub issues TR-01 to TR-35 (milestone "Data Axle Translator Phase 1"); status is in [TASKS.md](../TASKS.md).
+The Data Axle Translator is a tool in the JCA admin area that lets a library patron upload a business contacts spreadsheet, describe a target in plain terms (for example "Phoenix fabrication owners"), and download a ranked, explained shortlist as an Excel file. Typical users are business owners looking for customers and job seekers looking for employers; in Phase 1 the JCA team runs it for them from the admin area. Phase 1 covers upload, preview, a criteria form, deterministic ranking, results and Excel export, with synthetic data only and no AI. Phase 2 will add a Chat with AI option that fills the same criteria; its rules are set and its server route is built (TR-39), but the chat itself isn't yet ([Phase 2](#phase-2)). Page: `/admin/translator` (`src/app/admin/(protected)/translator/page.tsx`), behind the admin login, not in the public menu or sitemap. Work is tracked in GitHub issues TR-01 to TR-35 (milestone "Data Axle Translator Phase 1"); status is in [TASKS.md](../TASKS.md).
 
 Staging: `<URL pending>`
 
@@ -33,7 +33,7 @@ Staging: `<URL pending>`
 
 ## Rules
 
-One list for both phases. Two rules change in Phase 2, and each says how. Phase 2 is not built yet ([Phase 2](#phase-2)).
+One list for both phases. Two rules change in Phase 2, and each says how. Phase 2 is in progress: only its server route is built ([Phase 2](#phase-2)).
 
 - **Synthetic data only.** No Data Axle connection. Never upload, copy, paste or commit real Data Axle or Reference Solutions records, not even one row. Unchanged in Phase 2: the [file gate](#file-gate) stays and real exports remain out of scope.
 - **Browser only, with two Phase 2 exceptions.** Parsing, cleaning, ranking and export all run in the browser. Rows are never sent to the server, stored (Supabase, localStorage, cookies) or logged. They last for one session: Start over or a refresh clears them ([Session and Start over](#session-and-start-over)).
@@ -76,7 +76,8 @@ Everything is in `src/features/translator/` unless the path says otherwise.
 | `ranking/` | Filter, score, sort, explain, pin and omit, cut to the list size; counts, no-results diagnosis, missing fields | `index.ts` (`rank()`), `match.ts`, `filter.ts`, `weights.ts`, `score.ts`, `sort.ts`, `compare-ids.ts`, `reasons.ts`, `overrides.ts`, `limit.ts`, `counts.ts`, `diagnose.ts`, `missing.ts` | Use React, I/O, logging, randomness, AI, `localeCompare()` or `Intl.Collator` |
 | `export/` | Build the `.xlsx` in memory: Shortlist and Criteria sheets, safe text cells, file name and labels | `workbook.ts`, `shortlist-rows.ts`, `criteria-rows.ts`, `cells.ts`, `file-name.ts`, `labels.ts` | Use React. Read the uploaded buffer. Write a formula, or text other than through `setTextCell()` |
 | `ui/` | The React components and all session state | `translator-session.tsx`, `translator-wizard.tsx`, `file-upload.tsx`, `sample-buttons.tsx`, `preview-step.tsx`, `criteria-step.tsx`, `criteria-controls.tsx`, `criteria-summary.tsx`, `results-step.tsx`, `results-table.tsx`, `counts-summary.tsx`, `no-results.tsx`, `export-step.tsx`, `start-over.tsx`, `log-error.ts`, `samples.ts` | Compare or score records itself (it calls the pure modules). Store anything outside React state. Call `console` except through `logTranslatorError()` |
-| `__fixtures__/` | Test-only helpers, fixture builders and golden files | `pipeline.ts`, `import-pipeline.ts`, `build-workbook.ts`, `records.ts`, `rs-headers.ts`, `rs-row.ts`, `walkthroughs/` | Be imported by app code. Be allowlisted. Contain real data |
+| `ai/` | Phase 2 (in progress): the AI route's checks, the OpenAI client and the capabilities ([The AI route](#the-ai-route)) | `handle-request.ts`, `request-schema.ts`, `client.ts` (server only), `guardrails.ts`, `interview.ts`, `intro.ts`, `types.ts` | Use React or `next/*`. Import `openai` or read `process.env` outside `client.ts`. Log anything but `translator_ai_<code>`. Rank, score, filter or sort |
+| `__fixtures__/` | Test-only helpers, fixture builders and golden files | `pipeline.ts`, `import-pipeline.ts`, `build-workbook.ts`, `records.ts`, `rs-headers.ts`, `rs-row.ts`, `walkthroughs/`, `empty.ts` (stands in for `server-only` in tests) | Be imported by app code. Be allowlisted. Contain real data |
 
 Tests sit beside the code as `*.test.ts`; two cover the whole feature and sit at the top: `edge-cases.test.ts` and `rs-sample.test.ts` ([Tests](#tests)). ExcelJS is imported by `import/parse.ts` and `export/workbook.ts` (both loaded with `import()` on first use) and as a type by `export/cells.ts`; JSZip only by `import/xlsx-compat.ts`.
 
@@ -85,6 +86,7 @@ Outside the feature folder:
 | Path | What it is |
 |---|---|
 | `src/app/admin/(protected)/translator/page.tsx` | The page: `requireAdmin()`, then `SyntheticBanner` and `TranslatorSession` |
+| `src/app/api/translator/ai/route.ts` | Phase 2's AI route ([The AI route](#the-ai-route)) |
 | `src/components/admin/modules.ts` | The admin sidebar entry |
 | `public/translator/` | The two sample workbooks served to the sample buttons, byte-identical to the ones in this folder |
 | `scripts/translator/make-rs-fixture.ts` | Builds the Reference Solutions sample. Not part of the app |
@@ -101,7 +103,7 @@ criteria form ─▶ toBrief() ─▶ pending brief ─▶ Confirm and rank ─�
                        all in the browser; Start over throws it all away
 ```
 
-Every step runs in the browser. This is Phase 1 as built; Phase 2 will add two calls to a server route, described in [Phase 2](#phase-2). The pure functions live in `import/` to `export/`; `ui/translator-wizard.tsx` calls them and holds the results in React state.
+Every step runs in the browser. This is Phase 1 as built; Phase 2 adds two calls to a server route (the route is built, nothing calls it yet), described in [Phase 2](#phase-2). The pure functions live in `import/` to `export/`; `ui/translator-wizard.tsx` calls them and holds the results in React state.
 
 1. **Choose a workbook.** Every workbook enters through `handleWorkbook(input)` in `ui/translator-wizard.tsx`. The sample buttons (`ui/sample-buttons.tsx`, configured in `ui/samples.ts`) fetch a bundled file from `public/translator/` and turn it into a `File`; the file picker and drop zone (`ui/file-upload.tsx`) pass what the user chose. All take the same path, so there is no sample-only shortcut. If a workbook is already loaded, `handleWorkbook` starts a new session with the new files ([Session and Start over](#session-and-start-over)); otherwise `checkAndLoad()` calls `loadWorkbook(input, isCurrent)` (`import/load.ts`), which runs steps 2 to 4 and returns the gated file and the parsed workbook, or the step that refused the file with the message to show and, for an unexpected failure, the code the wizard logs. `isCurrent` lets it stop between steps once a newer file has been chosen, so a slow file never replaces it. On any problem the wizard stays on Upload and shows the message.
 2. **Check.** `checkWorkbookFile()` (`import/check-file.ts`): one file, not empty, at most 2 MB, `.xlsx` name, ZIP signature. Details: [Upload limits](#upload-limits).
@@ -878,7 +880,7 @@ Two columns, `Item` (width 28) and `Details` (width 90), with a bold, frozen hea
 
 ## Tests
 
-Unit tests run with Vitest: `npm run test` runs every test once, `npm run test:watch` re-runs them on save (TR-29). Config: `vitest.config.ts` (Node environment, files matching `src/**/*.test.ts`, the `@` alias). They sit beside the code as `*.test.ts` and run in Node, with no browser, no network, no environment variables and no random data. When to run them (before every commit and PR) and the rules for changing them: [WAY-OF-WORKING.md](../WAY-OF-WORKING.md#testing). There is no CI.
+Unit tests run with Vitest: `npm run test` runs every test once, `npm run test:watch` re-runs them on save (TR-29). Config: `vitest.config.ts` (Node environment, files matching `src/**/*.test.ts`, the `@` alias, and `server-only` aliased to the empty `__fixtures__/empty.ts`, because the real package throws outside a React Server environment). They sit beside the code as `*.test.ts` and run in Node, with no browser, no network, no real environment variables (`ai/client.test.ts` sets fake ones with `vi.stubEnv()`) and no random data. When to run them (before every commit and PR) and the rules for changing them: [WAY-OF-WORKING.md](../WAY-OF-WORKING.md#testing). There is no CI.
 
 **Run one file or one test.** Vitest filters by a part of the file path, and `-t` by test name:
 
@@ -905,6 +907,9 @@ npm run test -- edge-cases -t "file gate"        # tests in edge-cases.test.ts w
 | `ranking/walkthroughs.test.ts` | The three spec walkthroughs (TR-30) from the sample's bytes through `runPipeline()`: counts, first 8 rows, last row, score spread, the role change's export builders, repeat runs, 3 seeded shuffles, and the golden files |
 | `rs-sample.test.ts` | The [Reference Solutions sample](#the-reference-solutions-sample) (TR-35): its 396 headers, that only mapped columns are filled and every value is invented, the import figures, every documented row, the Phoenix fabrication shortlist and the export's Phone, Website and empty Email |
 | `edge-cases.test.ts` | The spec edge cases (TR-31), each from a real file (below) |
+| `ai/handle-request.test.ts` | The AI route's checks with fake dependencies (TR-39): `401`, `403`, `503`, every `400`, the `413` limits, `429`, the 20-second timeout with fake timers (`504`), `502`, the `200` shapes, `Cache-Control: no-store` on every reply, and that nothing but `translator_ai_<code>` reaches the console |
+| `ai/client.test.ts` | `aiEnabled()` for each key and `TRANSLATOR_AI` combination, `aiModel()`, and `createOpenAiCall()` against a mocked SDK: timeout, no retries, `store: false`, and timeout, error and empty reply mapped to a code without throwing or logging |
+| `ai/guardrails.test.ts`, `ai/interview.test.ts`, `ai/intro.test.ts` | `withTimeout()` with fake timers, and the placeholder capabilities with a fake AI call |
 
 `edge-cases.test.ts` in detail: a city not in the workbook (`no-value`, `No records are in Flagstaff. Try another city.`, Edit location), a required title with blank titles, the upload path through `loadWorkbook()` from a `File` (the sample and the Reference Solutions sample accepted; a copy with one cell changed and a copy re-saved with no edits refused by the file gate before parsing; a file over 2 MB refused at the size check), the Reference Solutions sample end to end (generated IDs and their warnings, other executives through to the export, no email and when Contact is missing, range-only sizes and the range fit rule, the job seeker brief with reasons from each record's own values, the Contact fallback), pins the ranking refuses (an excluded row, a grouped duplicate), and formula-like text in the export (every text cell a literal string with the Text format, no formula in the file, `assertNoFormulas()` throwing on a planted formula).
 
@@ -978,7 +983,7 @@ A new layout is mostly config, but a few places name the existing layouts. Work 
 
 Phase 2 adds a **Chat with AI** option to the Criteria step. Instead of working out the form, the user says what they need (for example "I sell welding supplies and want customers in Phoenix"). The AI asks a few short questions, fills the same `SearchBrief` the form fills, and the user confirms it. Then the Phase 1 ranking runs, unchanged. After the results, the AI can also draft a short introduction email for one business the user picks. The AI guides and writes. It never ranks, and the form is always there.
 
-- **Status:** not built. TR-38 set the rules, the code guide, the environment variables and the `openai` dependency. No code imports `openai` yet, and there is no route, no `ai/` folder and no chat UI. The later Phase 2 tickets build them (milestone "Data Axle Translator Phase 2").
+- **Status:** in progress. TR-38 set the rules, the code guide, the environment variables and the `openai` dependency. TR-39 built the server route, `/api/translator/ai`, with placeholder AI instructions ([The AI route](#the-ai-route)). There is no file summary, no real interview or intro yet and no chat UI. The later Phase 2 tickets build them (milestone "Data Axle Translator Phase 2").
 - **Plan:** [Data_Axle_Translator_Phase2_Plan.pdf](Data_Axle_Translator_Phase2_Plan.pdf) (the workflow diagram, what the AI receives, the ten capabilities and what the AI will not do).
 - **How to write the code:** [PHASE2-CODE-GUIDE.md](PHASE2-CODE-GUIDE.md). Every Phase 2 ticket follows it.
 - **Rules:** [Rules](#rules) above and the hard rules in [../../CLAUDE.md](../../CLAUDE.md).
@@ -1023,13 +1028,27 @@ Only two things may leave the browser, and only to our own server route, `/api/t
 - **`assumptions`** is where the AI records what it assumed (for example "Phoenix taken as a must-have."). The criteria summary shows each one as its own line, and the Criteria sheet records them.
 - **AI off or any AI error:** the Phase 1 form stays available and works exactly as before.
 
+### The AI route
+
+`POST /api/translator/ai` (TR-39) is the one way the Translator reaches the AI. The browser never holds the OpenAI key: it sends the request to our route, and the route calls OpenAI. Every status, message and shape: [API-DOCUMENTATION.md](../API-DOCUMENTATION.md#post-apitranslatorai).
+
+- **Its job.** Check who is asking and what was sent, run one capability (`runInterviewTurn()` in `ai/interview.ts` or `runIntroDraft()` in `ai/intro.ts`) with the real OpenAI call, and return an `AiResponse` as JSON. `route.ts` only builds the real dependencies; the work is in `handleAiRequest()` (`ai/handle-request.ts`), which takes them as a parameter so tests use fakes.
+- **Placeholders for now.** The interview's instructions are "You are a helpful assistant for a library business-contacts tool. Reply briefly." and `proposal` is always `null` (real instructions and validation: TR-41, TR-42). The intro's are "Write a short, polite two-sentence introduction." and only the goal is sent, not the intro fields (TR-48). The summary is accepted but not sent to OpenAI yet (TR-40, TR-41).
+- **Order of checks** (the first that fails answers): admin (`getAdmin()`, `401`), same origin (`403`), AI switched on (`aiEnabled()`, `503`), `Content-Type: application/json` (`400`), body size (`413`), JSON and shape (`aiRequestSchema`, `400`), message count and length (`413`), rate limit (`429`), then the AI call (`504` on timeout, `502` on any other failure).
+- **Limits:** 100 KB body, 30 messages, 1,000 characters per user message and for the intro goal, 4,000 per assistant message, 30 requests per 10 minutes per admin (per server instance, best effort). The constants are in `ai/request-schema.ts` and `ai/handle-request.ts`.
+- **Timeout:** 20 seconds (`AI_TIMEOUT_MS` in `ai/guardrails.ts`). The OpenAI client has the same timeout and `maxRetries: 0`, and `withTimeout()` holds the limit even if the SDK doesn't.
+- **No memory.** Each request is answered on its own. The chat history comes from the browser with every interview request, so an admin could send made-up assistant turns; that is accepted (admins only, nothing secret in the instructions). The schema refuses a `system` message, so the browser can't replace the instructions.
+- **Nothing stored.** Not in Supabase, files or a cache, and the route asks OpenAI not to store the response (`store: false`). Replies are `Cache-Control: no-store`.
+- **No logs except a code.** The only output is `console.error("translator_ai_<code>")` with `timeout`, `upstream`, `empty`, `rate_limited` or `bad_request`. Never the body, the chat, the summary, the intro fields, the reply or an error's message.
+- **The admin session.** The route is in the `proxy.ts` matcher, so an expired access token is refreshed before the route checks the admin, as on `/admin` pages.
+
 ### Where the code will live
 
 | Path | What it is |
 |---|---|
-| `src/features/translator/ai/` | Pure logic, no React, one file per capability. `client.ts` is the one server-only file: the only place that imports `openai` and reads the environment |
+| `src/features/translator/ai/` | Pure logic, no React, one file per capability. `client.ts` is the one server-only file: the only place that imports `openai` and reads the environment. Built so far (TR-39): `types.ts`, `request-schema.ts`, `client.ts`, `guardrails.ts`, `handle-request.ts`, and placeholder `interview.ts` and `intro.ts` |
 | `src/features/translator/ui/chat/` | The React components and the one chat hook. No business rules |
-| `src/app/api/translator/ai/route.ts` | The only server entry point. Admins only (`getAdmin()`, `401` as JSON) |
+| `src/app/api/translator/ai/route.ts` | The only server entry point (built in TR-39). Admins only (`getAdmin()`, `401` as JSON). Thin: it passes the real dependencies to `handleAiRequest()` |
 
 Files, layers, patterns and the "never do" list: [PHASE2-CODE-GUIDE.md](PHASE2-CODE-GUIDE.md).
 

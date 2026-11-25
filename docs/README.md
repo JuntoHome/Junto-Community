@@ -9,7 +9,7 @@ The site is one Next.js application with two faces:
 
 Supabase provides the database, admin logins and file storage. Vercel hosts the site. There is no separate backend service.
 
-The current project is the **Data Axle Translator**: an admin tool that ranks a business contacts spreadsheet entirely in the browser. Its Phase 2 (Chat with AI, rules set in TR-38, not built yet) adds one server route for AI calls that never receives full rows. Its developer guide is [translator/README.md](translator/README.md).
+The current project is the **Data Axle Translator**: an admin tool that ranks a business contacts spreadsheet entirely in the browser. Its Phase 2 (Chat with AI, rules set in TR-38, in progress) adds one server route for AI calls that never receives full rows; the route is built (TR-39), the chat isn't yet. Its developer guide is [translator/README.md](translator/README.md).
 
 ## Major features
 

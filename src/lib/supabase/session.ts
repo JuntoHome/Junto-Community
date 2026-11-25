@@ -3,7 +3,8 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getSupabasePublicConfig } from "./config";
 
 /**
- * Keeps the admin login fresh. Runs from proxy.ts on /admin requests: Server
+ * Keeps the admin login fresh. Runs from proxy.ts on /admin, /preview and
+ * /api/translator/ai requests: Server
  * Components can't write cookies, so an expired token is renewed here, before the
  * page renders. This is not the access check; every admin page and action checks
  * the user itself.
