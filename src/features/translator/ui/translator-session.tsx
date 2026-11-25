@@ -23,9 +23,10 @@ type Session = { key: number; files: readonly File[] | null; cleared: boolean };
  * so refreshing or closing the page clears it too.
  *
  * The announcement region sits outside the wizard, so it survives the remount and screen
- * readers hear "Everything was cleared."
+ * readers hear "Everything was cleared." The wizard uses it too, through `onAnnounce` (TR-43).
+ * `aiEnabled` comes from the server page and is passed to every new wizard.
  */
-export function TranslatorSession() {
+export function TranslatorSession({ aiEnabled }: { aiEnabled: boolean }) {
   const [session, setSession] = useState<Session>({ key: 0, files: null, cleared: false });
   const [announcement, setAnnouncement] = useState("");
 
@@ -34,6 +35,12 @@ export function TranslatorSession() {
     flushSync(() => setAnnouncement(""));
     setSession((s) => ({ key: s.key + 1, files: null, cleared: true }));
     setAnnouncement(CLEARED);
+  }
+
+  /** Says `text` in the live region. Emptied first, so the same words are announced again. */
+  function announce(text: string) {
+    flushSync(() => setAnnouncement(""));
+    setAnnouncement(text);
   }
 
   function startWithFiles(files: readonly File[]) {
@@ -45,10 +52,12 @@ export function TranslatorSession() {
     <>
       <TranslatorWizard
         key={session.key}
+        aiEnabled={aiEnabled}
         initialFiles={session.files}
         focusOnMount={session.cleared}
         onStartOver={startOver}
         onNewFiles={startWithFiles}
+        onAnnounce={announce}
       />
       <p role="status" aria-live="polite" className="sr-only">
         {announcement}

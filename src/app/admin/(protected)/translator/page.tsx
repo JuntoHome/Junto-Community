@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AdminPage } from "@/components/admin/admin-page";
+import { aiEnabled } from "@/features/translator/ai/client";
 import { SyntheticBanner } from "@/features/translator/ui/synthetic-banner";
 import { TranslatorSession } from "@/features/translator/ui/translator-session";
 import { requireAdmin } from "@/lib/auth";
@@ -17,7 +18,8 @@ export default async function TranslatorPage() {
       <div className="flex flex-col gap-6">
         {/* Outside the session, so it stays on every step and through Start over. */}
         <SyntheticBanner />
-        <TranslatorSession />
+        {/* Read on the server (only ai/client.ts reads the environment); the UI gets a boolean. */}
+        <TranslatorSession aiEnabled={aiEnabled()} />
       </div>
     </AdminPage>
   );
