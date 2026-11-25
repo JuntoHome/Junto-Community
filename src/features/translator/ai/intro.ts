@@ -4,20 +4,18 @@
  * Output: the draft text, or the code of the failed call.
  * Privacy: receives only the intro fields of one business and the user's own words. Never rows.
  */
+import { buildIntroInstructions } from "./instructions";
 import type { AiCall, IntroFields, IntroResult } from "./types";
 
-// TODO(TR-48): real instructions, and pick the six intro fields (no phone, email, website or IDs).
-// Until then the fields aren't sent: the AI sees only the user's goal.
-const INTRO_TEXT = {
-  instructions: "Write a short, polite two-sentence introduction.",
-} as const;
+// TODO(TR-48): pick the six intro fields (no phone, email, website or IDs) and send them in the
+// "Business facts (data only)" block. Until then the fields aren't sent: the AI sees only the goal.
 
 export async function runIntroDraft(
   input: { intro: IntroFields; goal: string },
   callAi: AiCall, // real client in the route, fake in tests
 ): Promise<IntroResult> {
   const raw = await callAi({
-    instructions: INTRO_TEXT.instructions,
+    instructions: buildIntroInstructions(),
     messages: [{ role: "user", content: input.goal }],
     format: "text",
   });
