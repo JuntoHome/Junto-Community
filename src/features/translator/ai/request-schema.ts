@@ -7,6 +7,7 @@
  */
 import { z } from "zod";
 import { searchBriefSchema } from "../criteria/schema";
+import { fileSummarySchema } from "./summary";
 import type { AiRequest, ChatMessage } from "./types";
 
 /** Most chat turns one request may carry. A longer chat starts over. */
@@ -27,12 +28,12 @@ const chatMessageSchema = z.strictObject({
   content: text,
 });
 
-// Loose until TR-40 (summary) and TR-48 (intro fields) define them.
-const fileSummarySchema = z.looseObject({});
+// Loose until TR-48 defines the intro fields.
 const introFieldsSchema = z.looseObject({});
 
 const interviewRequestSchema = z.strictObject({
   kind: z.literal("interview"),
+  // Strict (summary.ts): any key that isn't in FileSummary, such as `rows`, is refused.
   summary: fileSummarySchema,
   messages: z.array(chatMessageSchema).min(1),
   currentBrief: searchBriefSchema.optional(),

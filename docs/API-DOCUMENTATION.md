@@ -39,9 +39,21 @@ type AiRequest =
   | { kind: "interview"; summary: FileSummary; messages: ChatMessage[]; currentBrief?: SearchBrief }
   | { kind: "intro"; intro: IntroFields; goal: string };
 type ChatMessage = { role: "user" | "assistant"; content: string };   // no "system" role
+type FileSummary = {                       // fileSummarySchema in ai/summary.ts (TR-40), strict
+  layout: "synthetic" | "reference-solutions";
+  uniqueRecords: number;                   // whole number, 0 or more
+  cities: SummaryValue[];                  // each list: at most 100 items
+  states: SummaryValue[];
+  industries: SummaryValue[];
+  titles: SummaryValue[];
+  employees: { min: number | null; max: number | null; withValue: number; blank: number };
+  truncated: { cities: boolean; states: boolean; industries: boolean; titles: boolean };
+};
+type SummaryValue = { value: string; count: number };   // value 1 to 80 characters, count a whole number, 1 or more
 ```
 
-- `summary` and `intro` are any JSON object for now. TR-40 (file summary) and TR-48 (intro fields) define them.
+- `summary` is the file summary built in the browser by `buildFileSummary()`: what it holds, how it is sorted and which values are dropped are in [translator/README.md](translator/README.md#the-file-summary). The schema is **strict at every level**: an extra key anywhere (for example `rows`), a missing list or flag, a list over 100 items, a value that is empty or over 80 characters, a count below 1 or not whole, `min`, `max`, `withValue` or `blank` not a whole number (`withValue` and `blank` 0 or more), or an unknown `layout` gives `400`. The largest valid summary (4 lists of 100 values of 80 characters) is about 40 KB, well under the body limit.
+- `intro` is any JSON object for now. TR-48 (intro fields) defines it.
 - `messages`: 1 to 30. Each `content` has text in it (it is trimmed).
 - `currentBrief`, when given, must be a valid `SearchBrief` ([translator/README.md](translator/README.md#criteria-schema)).
 - `goal`: the user's own words, with text in it.
@@ -51,6 +63,8 @@ type ChatMessage = { role: "user" | "assistant"; content: string };   // no "sys
 | Limit | Value | Constant |
 |---|---|---|
 | Body | 100 KB (102,400 bytes), by `Content-Length` and by the bytes actually read | `MAX_BODY_BYTES` |
+| Values per `summary` list | 100 | `MAX_SUMMARY_VALUES` (`ai/summary.ts`) |
+| A `summary` value | 80 characters | `MAX_SUMMARY_VALUE_CHARS` (`ai/guardrails.ts`) |
 | Messages per request | 30 | `MAX_MESSAGES` |
 | A user message, or the intro `goal` | 1,000 characters | `MAX_USER_MESSAGE_CHARS` |
 | An assistant message | 4,000 characters | `MAX_ASSISTANT_MESSAGE_CHARS` |
@@ -75,7 +89,7 @@ The checks run in this order; the first that fails answers.
 | 3 | 503 | The AI assistant is not available right now. Use the form instead. | `OPENAI_API_KEY` not set, or `TRANSLATOR_AI` is `off` | |
 | 4 | 400 | The request couldn't be read. Refresh the page and try again. | `Content-Type` isn't `application/json` | `translator_ai_bad_request` |
 | 5 | 413 | This request is too large. Start a new chat and try again. | Body over 100 KB | |
-| 6 | 400 | The request couldn't be read. Refresh the page and try again. | Not JSON, or not the shape above (unknown `kind`, a `system` message, an unknown key, an invalid `currentBrief`) | `translator_ai_bad_request` |
+| 6 | 400 | The request couldn't be read. Refresh the page and try again. | Not JSON, or not the shape above (unknown `kind`, a `system` message, an unknown key, an invalid `currentBrief`, a `summary` that isn't a valid `FileSummary`) | `translator_ai_bad_request` |
 | 7 | 413 | This conversation is too long. Start a new chat to keep going. | More than 30 messages, or an assistant message over 4,000 characters | |
 | 8 | 413 | Your message is too long. Keep it under 1,000 characters. | A user message, or the `goal`, over 1,000 characters | |
 | 9 | 429 | You've sent a lot of requests. Wait a few minutes and try again. | Over 30 requests in 10 minutes | `translator_ai_rate_limited` |
@@ -90,7 +104,17 @@ The checks run in this order; the first that fails answers.
 await (await fetch("/api/translator/ai", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ kind: "interview", summary: {}, messages: [{ role: "user", content: "Hello" }] }),
+  body: JSON.stringify({
+    kind: "interview",
+    summary: {
+      layout: "synthetic", uniqueRecords: 1,
+      cities: [{ value: "Phoenix", count: 1 }], states: [{ value: "AZ", count: 1 }],
+      industries: [{ value: "Fabrication", count: 1 }], titles: [{ value: "Owner", count: 1 }],
+      employees: { min: 25, max: 25, withValue: 1, blank: 0 },
+      truncated: { cities: false, states: false, industries: false, titles: false },
+    },
+    messages: [{ role: "user", content: "Hello" }],
+  }),
 })).json();
 ```
 

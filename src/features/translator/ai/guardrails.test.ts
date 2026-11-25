@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { withTimeout } from "./guardrails";
+import { MAX_SUMMARY_VALUE_CHARS, sanitizeSummaryValue, withTimeout } from "./guardrails";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -32,5 +32,50 @@ describe("withTimeout", () => {
     vi.useFakeTimers();
     await withTimeout(Promise.resolve(1), 20_000, () => 0);
     expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe("sanitizeSummaryValue", () => {
+  it("keeps a plain value as it is", () => {
+    expect(sanitizeSummaryValue("Operations Manager")).toBe("Operations Manager");
+  });
+
+  it("turns control characters and line breaks into single spaces and trims", () => {
+    expect(sanitizeSummaryValue("  Head\nof\r\n\tSales\u0000Team Lead\u0085  ")).toBe("Head of Sales Team Lead");
+  });
+
+  it.each([
+    ["an email", "jane@example.invalid"],
+    ["a bare @", "Sales @ HQ"],
+    ["a website", "www.example.invalid"],
+    ["a website in capitals", "WWW.EXAMPLE.INVALID"],
+    ["a URL", "HTTPS://example.invalid/page"],
+    ["a phone with spaces", "602 555 0100"],
+    ["a phone with punctuation", "(602) 555-0100"],
+    ["7 digits in all", "Unit 12 Suite 34 Box 567"],
+  ])("drops %s", (_, text) => {
+    expect(sanitizeSummaryValue(text)).toBeNull();
+  });
+
+  it("keeps a value with 6 digits", () => {
+    expect(sanitizeSummaryValue("Route 66 Team 2024")).toBe("Route 66 Team 2024");
+  });
+
+  it("drops a value with nothing left", () => {
+    expect(sanitizeSummaryValue(" \n\t\u0001 ")).toBeNull();
+  });
+
+  it("checks the whole value before cutting it", () => {
+    expect(sanitizeSummaryValue(`${"a".repeat(100)} jane@example.invalid`)).toBeNull();
+  });
+
+  it("cuts to 80 characters and trims what is left", () => {
+    expect(sanitizeSummaryValue("b".repeat(200))).toBe("b".repeat(MAX_SUMMARY_VALUE_CHARS));
+    expect(sanitizeSummaryValue(`${"c".repeat(79)} more`)).toBe("c".repeat(79));
+  });
+
+  it("never splits a two-unit character at the cut", () => {
+    const value = sanitizeSummaryValue(`${"d".repeat(79)}\u{1F600}tail`);
+    expect(value).toBe("d".repeat(79));
   });
 });

@@ -9,15 +9,16 @@
  * This module is pure (types only).
  */
 import type { SearchBrief } from "../criteria/schema";
+import type { FileSummary } from "./summary";
+
+/**
+ * What the AI may know about the file. Defined once, in summary.ts (inferred from
+ * `fileSummarySchema`), and re-exported here so the shared types stay in one place.
+ */
+export type { FileSummary, SummaryValue } from "./summary";
 
 /** One chat turn. There is no "system" role: the instructions are set on the server only. */
 export type ChatMessage = { role: "user" | "assistant"; content: string };
-
-/**
- * What the AI may know about the file. Loose for now: TR-40 builds the real summary
- * (row count, and the cities, states, industries, titles and employee range, with counts).
- */
-export type FileSummary = Record<string, unknown>;
 
 /**
  * The fields of one chosen business for the intro draft. Loose for now: TR-48 tightens it to

@@ -17,7 +17,7 @@ The developer guide for the Data Axle Translator. This file owns every Translato
 11. [Tests](#tests)
 12. [Expected results](#expected-results)
 13. [How to add a new input format](#how-to-add-a-new-input-format)
-14. [Phase 2](#phase-2): [Flow](#flow), [What is sent to the AI](#what-is-sent-to-the-ai), [How the brief plugs in](#how-the-brief-plugs-in), [The AI route](#the-ai-route), [Where the code will live](#where-the-code-will-live), [Switching it on](#switching-it-on), [Open items](#open-items)
+14. [Phase 2](#phase-2): [Flow](#flow), [What is sent to the AI](#what-is-sent-to-the-ai), [The file summary](#the-file-summary), [How the brief plugs in](#how-the-brief-plugs-in), [The AI route](#the-ai-route), [Where the code will live](#where-the-code-will-live), [Switching it on](#switching-it-on), [Open items](#open-items)
 15. [How to change scoring](#how-to-change-scoring)
 16. [Troubleshooting](#troubleshooting)
 17. [Known limitations](#known-limitations)
@@ -76,7 +76,7 @@ Everything is in `src/features/translator/` unless the path says otherwise.
 | `ranking/` | Filter, score, sort, explain, pin and omit, cut to the list size; counts, no-results diagnosis, missing fields | `index.ts` (`rank()`), `match.ts`, `filter.ts`, `weights.ts`, `score.ts`, `sort.ts`, `compare-ids.ts`, `reasons.ts`, `overrides.ts`, `limit.ts`, `counts.ts`, `diagnose.ts`, `missing.ts` | Use React, I/O, logging, randomness, AI, `localeCompare()` or `Intl.Collator` |
 | `export/` | Build the `.xlsx` in memory: Shortlist and Criteria sheets, safe text cells, file name and labels | `workbook.ts`, `shortlist-rows.ts`, `criteria-rows.ts`, `cells.ts`, `file-name.ts`, `labels.ts` | Use React. Read the uploaded buffer. Write a formula, or text other than through `setTextCell()` |
 | `ui/` | The React components and all session state | `translator-session.tsx`, `translator-wizard.tsx`, `file-upload.tsx`, `sample-buttons.tsx`, `preview-step.tsx`, `criteria-step.tsx`, `criteria-controls.tsx`, `criteria-summary.tsx`, `results-step.tsx`, `results-table.tsx`, `counts-summary.tsx`, `no-results.tsx`, `export-step.tsx`, `start-over.tsx`, `log-error.ts`, `samples.ts` | Compare or score records itself (it calls the pure modules). Store anything outside React state. Call `console` except through `logTranslatorError()` |
-| `ai/` | Phase 2 (in progress): the AI route's checks, the OpenAI client and the capabilities ([The AI route](#the-ai-route)) | `handle-request.ts`, `request-schema.ts`, `client.ts` (server only), `guardrails.ts`, `interview.ts`, `intro.ts`, `types.ts` | Use React or `next/*`. Import `openai` or read `process.env` outside `client.ts`. Log anything but `translator_ai_<code>`. Rank, score, filter or sort |
+| `ai/` | Phase 2 (in progress): the AI route's checks, the OpenAI client and the capabilities ([The AI route](#the-ai-route)) | `handle-request.ts`, `request-schema.ts`, `client.ts` (server only), `guardrails.ts`, `summary.ts`, `interview.ts`, `intro.ts`, `types.ts` | Use React or `next/*`. Import `openai` or read `process.env` outside `client.ts`. Log anything but `translator_ai_<code>`. Rank, score, filter or sort |
 | `__fixtures__/` | Test-only helpers, fixture builders and golden files | `pipeline.ts`, `import-pipeline.ts`, `build-workbook.ts`, `records.ts`, `rs-headers.ts`, `rs-row.ts`, `walkthroughs/`, `empty.ts` (stands in for `server-only` in tests) | Be imported by app code. Be allowlisted. Contain real data |
 
 Tests sit beside the code as `*.test.ts`; two cover the whole feature and sit at the top: `edge-cases.test.ts` and `rs-sample.test.ts` ([Tests](#tests)). ExcelJS is imported by `import/parse.ts` and `export/workbook.ts` (both loaded with `import()` on first use) and as a type by `export/cells.ts`; JSZip only by `import/xlsx-compat.ts`.
@@ -907,9 +907,10 @@ npm run test -- edge-cases -t "file gate"        # tests in edge-cases.test.ts w
 | `ranking/walkthroughs.test.ts` | The three spec walkthroughs (TR-30) from the sample's bytes through `runPipeline()`: counts, first 8 rows, last row, score spread, the role change's export builders, repeat runs, 3 seeded shuffles, and the golden files |
 | `rs-sample.test.ts` | The [Reference Solutions sample](#the-reference-solutions-sample) (TR-35): its 396 headers, that only mapped columns are filled and every value is invented, the import figures, every documented row, the Phoenix fabrication shortlist and the export's Phone, Website and empty Email |
 | `edge-cases.test.ts` | The spec edge cases (TR-31), each from a real file (below) |
-| `ai/handle-request.test.ts` | The AI route's checks with fake dependencies (TR-39): `401`, `403`, `503`, every `400`, the `413` limits, `429`, the 20-second timeout with fake timers (`504`), `502`, the `200` shapes, `Cache-Control: no-store` on every reply, and that nothing but `translator_ai_<code>` reaches the console |
+| `ai/handle-request.test.ts` | The AI route's checks with fake dependencies (TR-39): `401`, `403`, `503`, every `400` (TR-40 adds the summary cases: an extra key, a missing list, 101 values, an 81-character value), the `413` limits, `429`, the 20-second timeout with fake timers (`504`), `502`, the `200` shapes, `Cache-Control: no-store` on every reply, and that nothing but `translator_ai_<code>` reaches the console |
 | `ai/client.test.ts` | `aiEnabled()` for each key and `TRANSLATOR_AI` combination, `aiModel()`, and `createOpenAiCall()` against a mocked SDK: timeout, no retries, `store: false`, and timeout, error and empty reply mapped to a code without throwing or logging |
-| `ai/guardrails.test.ts`, `ai/interview.test.ts`, `ai/intro.test.ts` | `withTimeout()` with fake timers, and the placeholder capabilities with a fake AI call |
+| `ai/summary.test.ts` | `buildFileSummary()` (TR-40) on both samples and invented records: the sample's lists, counts and employee range, the city picker match, the 100-value cap and `truncated`, tie order on repeat and shuffled runs, an open range with a finite `max`, dropped contact-looking values, that the JSON holds no company, person, ID, email, phone, website, address or NAICS text, and `fileSummarySchema` accepting both samples and refusing extra keys and out-of-limit values |
+| `ai/guardrails.test.ts`, `ai/interview.test.ts`, `ai/intro.test.ts` | `withTimeout()` with fake timers, `sanitizeSummaryValue()` (cleaning, the 80-character cut, contact-looking values dropped), and the placeholder capabilities with a fake AI call |
 
 `edge-cases.test.ts` in detail: a city not in the workbook (`no-value`, `No records are in Flagstaff. Try another city.`, Edit location), a required title with blank titles, the upload path through `loadWorkbook()` from a `File` (the sample and the Reference Solutions sample accepted; a copy with one cell changed and a copy re-saved with no edits refused by the file gate before parsing; a file over 2 MB refused at the size check), the Reference Solutions sample end to end (generated IDs and their warnings, other executives through to the export, no email and when Contact is missing, range-only sizes and the range fit rule, the job seeker brief with reasons from each record's own values, the Contact fallback), pins the ranking refuses (an excluded row, a grouped duplicate), and formula-like text in the export (every text cell a literal string with the Text format, no formula in the file, `assertNoFormulas()` throwing on a planted formula).
 
@@ -983,7 +984,7 @@ A new layout is mostly config, but a few places name the existing layouts. Work 
 
 Phase 2 adds a **Chat with AI** option to the Criteria step. Instead of working out the form, the user says what they need (for example "I sell welding supplies and want customers in Phoenix"). The AI asks a few short questions, fills the same `SearchBrief` the form fills, and the user confirms it. Then the Phase 1 ranking runs, unchanged. After the results, the AI can also draft a short introduction email for one business the user picks. The AI guides and writes. It never ranks, and the form is always there.
 
-- **Status:** in progress. TR-38 set the rules, the code guide, the environment variables and the `openai` dependency. TR-39 built the server route, `/api/translator/ai`, with placeholder AI instructions ([The AI route](#the-ai-route)). There is no file summary, no real interview or intro yet and no chat UI. The later Phase 2 tickets build them (milestone "Data Axle Translator Phase 2").
+- **Status:** in progress. TR-38 set the rules, the code guide, the environment variables and the `openai` dependency. TR-39 built the server route, `/api/translator/ai`, with placeholder AI instructions ([The AI route](#the-ai-route)). TR-40 built the file summary the interview will send, and the route now checks it with a strict schema ([The file summary](#the-file-summary)). There is no real interview or intro yet and no chat UI. The later Phase 2 tickets build them (milestone "Data Axle Translator Phase 2").
 - **Plan:** [Data_Axle_Translator_Phase2_Plan.pdf](Data_Axle_Translator_Phase2_Plan.pdf) (the workflow diagram, what the AI receives, the ten capabilities and what the AI will not do).
 - **How to write the code:** [PHASE2-CODE-GUIDE.md](PHASE2-CODE-GUIDE.md). Every Phase 2 ticket follows it.
 - **Rules:** [Rules](#rules) above and the hard rules in [../../CLAUDE.md](../../CLAUDE.md).
@@ -996,7 +997,7 @@ Steps 1, 2, 7, 8 and 10 are Phase 1 as built. The step numbers are the plan's.
 |---|---|---|---|
 | 1 | Upload the file | Browser | Phase 1. Approved synthetic files only: the [file gate](#file-gate) stays |
 | 2 | Check the file | Browser | Phase 1: rows, duplicates, issues |
-| 3 | Build a file summary | Browser | New. Counts of the cities, states, industries, titles and employee range in the file (TR-40) |
+| 3 | Build a file summary | Browser | New. `buildFileSummary()`: the cities, states, industries and titles in the file with counts, and the employee range (TR-40, [The file summary](#the-file-summary)) |
 | 4 | The AI asks questions | Server route, then OpenAI | New. It sees the summary and the chat, nothing else |
 | 5 | The AI fills the criteria | Server route, then OpenAI | New. It proposes a `SearchBrief` from the answers |
 | 6 | The user confirms | Browser | The user can change any item before ranking |
@@ -1011,7 +1012,7 @@ Only two things may leave the browser, and only to our own server route, `/api/t
 
 | Call | Sent | Never sent |
 |---|---|---|
-| Interview (steps 4 and 5) | The file summary (row count, and the cities, states, industries, titles and employee range, with counts) and the chat messages | Company names, people, phones, emails, websites, IDs, any full row |
+| Interview (steps 4 and 5) | The file summary (layout, unique record count, the cities, states, industries and titles with counts, and the employee range; [The file summary](#the-file-summary)) and the chat messages | Company names, people, phones, emails, websites, IDs, addresses, NAICS, other executives, any full row |
 | Intro draft (step 9) | Company name, industry, city, state, contact name and contact title for ONE business the user picked, and the user's goal. The contact name is a person's name sent to a third party: acceptable only while the data is synthetic, and to be reviewed before any real data | Every other row. For the chosen business: phone, email, website, IDs |
 
 - **The plan PDF says the intro sends "one row".** The rule here is stricter and replaces that sentence: only the six fields in the table, never the whole row.
@@ -1019,6 +1020,57 @@ Only two things may leave the browser, and only to our own server route, `/api/t
 - **Nothing is stored or logged** by our code: not the summary, the chat, the intro fields or the AI's replies. No Supabase, localStorage, sessionStorage or cookies. The chat lives in React state for one session, like the rest of the Translator ([Session and Start over](#session-and-start-over)).
 - **The AI never ranks, scores, filters or sorts.** It proposes a `SearchBrief` and drafts intro text. The same file and the same brief still give the same order and reasons.
 - **Workbook text is data, never instructions.** The summary's values come from the workbook, so they are untrusted text wherever they reach the AI.
+
+### The file summary
+
+The only file information the interview sends (TR-40). It lets the AI ask good questions ("Phoenix only, or also Tempe?") and suggest only values that exist in the file, without seeing any row. Code: `buildFileSummary(records, layout)` and `fileSummarySchema` in `ai/summary.ts` (pure), with `sanitizeSummaryValue()` in `ai/guardrails.ts`. Nothing calls it from the UI yet: TR-44 sends it.
+
+| Key | What it holds |
+|---|---|
+| `layout` | `"synthetic"` or `"reference-solutions"`: the parsed workbook's `layout.id` |
+| `uniqueRecords` | The grouped records (TR-12), the same "Unique records" figure the Preview step shows |
+| `cities`, `states`, `industries`, `titles` | `{ value, count }` lists. `value` is the picker's label (the most common spelling, never the match key) and `count` its record count, both from `fieldOptions()`, not recounted. Blank values aren't listed |
+| `employees` | `{ min, max, withValue, blank }`. `withValue`: records with a known size (an actual count or a range). `blank`: blank or invalid. `min` and `max` come from actual counts and finite range bounds; an open range such as "10,000+" counts in `withValue` and adds only its lower bound, never Infinity (`JSON.stringify(Infinity)` is `null`). Both are `null` when no record has a size |
+| `truncated` | `{ cities, states, industries, titles }`: true when that list was cut at 100. The issue listed no flag for `states`; it has one because states are capped too, so a bad file can't lose values silently |
+
+- **Sorting:** count, highest first, then `value` A to Z by upper-cased code unit order (no `localeCompare()`, the same rule as `compareRecordIds()`), so the same records always give the same JSON.
+- **Caps:** at most 100 values per list (`MAX_SUMMARY_VALUES`), the most common kept. Each value is at most 80 characters (`MAX_SUMMARY_VALUE_CHARS`).
+- **Every value is cleaned first** by `sanitizeSummaryValue()`: control characters and line breaks become spaces, spaces collapse, the ends are trimmed, and the value is cut to 80 characters. A value that looks like contact data is **dropped**, not masked: one containing `@`, `http` or `www.` (any case), or 7 or more digits in all. So a column holding the wrong data can't leak an email, phone or website. Dropped values are left out and don't count as truncation.
+- **Never in it:** company names, person names, phones, emails, websites, record IDs, addresses, ZIP codes, NAICS text, other executives or any other row-level field.
+- **The schema is strict** at every level: `fileSummarySchema` refuses any extra key (such as `rows`), a missing list or flag, more than 100 values, a value over 80 characters or empty, a count below 1 or not whole, and an unknown layout. The route uses it for the interview's `summary`, so even a future UI bug that adds row data gets a `400`. `FileSummary` is inferred from this schema and defined only there.
+
+The synthetic sample's summary (703 bytes as sent):
+
+```json
+{
+  "layout": "synthetic",
+  "uniqueRecords": 499,
+  "cities": [
+    { "value": "Glendale", "count": 100 },
+    { "value": "Mesa", "count": 100 },
+    { "value": "Phoenix", "count": 100 },
+    { "value": "Tempe", "count": 100 },
+    { "value": "Scottsdale", "count": 99 }
+  ],
+  "states": [{ "value": "AZ", "count": 499 }],
+  "industries": [
+    { "value": "Business Services", "count": 100 },
+    { "value": "Fabrication", "count": 100 },
+    { "value": "Logistics", "count": 100 },
+    { "value": "Technology", "count": 100 },
+    { "value": "Retail", "count": 99 }
+  ],
+  "titles": [
+    { "value": "Operations Manager", "count": 126 },
+    { "value": "General Manager", "count": 124 },
+    { "value": "Owner", "count": 124 }
+  ],
+  "employees": { "min": 8, "max": 120, "withValue": 375, "blank": 124 },
+  "truncated": { "cities": false, "states": false, "industries": false, "titles": false }
+}
+```
+
+The Reference Solutions sample gives `uniqueRecords` 99, four cities (Mesa, Phoenix and Tempe 25 each, Glendale 24), AZ 99, five industries (20 each, Business Services 19), four titles (Owner 38, the others 19 each) and `employees` `{ "min": 1, "max": 4999, "withValue": 98, "blank": 1 }`. Tests: `ai/summary.test.ts`.
 
 ### How the brief plugs in
 
@@ -1033,8 +1085,8 @@ Only two things may leave the browser, and only to our own server route, `/api/t
 `POST /api/translator/ai` (TR-39) is the one way the Translator reaches the AI. The browser never holds the OpenAI key: it sends the request to our route, and the route calls OpenAI. Every status, message and shape: [API-DOCUMENTATION.md](../API-DOCUMENTATION.md#post-apitranslatorai).
 
 - **Its job.** Check who is asking and what was sent, run one capability (`runInterviewTurn()` in `ai/interview.ts` or `runIntroDraft()` in `ai/intro.ts`) with the real OpenAI call, and return an `AiResponse` as JSON. `route.ts` only builds the real dependencies; the work is in `handleAiRequest()` (`ai/handle-request.ts`), which takes them as a parameter so tests use fakes.
-- **Placeholders for now.** The interview's instructions are "You are a helpful assistant for a library business-contacts tool. Reply briefly." and `proposal` is always `null` (real instructions and validation: TR-41, TR-42). The intro's are "Write a short, polite two-sentence introduction." and only the goal is sent, not the intro fields (TR-48). The summary is accepted but not sent to OpenAI yet (TR-40, TR-41).
-- **Order of checks** (the first that fails answers): admin (`getAdmin()`, `401`), same origin (`403`), AI switched on (`aiEnabled()`, `503`), `Content-Type: application/json` (`400`), body size (`413`), JSON and shape (`aiRequestSchema`, `400`), message count and length (`413`), rate limit (`429`), then the AI call (`504` on timeout, `502` on any other failure).
+- **Placeholders for now.** The interview's instructions are "You are a helpful assistant for a library business-contacts tool. Reply briefly." and `proposal` is always `null` (real instructions and validation: TR-41, TR-42). The intro's are "Write a short, polite two-sentence introduction." and only the goal is sent, not the intro fields (TR-48). The summary is checked with the strict `fileSummarySchema` (TR-40) but not sent to OpenAI yet (TR-41).
+- **Order of checks** (the first that fails answers): admin (`getAdmin()`, `401`), same origin (`403`), AI switched on (`aiEnabled()`, `503`), `Content-Type: application/json` (`400`), body size (`413`), JSON and shape (`aiRequestSchema`, including the strict `fileSummarySchema` for `summary`, `400`), message count and length (`413`), rate limit (`429`), then the AI call (`504` on timeout, `502` on any other failure).
 - **Limits:** 100 KB body, 30 messages, 1,000 characters per user message and for the intro goal, 4,000 per assistant message, 30 requests per 10 minutes per admin (per server instance, best effort). The constants are in `ai/request-schema.ts` and `ai/handle-request.ts`.
 - **Timeout:** 20 seconds (`AI_TIMEOUT_MS` in `ai/guardrails.ts`). The OpenAI client has the same timeout and `maxRetries: 0`, and `withTimeout()` holds the limit even if the SDK doesn't.
 - **No memory.** Each request is answered on its own. The chat history comes from the browser with every interview request, so an admin could send made-up assistant turns; that is accepted (admins only, nothing secret in the instructions). The schema refuses a `system` message, so the browser can't replace the instructions.
@@ -1046,7 +1098,7 @@ Only two things may leave the browser, and only to our own server route, `/api/t
 
 | Path | What it is |
 |---|---|
-| `src/features/translator/ai/` | Pure logic, no React, one file per capability. `client.ts` is the one server-only file: the only place that imports `openai` and reads the environment. Built so far (TR-39): `types.ts`, `request-schema.ts`, `client.ts`, `guardrails.ts`, `handle-request.ts`, and placeholder `interview.ts` and `intro.ts` |
+| `src/features/translator/ai/` | Pure logic, no React, one file per capability. `client.ts` is the one server-only file: the only place that imports `openai` and reads the environment. Built so far: `types.ts`, `request-schema.ts`, `client.ts`, `guardrails.ts`, `handle-request.ts`, and placeholder `interview.ts` and `intro.ts` (TR-39); `summary.ts` (TR-40) |
 | `src/features/translator/ui/chat/` | The React components and the one chat hook. No business rules |
 | `src/app/api/translator/ai/route.ts` | The only server entry point (built in TR-39). Admins only (`getAdmin()`, `401` as JSON). Thin: it passes the real dependencies to `handleAiRequest()` |
 

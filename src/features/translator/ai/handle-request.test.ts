@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
+import { EXAMPLE_SUMMARY } from "../__fixtures__/summary";
 import { AI_TIMEOUT_MS } from "./guardrails";
 import { handleAiRequest, type AiRouteDeps } from "./handle-request";
 import { MAX_BODY_BYTES, MAX_MESSAGES, MAX_USER_MESSAGE_CHARS } from "./request-schema";
 import type { AiCall, ChatMessage } from "./types";
 
 const ROUTE_URL = "http://localhost:3000/api/translator/ai";
-const INTERVIEW = { kind: "interview", summary: {}, messages: [{ role: "user", content: "Hello" }] };
+const INTERVIEW = { kind: "interview", summary: EXAMPLE_SUMMARY, messages: [{ role: "user", content: "Hello" }] };
 const INTRO = { kind: "intro", intro: { companyName: "Example Fabrication Co" }, goal: "I sell welding supplies." };
 
 const replyWith =
@@ -111,11 +112,32 @@ describe("handleAiRequest: what it accepts", () => {
     ["an empty chat", post({ ...INTERVIEW, messages: [] })],
     ["an invalid currentBrief", post({ ...INTERVIEW, currentBrief: { intent: "everything" } })],
     ["an intro without a goal", post({ kind: "intro", intro: {} })],
+    ["a summary with an extra key", post({ ...INTERVIEW, summary: { ...EXAMPLE_SUMMARY, rows: [] } })],
+    ["a summary missing a list", post({ ...INTERVIEW, summary: Object.fromEntries(Object.entries(EXAMPLE_SUMMARY).filter(([key]) => key !== "titles")) })],
+    ["an empty summary", post({ ...INTERVIEW, summary: {} })],
+    [
+      "a summary list with 101 values",
+      post({
+        ...INTERVIEW,
+        summary: { ...EXAMPLE_SUMMARY, cities: Array.from({ length: 101 }, (_, i) => ({ value: `City ${i}`, count: 1 })) },
+      }),
+    ],
+    [
+      "a summary value of 81 characters",
+      post({ ...INTERVIEW, summary: { ...EXAMPLE_SUMMARY, titles: [{ value: "a".repeat(81), count: 1 }] } }),
+    ],
   ])("returns 400 for %s and logs only translator_ai_bad_request", async (_, request) => {
     const deps = fakeDeps();
     await expectFailure(await handleAiRequest(request, deps), 400, BAD_REQUEST);
     expect(deps.callAi).not.toHaveBeenCalled();
     expect(logged()).toEqual([["translator_ai_bad_request"]]);
+  });
+
+  it("accepts a valid file summary, including 100 values of 80 characters per list", async () => {
+    const full = Array.from({ length: 100 }, (_, i) => ({ value: `${String(i).padStart(3, "0")}${"v".repeat(77)}`, count: 1 }));
+    const summary = { ...EXAMPLE_SUMMARY, cities: full, states: full, industries: full, titles: full };
+    const response = await handleAiRequest(post({ ...INTERVIEW, summary }), fakeDeps());
+    expect(response.status).toBe(200);
   });
 
   it("accepts application/json with a charset", async () => {
@@ -124,7 +146,7 @@ describe("handleAiRequest: what it accepts", () => {
   });
 
   it("returns 413 for a body over 100 KB, even without a Content-Length", async () => {
-    const big = { ...INTERVIEW, summary: { padding: "x".repeat(MAX_BODY_BYTES) } };
+    const big = { ...INTERVIEW, padding: "x".repeat(MAX_BODY_BYTES) };
     const deps = fakeDeps();
     const message = "This request is too large. Start a new chat and try again.";
     await expectFailure(await handleAiRequest(post(big), deps), 413, message);
