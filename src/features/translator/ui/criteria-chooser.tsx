@@ -10,7 +10,6 @@ export const CHOOSER_TEXT = {
   useForm: "Use the form instead",
   useChat: "Chat with AI instead",
   chatHeading: "Chat with AI",
-  chatComingSoon: "Chat coming soon",
 } as const;
 
 const CHOOSER_HELP_ID = "criteria-chooser-help";

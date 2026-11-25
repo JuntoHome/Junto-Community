@@ -2,7 +2,7 @@
 
 How to write the Translator's Phase 2 code (Chat with AI). Every Phase 2 ticket follows this guide.
 
-- **Status:** in progress. TR-38 set the rules, this guide, the environment variables and the `openai` dependency. TR-39 built the route and the files it needs: `types.ts`, `request-schema.ts`, `client.ts`, `guardrails.ts`, `handle-request.ts`, and placeholder `interview.ts` and `intro.ts`. TR-40 added `summary.ts` and `sanitizeSummaryValue()` in `guardrails.ts`. TR-41 added `instructions.ts`. TR-42 added `schema.ts` and `validate.ts`, made `interview.ts` real, and added `cleanAiText()` and `cutText()` to `guardrails.ts`. TR-43 made the admin page pass `aiEnabled` to the Criteria step (the chooser is in `ui/`, no new `ai/` files). The other files below are created by later tickets.
+- **Status:** in progress. TR-38 set the rules, this guide, the environment variables and the `openai` dependency. TR-39 built the route and the files it needs: `types.ts`, `request-schema.ts`, `client.ts`, `guardrails.ts`, `handle-request.ts`, and placeholder `interview.ts` and `intro.ts`. TR-40 added `summary.ts` and `sanitizeSummaryValue()` in `guardrails.ts`. TR-41 added `instructions.ts`. TR-42 added `schema.ts` and `validate.ts`, made `interview.ts` real, and added `cleanAiText()` and `cutText()` to `guardrails.ts`. TR-43 made the admin page pass `aiEnabled` to the Criteria step (the chooser is in `ui/`, no new `ai/` files). TR-44 added `chat-session.ts`, `index.ts`, `ui/chat/chat-panel.tsx` and `ui/chat/use-chat-session.ts`. The other files below are created by later tickets.
 - **Rules:** the hard rules are in [../../CLAUDE.md](../../CLAUDE.md). What Phase 2 is, its flow and what is sent to the AI: [README.md](README.md#phase-2).
 - **Source:** the code guide in issue #81 (TR-38), with the corrections listed in [Changes from the issue's guide](#changes-from-the-issues-guide).
 
@@ -30,13 +30,14 @@ src/
       intro.ts            # Capability: pick intro fields + run the intro draft
       diff-brief.ts       # Capability: what changed between two briefs
       explain-change.ts   # Capability: plain sentence on why the list moved (no AI)
+      chat-session.ts     # Capability: the chat's rules. chatReducer, buildChatRequest, canSend, interpretResponse, CHAT_TEXT (TR-44)
       guardrails.ts       # Capability: limits (withTimeout, AI_ATTEMPT_TIMEOUT_MS, AI_REQUEST_TIMEOUT_MS), sanitising values (sanitizeSummaryValue), cleaning AI text (cleanAiText, cutText), stripping invented contacts
-      index.ts            # Public exports for the UI (types + pure helpers only, never client.ts)
+      index.ts            # Public exports for the UI (types + pure helpers only, never client.ts). Built in TR-44
     ui/chat/              # NEW. React only. No business rules here.
-      chat-panel.tsx
+      chat-panel.tsx      # Render and forward only (TR-44)
       proposal-card.tsx
       intro-panel.tsx
-      use-chat-session.ts # The only stateful hook: messages, lastValidBrief, drafts, limits
+      use-chat-session.ts # The only stateful hook: a thin wrapper around chatReducer and the one fetch (TR-44)
     __fixtures__/
       empty.ts            # Stands in for "server-only" in tests (vitest.config.ts alias)
       summary.ts          # EXAMPLE_SUMMARY: a small valid FileSummary for route and interview tests (TR-40)
@@ -206,6 +207,24 @@ Notes on the pattern:
 - State lives in React only. No localStorage, sessionStorage, cookies, URL params with content.
 - The UI learns whether the AI is on from a boolean prop (`aiEnabled`) passed down from the admin page (section 2, TR-43). It never reads an environment variable.
 - Show the route's `error` text as it is. The status only matters for `401` (the session ended: offer a way to log in again).
+- **Import from `ai/index.ts`** (TR-44), never from a single `ai/` file, so the UI can only reach what is meant for it.
+
+### Rules pure, hook thin: the chat session (TR-44)
+
+The chat is the pattern for any stateful AI feature. The rules are a pure reducer in `ai/`, tested with Vitest; the hook only wires them to React and the network. That keeps the logic testable without React Testing Library (a new dependency), and the hook small enough to read in one go.
+
+| Piece | File | Holds |
+|---|---|---|
+| Rules | `ai/chat-session.ts` (pure) | `ChatState`, `chatReducer` (`edit`, `send`, `received`, `failed`, `reset`), `buildChatRequest()`, `canSend()`, `limitReached()`, `currentBriefFor()`, `interpretResponse()`, `latestAnnouncement()`, `characterCount()`, `GREETING`, `CHAT_TEXT` |
+| Wiring | `ui/chat/use-chat-session.ts` | `useReducer(chatReducer)`, the memoised `buildFileSummary()`, the one `fetch`, the `AbortController` |
+| View | `ui/chat/chat-panel.tsx` | Markup, focus, scrolling, key handling. Every decision comes from the rules |
+
+- **The request.** `fetch("/api/translator/ai", { method: "POST", headers: { "Content-Type": "application/json" }, body, signal })`. The header is required: the route reads JSON only and answers anything else with `400`. The body is `buildChatRequest(state, summary, currentBrief)` and nothing else; build it from the state the reducer makes for the `send` (the hook runs `chatReducer` on the current state to get it), so the request holds exactly what is on screen.
+- **Stale replies.** Each `send` sets a new `requestId`; `received` and `failed` carry it and are ignored unless it matches and the chat is waiting. `reset` starts a new number. The hook also aborts the request on `resetChat()` and on unmount, and dispatches nothing after an abort.
+- **One response path.** The hook reads the response as text (or `null` when `fetch` throws) and hands it to `interpretResponse(status, body)`, which gives a `received` or `failed` action. No parsing or status logic in the hook.
+- **Limits come from `request-schema.ts`.** `MAX_MESSAGES` and `MAX_USER_MESSAGE_CHARS` are imported, never copied, so the UI's limits can't drift from the route's.
+- **Notes aren't sent.** Only `user` and `assistant` items become `messages`.
+- **The message box is in the state** (`draft`, changed with `edit`), so `failed` can put the failed message back for a retry inside the reducer.
 
 ## 6. When the AI is off or fails
 

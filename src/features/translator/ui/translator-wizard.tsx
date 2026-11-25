@@ -258,6 +258,8 @@ export function TranslatorWizard({
         ) : step.id === "criteria" && workbook ? (
           <CriteriaStep
             aiEnabled={aiEnabled}
+            layout={workbook.parsed.layout.id}
+            pendingBrief={pendingBrief}
             mode={criteriaMode}
             onModeChange={setCriteriaMode}
             onAnnounce={onAnnounce}
