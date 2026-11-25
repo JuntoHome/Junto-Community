@@ -18,6 +18,8 @@ import {
   PickedPreferenceField,
   useCriteriaOptions,
 } from "./criteria-controls";
+import type { FileSummary } from "../ai";
+import { ChatPanel } from "./chat/chat-panel";
 import { CHOOSER_TEXT, CriteriaChooser, SwitchLink } from "./criteria-chooser";
 import { type CriteriaMode, MODE_ANNOUNCEMENT } from "./criteria-mode";
 
@@ -59,9 +61,15 @@ type CriteriaFormProps = {
  * and Start over or a new workbook resets it. After a choice or a switch, focus moves to the
  * heading of what opened (the chat's heading, or the step's heading for the form) and
  * `onAnnounce` tells screen readers which one it is.
+ *
+ * The chat (TR-44) keeps its conversation while it is on screen. Switching to the form or
+ * leaving the step unmounts it: the request in flight is aborted and the chat starts again
+ * from the greeting next time.
  */
 export function CriteriaStep({
   aiEnabled,
+  layout,
+  pendingBrief,
   mode,
   onModeChange,
   onAnnounce,
@@ -69,6 +77,10 @@ export function CriteriaStep({
   ...formProps
 }: CriteriaFormProps & {
   aiEnabled: boolean;
+  /** The workbook's layout id, for the file summary the chat sends (TR-44). */
+  layout: FileSummary["layout"];
+  /** The brief waiting to be ranked, if any. The chat sends it as the current brief until the AI proposes one. */
+  pendingBrief: SearchBrief | null;
   mode: CriteriaMode;
   onModeChange: (mode: CriteriaMode) => void;
   /** Says the text in the page's live region. */
@@ -111,7 +123,6 @@ export function CriteriaStep({
     return <CriteriaChooser onChat={() => switchTo("chat")} onForm={() => switchTo("form")} />;
   }
 
-  // TODO(TR-44): replace this placeholder with the chat panel (ui/chat/chat-panel.tsx).
   return (
     <section aria-labelledby="criteria-chat-heading" className="mt-5 flex flex-col items-start gap-3 text-base">
       <h3
@@ -122,7 +133,12 @@ export function CriteriaStep({
       >
         {CHOOSER_TEXT.chatHeading}
       </h3>
-      <div className="w-full rounded-xl border border-sand bg-ivory p-5 text-muted">{CHOOSER_TEXT.chatComingSoon}</div>
+      <ChatPanel
+        records={formProps.records}
+        layout={layout}
+        pendingBrief={pendingBrief}
+        onUseForm={() => switchTo("form")}
+      />
       <SwitchLink onClick={() => switchTo("form")}>{CHOOSER_TEXT.useForm}</SwitchLink>
     </section>
   );
