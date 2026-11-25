@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MAX_SUMMARY_VALUE_CHARS, sanitizeSummaryValue, withTimeout } from "./guardrails";
+import { cleanAiText, cutText, MAX_SUMMARY_VALUE_CHARS, sanitizeSummaryValue, withTimeout } from "./guardrails";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -77,5 +77,33 @@ describe("sanitizeSummaryValue", () => {
   it("never splits a two-unit character at the cut", () => {
     const value = sanitizeSummaryValue(`${"d".repeat(79)}\u{1F600}tail`);
     expect(value).toBe("d".repeat(79));
+  });
+});
+
+describe("cutText", () => {
+  it("keeps short text and cuts long text to the limit, trimmed", () => {
+    expect(cutText("short", 10)).toBe("short");
+    expect(cutText(`${"e".repeat(9)} tail`, 10)).toBe("e".repeat(9));
+  });
+
+  it("never splits a two-unit character at the cut", () => {
+    expect(cutText(`${"f".repeat(9)}\u{1F600}`, 10)).toBe("f".repeat(9));
+  });
+});
+
+// Dashes are written as escapes (\u2014 em-dash, \u2013 en-dash) so the source has none.
+describe("cleanAiText", () => {
+  it("replaces an em-dash or en-dash, and the spaces around it, with a comma and a space", () => {
+    expect(cleanAiText("Phoenix \u2014 owners only")).toBe("Phoenix, owners only");
+    expect(cleanAiText("Phoenix\u2014owners")).toBe("Phoenix, owners");
+    expect(cleanAiText("10\u201399 people")).toBe("10, 99 people");
+  });
+
+  it("collapses runs of spaces, keeps line breaks and trims the ends", () => {
+    expect(cleanAiText("  Two   spaces\tand a tab.\nNext line.  ")).toBe("Two spaces and a tab.\nNext line.");
+  });
+
+  it("leaves clean text as it is", () => {
+    expect(cleanAiText("Phoenix only, or also Tempe?")).toBe("Phoenix only, or also Tempe?");
   });
 });

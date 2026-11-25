@@ -28,7 +28,7 @@ curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/keep
 
 The Translator's one server route for AI calls (Phase 2, TR-39). The browser sends the interview chat or an intro request; the route checks it, calls OpenAI and returns the answer. It keeps nothing between calls, stores nothing and logs no content. Files: [src/app/api/translator/ai/route.ts](../src/app/api/translator/ai/route.ts) (thin) and [src/features/translator/ai/handle-request.ts](../src/features/translator/ai/handle-request.ts) (the checks). Background: [translator/README.md](translator/README.md#the-ai-route).
 
-**Status:** the route works end to end, but its AI instructions are placeholders until TR-41 (interview) and TR-48 (intro), so `proposal` is always `null` and the intro fields are not sent to OpenAI yet. No UI calls it yet.
+**Status:** the route works end to end. The interview uses the real instructions (TR-41) and answers in a fixed format that is checked before it is returned (TR-42), so `proposal` is a checked brief or `null`. The intro instructions are real, but the intro fields are not sent to OpenAI until TR-48. No UI calls it yet.
 
 **Access:** a logged-in JCA admin (`getAdmin()`, the same check as `requireAdmin()` without the redirect). The session cookie is refreshed by `proxy.ts`, which lists this path in its `matcher`. Same origin only: a request with an `Origin` header from another site is refused, and only `Content-Type: application/json` is read, so a form on another site can't post to it with the admin's cookie. `POST` only (`GET` gives `405`).
 
@@ -69,16 +69,23 @@ type SummaryValue = { value: string; count: number };   // value 1 to 80 charact
 | A user message, or the intro `goal` | 1,000 characters | `MAX_USER_MESSAGE_CHARS` |
 | An assistant message | 4,000 characters | `MAX_ASSISTANT_MESSAGE_CHARS` |
 | Requests per admin | 30 per 10 minutes, per server instance (best effort, [KNOWN-ISSUES.md](KNOWN-ISSUES.md#security)) | `AI_REQUESTS_PER_WINDOW` |
-| Time for the AI to answer | 20 seconds, no retries | `AI_TIMEOUT_MS` |
+| Time for one AI attempt | 12 seconds (the SDK makes no retries of its own) | `AI_ATTEMPT_TIMEOUT_MS` (`ai/guardrails.ts`) |
+| Time for the whole request | 25 seconds, the interview's one retry included | `AI_REQUEST_TIMEOUT_MS` (`ai/guardrails.ts`) |
+| Vercel function duration | 30 seconds | `export const maxDuration = 30` in `route.ts` |
 
 **Response** (always JSON, always `Cache-Control: no-store`):
 
 ```ts
 type AiResponse =
-  | { ok: true; kind: "interview"; reply: string; proposal: SearchBrief | null }
+  | { ok: true; kind: "interview"; reply: string; proposal: SearchBrief | null; note: string | null }
   | { ok: true; kind: "intro"; draft: string }
   | { ok: false; error: string };   // plain-language message for the user
 ```
+
+- **Interview `proposal`** has passed `parseInterviewReply()` (`ai/validate.ts`, TR-42): the brief schema with its cross-field rules, only the parts the form can edit, and every city, state, industry and title value in the file summary, in the summary's spelling. Otherwise it is `null`. A proposal that fails `searchBriefSchema` is never returned. The rules: [translator/README.md](translator/README.md#checking-the-ais-reply).
+- **Interview `note`** (TR-42) is `null`, or says why a proposal was dropped, for the UI to show beside `reply`: "I couldn't use "Flagstaff" because it's not in this file." (or "... "Flagstaff" and "Mining" because they're not in this file."), "I couldn't use that suggestion because it includes an option this tool can't edit yet. Try the form, or ask me again." or "I couldn't use that suggestion because some parts don't fit together. Try again, or use the form."
+- **Retry:** when the interview reply isn't in the format, the route asks OpenAI once more inside the same request. A second unusable reply gives the `502` below. There is no retry after a timeout or another failure.
+- **`maxDuration = 30`:** Vercel's docs (checked 2026-11-25) give every plan a maximum of 300 seconds or more with Fluid Compute, on by default for new projects. This project's plan and Fluid Compute setting: **Unverified**.
 
 The checks run in this order; the first that fails answers.
 
@@ -93,11 +100,12 @@ The checks run in this order; the first that fails answers.
 | 7 | 413 | This conversation is too long. Start a new chat to keep going. | More than 30 messages, or an assistant message over 4,000 characters | |
 | 8 | 413 | Your message is too long. Keep it under 1,000 characters. | A user message, or the `goal`, over 1,000 characters | |
 | 9 | 429 | You've sent a lot of requests. Wait a few minutes and try again. | Over 30 requests in 10 minutes | `translator_ai_rate_limited` |
-| 10 | 504 | The AI took too long to answer. Try again, or use the form. | No answer within 20 seconds | `translator_ai_timeout` |
-| 10 | 502 | The AI couldn't answer right now. Try again, or use the form. | OpenAI returned an error, or an empty answer | `translator_ai_upstream`, `translator_ai_empty` |
+| 10 | 504 | The AI took too long to answer. Try again, or use the form. | An attempt got no answer within 12 seconds, or the request ran past 25 seconds | `translator_ai_timeout` |
+| 10 | 502 | The AI couldn't answer right now. Try again, or use the form. | OpenAI returned an error, an empty answer or a refusal | `translator_ai_upstream`, `translator_ai_empty` |
+| 10 | 502 | The AI gave an answer I couldn't use. Your last criteria are kept. Try again or use the form. | Interview only: the reply wasn't in the format twice in a row (TR-42) | `translator_ai_unusable` |
 | 11 | 200 | | The `AiResponse` above | |
 
-**Logging:** only `console.error("translator_ai_<code>")` with one of the fixed codes in the table. Never the body, the chat, the summary, the intro fields, the AI's reply or an error's message. The route asks OpenAI not to store the response (`store: false`).
+**Logging:** only `console.error("translator_ai_<code>")` with one of the fixed codes in the table. Never the body, the chat, the summary, the intro fields, the AI's reply (including a reply in the wrong format), a note or an error's message. The route asks OpenAI not to store the response (`store: false`).
 
 ```js
 // In the browser console on the site, logged in as an admin:

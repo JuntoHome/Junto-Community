@@ -3,14 +3,14 @@
  * Input: the request, and its dependencies (admin check, on/off switch, AI call, rate limit),
  * passed in so tests need no module mocks. The route passes the real ones.
  * Output: a JSON Response, `Cache-Control: no-store`. AiResponse on success, `{ ok: false, error }` otherwise.
- * Privacy: keeps nothing between calls and never logs content. The only log is
- * `translator_ai_<code>` with a fixed code.
+ * Privacy: keeps nothing between calls and never logs content: not the request, not the AI's
+ * reply, not a note. The only log is `translator_ai_<code>` with a fixed code.
  */
-import { AI_TIMEOUT_MS, withTimeout } from "./guardrails";
+import { AI_REQUEST_TIMEOUT_MS, withTimeout } from "./guardrails";
 import { runInterviewTurn } from "./interview";
 import { runIntroDraft } from "./intro";
 import { MAX_BODY_BYTES, parseAiRequest, type AiRequestProblem } from "./request-schema";
-import type { AiCall, AiErrorCode, AiResponse, InterviewResult, IntroResult } from "./types";
+import type { AiCall, AiResponse, InterviewErrorCode, InterviewResult, IntroResult } from "./types";
 
 /** Requests one admin may make per rate-limit window (10 minutes, `src/lib/rate-limit.ts`). */
 export const AI_REQUESTS_PER_WINDOW = 30;
@@ -26,6 +26,7 @@ const ROUTE_TEXT = {
   rateLimited: "You've sent a lot of requests. Wait a few minutes and try again.",
   timeout: "The AI took too long to answer. Try again, or use the form.",
   noAnswer: "The AI couldn't answer right now. Try again, or use the form.",
+  unusable: "The AI gave an answer I couldn't use. Your last criteria are kept. Try again or use the form.",
 } as const;
 
 export type AiRouteDeps = {
@@ -40,7 +41,7 @@ export type AiRouteDeps = {
 };
 
 /** Codes that may be logged. Nothing else is ever written to the console. */
-type LogCode = AiErrorCode | "rate_limited" | "bad_request";
+type LogCode = InterviewErrorCode | "rate_limited" | "bad_request";
 
 const logCode = (code: LogCode) => console.error(`translator_ai_${code}`);
 
@@ -55,10 +56,11 @@ const PROBLEM_REPLY: Record<AiRequestProblem, [string, number]> = {
   "message-too-long": [ROUTE_TEXT.messageTooLong, 413],
 };
 
-const AI_FAILURE_REPLY: Record<AiErrorCode, [string, number]> = {
+const AI_FAILURE_REPLY: Record<InterviewErrorCode, [string, number]> = {
   timeout: [ROUTE_TEXT.timeout, 504],
   upstream: [ROUTE_TEXT.noAnswer, 502],
   empty: [ROUTE_TEXT.noAnswer, 502],
+  unusable: [ROUTE_TEXT.unusable, 502], // the reply didn't match the format twice (TR-42)
 };
 
 /** True when the request carries an Origin header from another site. */
@@ -134,7 +136,8 @@ export async function handleAiRequest(request: Request, deps: AiRouteDeps): Prom
     input.kind === "interview" ? runInterviewTurn(input, deps.callAi) : runIntroDraft(input, deps.callAi);
   let result: InterviewResult | IntroResult;
   try {
-    result = await withTimeout(run, AI_TIMEOUT_MS, () => ({ ok: false, code: "timeout" }) as const);
+    // The whole request, retry included. Each attempt has its own 12-second limit in the capability.
+    result = await withTimeout(run, AI_REQUEST_TIMEOUT_MS, () => ({ ok: false, code: "timeout" }) as const);
   } catch {
     result = { ok: false, code: "upstream" }; // the AI call should never throw, but if it does
   }

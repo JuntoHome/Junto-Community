@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import { EXAMPLE_SUMMARY } from "../__fixtures__/summary";
-import { AI_TIMEOUT_MS } from "./guardrails";
+import { BUSINESS_OWNER_BRIEF } from "../criteria/examples";
+import { searchBriefSchema } from "../criteria/schema";
+import { AI_ATTEMPT_TIMEOUT_MS } from "./guardrails";
 import { handleAiRequest, type AiRouteDeps } from "./handle-request";
 import { MAX_BODY_BYTES, MAX_MESSAGES, MAX_USER_MESSAGE_CHARS } from "./request-schema";
 import type { AiCall, ChatMessage } from "./types";
@@ -13,8 +15,20 @@ const replyWith =
   (value: string): AiCall =>
   async () => ({ ok: true, value });
 
+/** An interview reply in the format, as JSON text. */
+const interviewReply = (message: string, proposal: unknown = null) => JSON.stringify({ message, proposal });
+
+/** Answers in the format asked for: the interview's JSON, or the intro's plain text. */
+const answerInFormat: AiCall = async ({ format }) => ({
+  ok: true,
+  value: format === "text" ? "Hello from a local supplier." : interviewReply("Hi! What are you looking for?"),
+});
+
+/** The business owner brief as OpenAI sends it, with some parts changed. */
+const transportBrief = (changes: Record<string, unknown> = {}) => ({ ...BUSINESS_OWNER_BRIEF, priorityOrder: null, ...changes });
+
 function fakeDeps(overrides: Partial<AiRouteDeps> = {}) {
-  const callAi = vi.fn<AiCall>(replyWith("Hi! What are you looking for?"));
+  const callAi = vi.fn<AiCall>(answerInFormat);
   const deps: AiRouteDeps = {
     getAdmin: async () => ({ userId: "admin-1" }),
     aiEnabled: () => true,
@@ -222,12 +236,12 @@ describe("handleAiRequest: what it accepts", () => {
 });
 
 describe("handleAiRequest: calling the AI", () => {
-  it("returns 504 after 20 seconds when the AI never answers, and logs only the code", async () => {
+  it("returns 504 after 12 seconds when the AI never answers, without a retry, and logs only the code", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const deps = fakeDeps({ callAi: vi.fn<AiCall>(() => new Promise(() => {})) });
     const pending = handleAiRequest(post(INTERVIEW), deps);
 
-    await vi.advanceTimersByTimeAsync(AI_TIMEOUT_MS - 1);
+    await vi.advanceTimersByTimeAsync(AI_ATTEMPT_TIMEOUT_MS - 1);
     let settled = false;
     void pending.then(() => (settled = true));
     await Promise.resolve();
@@ -236,6 +250,7 @@ describe("handleAiRequest: calling the AI", () => {
     await vi.advanceTimersByTimeAsync(1);
     await expectFailure(await pending, 504, "The AI took too long to answer. Try again, or use the form.");
     expect(logged()).toEqual([["translator_ai_timeout"]]);
+    expect(deps.callAi).toHaveBeenCalledTimes(1);
   });
 
   it.each([
@@ -262,7 +277,7 @@ describe("handleAiRequest: calling the AI", () => {
     expect(logged()).toEqual([["translator_ai_upstream"]]);
   });
 
-  it("returns 200 with an interview reply and no proposal", async () => {
+  it("returns 200 with an interview reply, no proposal and no note", async () => {
     const deps = fakeDeps();
     const response = await handleAiRequest(post(INTERVIEW), deps);
     expect(response.status).toBe(200);
@@ -272,16 +287,78 @@ describe("handleAiRequest: calling the AI", () => {
       kind: "interview",
       reply: "Hi! What are you looking for?",
       proposal: null,
+      note: null,
     });
     expect(deps.callAi).toHaveBeenCalledWith({
       instructions: expect.any(String),
       messages: [{ role: "user", content: "Hello" }],
-      format: "text",
+      format: { name: "interview_reply", schema: expect.any(Object) },
     });
   });
 
+  it("returns 200 with a checked proposal in the file's spelling", async () => {
+    const proposal = transportBrief({ mustHaves: [{ field: "city", operator: "equals", value: "phoenix" }] });
+    const deps = fakeDeps({ callAi: replyWith(interviewReply("Does this look right?", proposal)) });
+    expect(await (await handleAiRequest(post(INTERVIEW), deps)).json()).toEqual({
+      ok: true,
+      kind: "interview",
+      reply: "Does this look right?",
+      proposal: { ...BUSINESS_OWNER_BRIEF, mustHaves: [{ field: "city", operator: "equals", value: "Phoenix" }] },
+      note: null,
+    });
+  });
+
+  it("returns 200 with the note and no proposal for a value that isn't in the file, and logs nothing", async () => {
+    const proposal = transportBrief({ mustHaves: [{ field: "city", operator: "equals", value: "Flagstaff" }] });
+    const deps = fakeDeps({ callAi: vi.fn<AiCall>(replyWith(interviewReply("Here you go.", proposal))) });
+    expect(await (await handleAiRequest(post(INTERVIEW), deps)).json()).toEqual({
+      ok: true,
+      kind: "interview",
+      reply: "Here you go.",
+      proposal: null,
+      note: `I couldn't use "Flagstaff" because it's not in this file.`,
+    });
+    expect(deps.callAi).toHaveBeenCalledTimes(1);
+    expect(logged()).toEqual([]);
+  });
+
+  it("returns 502 after two replies in the wrong format, and logs only translator_ai_unusable", async () => {
+    const deps = fakeDeps({ callAi: vi.fn<AiCall>(replyWith("secret reply text, not JSON")) });
+    const body = await expectFailure(
+      await handleAiRequest(post(INTERVIEW), deps),
+      502,
+      "The AI gave an answer I couldn't use. Your last criteria are kept. Try again or use the form.",
+    );
+    expect(JSON.stringify(body)).not.toContain("secret");
+    expect(deps.callAi).toHaveBeenCalledTimes(2);
+    expect(logged()).toEqual([["translator_ai_unusable"]]);
+  });
+
+  it("never returns a proposal that fails searchBriefSchema", async () => {
+    const proposals = [
+      transportBrief(),
+      transportBrief({ listSize: 500 }),
+      transportBrief({ preferences: [{ field: "employees", operator: "range", value: { min: 99, max: 10 } }] }),
+      transportBrief({ exclusions: [{ field: "city", operator: "equals", value: "Phoenix" }] }),
+      transportBrief({ preferences: [{ field: "city", operator: "equals", value: "Phoenix" }] }),
+      transportBrief({ mustHaves: [{ field: "city", operator: "in", value: ["Phoenix", "phoenix"] }] }),
+      transportBrief({ intent: "everything" }),
+    ];
+    let withProposal = 0;
+    for (const proposal of proposals) {
+      const deps = fakeDeps({ callAi: replyWith(interviewReply("Here.", proposal)) });
+      const body = await (await handleAiRequest(post(INTERVIEW), deps)).json();
+      expect(body.ok).toBe(true);
+      expect(body).toHaveProperty("note");
+      if (body.proposal === null) continue;
+      withProposal += 1;
+      expect(searchBriefSchema.safeParse(body.proposal).success).toBe(true);
+    }
+    expect(withProposal).toBe(2); // the valid brief and the in list fixed to equals
+  });
+
   it("returns 200 with an intro draft", async () => {
-    const deps = fakeDeps({ callAi: vi.fn<AiCall>(replyWith("Hello from a local supplier.")) });
+    const deps = fakeDeps();
     const response = await handleAiRequest(post(INTRO), deps);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, kind: "intro", draft: "Hello from a local supplier." });
