@@ -2,7 +2,7 @@
 
 How to write the Translator's Phase 2 code (Chat with AI). Every Phase 2 ticket follows this guide.
 
-- **Status:** in progress. TR-38 set the rules, this guide, the environment variables and the `openai` dependency. TR-39 built the route and the files it needs: `types.ts`, `request-schema.ts`, `client.ts`, `guardrails.ts`, `handle-request.ts`, and placeholder `interview.ts` and `intro.ts`. The other files below are created by later tickets.
+- **Status:** in progress. TR-38 set the rules, this guide, the environment variables and the `openai` dependency. TR-39 built the route and the files it needs: `types.ts`, `request-schema.ts`, `client.ts`, `guardrails.ts`, `handle-request.ts`, and placeholder `interview.ts` and `intro.ts`. TR-40 added `summary.ts` and `sanitizeSummaryValue()` in `guardrails.ts`. The other files below are created by later tickets.
 - **Rules:** the hard rules are in [../../CLAUDE.md](../../CLAUDE.md). What Phase 2 is, its flow and what is sent to the AI: [README.md](README.md#phase-2).
 - **Source:** the code guide in issue #81 (TR-38), with the corrections listed in [Changes from the issue's guide](#changes-from-the-issues-guide).
 
@@ -17,12 +17,12 @@ src/
       route.ts            # ONLY server entry point. Thin: builds the real deps and calls handleAiRequest().
   features/translator/
     ai/                   # NEW. Pure logic, no React. One file per capability.
-      types.ts            # Shared types: ChatMessage, AiRequest, AiResponse, FileSummary, IntroFields, AiCall
+      types.ts            # Shared types: ChatMessage, AiRequest, AiResponse, IntroFields, AiCall. Re-exports FileSummary from summary.ts
       client.ts           # Server only. First line: import "server-only". The ONLY file that imports
                           # "openai" and reads process.env. Exports aiEnabled(), aiModel(), createOpenAiCall().
       handle-request.ts   # The route's work: every check in order, run the capability, JSON reply (TR-39)
       request-schema.ts   # The request shape (aiRequestSchema) and its size limits (TR-39)
-      summary.ts          # Capability: build the file summary (what the AI may see)
+      summary.ts          # Capability: build the file summary (what the AI may see). fileSummarySchema, FileSummary (TR-40)
       instructions.ts     # Capability: interview + intro instructions (system prompts)
       schema.ts           # Capability: the AI's reply shape (reuses searchBriefSchema). The request is in request-schema.ts
       validate.ts         # Capability: check AI output, "value must exist in the file"
@@ -30,7 +30,7 @@ src/
       intro.ts            # Capability: pick intro fields + run the intro draft
       diff-brief.ts       # Capability: what changed between two briefs
       explain-change.ts   # Capability: plain sentence on why the list moved (no AI)
-      guardrails.ts       # Capability: limits (withTimeout, AI_TIMEOUT_MS), sanitising values, stripping invented contacts
+      guardrails.ts       # Capability: limits (withTimeout, AI_TIMEOUT_MS), sanitising values (sanitizeSummaryValue), stripping invented contacts
       index.ts            # Public exports for the UI (types + pure helpers only, never client.ts)
     ui/chat/              # NEW. React only. No business rules here.
       chat-panel.tsx
@@ -39,6 +39,7 @@ src/
       use-chat-session.ts # The only stateful hook: messages, lastValidBrief, drafts, limits
     __fixtures__/
       empty.ts            # Stands in for "server-only" in tests (vitest.config.ts alias)
+      summary.ts          # EXAMPLE_SUMMARY: a small valid FileSummary for route and interview tests (TR-40)
       fake-ai.ts          # Scripted fake for tests
       walkthroughs/ai-*.json
 ```
@@ -75,6 +76,15 @@ Rules:
 - **Nothing stored at OpenAI either.** Calls use the Responses API with `store: false`.
 - **Errors.** `client.ts` catches every OpenAI error and returns `{ ok: false, code }` to the capability, with `code` one of `timeout`, `upstream` or `empty` (`AiErrorCode`). It never throws, never logs and never returns the error's message: an error message can quote what was sent. `handle-request.ts` is the one place that logs, and only `console.error("translator_ai_<code>")` with a fixed code: `timeout`, `upstream`, `empty`, `rate_limited` or `bad_request`. This is the same idea as `logTranslatorError()` in Phase 1 ([README.md](README.md#session-and-start-over)).
 - **Tests and `server-only`.** Importing `server-only` throws outside a React Server environment, so `vitest.config.ts` aliases it to the empty `__fixtures__/empty.ts`. Tests can import `client.ts` (with `openai` mocked); the Next.js build still uses the real package. Never remove the import from `client.ts`.
+
+### The file summary (`ai/summary.ts`)
+
+- **`FileSummary` is defined once,** in `summary.ts`, as `z.infer<typeof fileSummarySchema>`. `types.ts` only re-exports it, and `request-schema.ts` uses the same `fileSummarySchema` for the interview's `summary`. Never write the shape out by hand anywhere else: change the schema and the type follows.
+- **The schema is strict** (`z.strictObject` at every level). It is the server-side privacy wall: a summary with any extra key, such as `rows`, gets a `400`. Each value is also refused when `looksLikeContactData()` (`guardrails.ts`) is true, the same rule `sanitizeSummaryValue()` uses to drop values in the browser, so the two can't drift apart.
+- **`truncated` has a `states` flag** as well as `cities`, `industries` and `titles`. Issue #83's type had no `states` flag, but states are capped at 100 too, and without a flag a bad file could lose values silently. Later tickets use the schema, not the issue's type.
+- **No `Infinity`.** `employees.min` and `max` use finite bounds only, because `JSON.stringify(Infinity)` is `null`.
+- **It reuses `fieldOptions()`** for the four lists and never recounts. What the summary holds, its caps, sorting and dropped values: [README.md](README.md#the-file-summary).
+- **Adding a field to the summary** changes what leaves the browser: update the README's [What is sent to the AI](README.md#what-is-sent-to-the-ai) table, and never add a row-level field.
 
 ## 3. Shape of a capability file (follow this pattern)
 
