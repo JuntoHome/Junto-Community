@@ -2,7 +2,8 @@
  * Capability: the chat's rules (TR-44). The chat panel and `use-chat-session.ts` only render
  * and wire these up. The proposal card (TR-45) uses `PROPOSAL_TEXT` and the `remove-chip` action.
  * The chat on the Results step (TR-46) is the same chat in "revise" mode: its own opening line,
- * the confirmed brief as `currentBrief`, `settleRevision()` and `REVISE_TEXT`.
+ * the confirmed brief as `currentBrief`, `settleRevision()` and `REVISE_TEXT`. After a revision
+ * is confirmed, the `add-note` action puts TR-47's explanation (`explainChange()`) in the chat.
  * Input: the chat state, the actions the hook dispatches, and the route's raw responses.
  * Output: the next chat state, the request body for `/api/translator/ai`, whether Send may run,
  * and what screen readers hear.
@@ -59,14 +60,6 @@ export const REVISE_TEXT = {
   noChange: "Your criteria are the same, so nothing to update.",
   cancel: "Cancel",
   marks: { new: "(new)", changed: "(changed)" },
-  /**
-   * After Confirm and rank, the shortlist's first row: "Updated. Now first: Synthetic Company 0006
-   * (SYN-0006)." or, with no company name, "Updated. Now first: SYN-0006."; for an empty
-   * shortlist, the updatedEmpty line.
-   */
-  updated: (company: string | null, recordId: string) =>
-    company === null ? `Updated. Now first: ${recordId}.` : `Updated. Now first: ${company} (${recordId}).`,
-  updatedEmpty: "Updated. No records match these criteria now.",
 } as const;
 
 /**
@@ -115,6 +108,11 @@ export type ChatAction =
   | { type: "remove-chip"; chipId: string }
   /** The proposal card closes (TR-46): Cancel, or a revision confirmed. The chat is kept. */
   | { type: "dismiss-proposal" }
+  /**
+   * An app note added after the chat's own turns (TR-47): the explanation after a confirmed
+   * revision. A note like any other, so it is never sent. No AI call.
+   */
+  | { type: "add-note"; content: string }
   | { type: "reset" };
 
 /** What `interpretResponse()` gives: a `received` or `failed` action, without the request it answers. */
@@ -125,6 +123,14 @@ export type ChatOutcome =
 type InterviewRequest = Extract<AiRequest, { kind: "interview" }>;
 
 const GREETING_ID = "greeting";
+
+/** The id prefix of a note added with `add-note`, so the live region can read it on its own. */
+const ADDED_NOTE_PREFIX = "added-note-";
+
+/** Whether `item` is a note added with `add-note` (TR-47's explanation). */
+export function isAddedNote(item: ChatItem): boolean {
+  return item.role === "note" && item.id.startsWith(ADDED_NOTE_PREFIX);
+}
 
 /** A new chat: only the opening line (the greeting by default), nothing typed, nothing proposed. */
 export function initialChatState(opening: string = GREETING): ChatState {
@@ -230,6 +236,13 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
     case "dismiss-proposal":
       return state.proposal ? { ...state, proposal: null } : state;
 
+    case "add-note": {
+      if (action.content.trim() === "") return state;
+      // Items only grow until a reset, so the count makes the id unique in this list.
+      const item: ChatItem = { id: `${ADDED_NOTE_PREFIX}${state.items.length}`, role: "note", content: action.content };
+      return { ...state, items: [...state.items, item] };
+    }
+
     case "reset":
       // A fresh request number, so a reply to a request sent before the reset is ignored.
       return { ...initialChatState(state.opening), requestId: state.requestId + 1 };
@@ -317,9 +330,12 @@ export function interpretResponse(status: number, body: string | null): ChatOutc
 /**
  * What the live region says: the AI's newest reply and its note, if any, after the last thing
  * the user sent. Empty until the first reply, so the greeting and the history are never read
- * out again.
+ * out again. When the newest item is a note added with `add-note` (TR-47), only that note, so
+ * the reply isn't read again.
  */
 export function latestAnnouncement(state: ChatState): string {
+  const last = state.items.at(-1);
+  if (last && isAddedNote(last)) return last.content;
   let lastUser = state.items.length - 1;
   while (lastUser >= 0 && state.items[lastUser].role !== "user") lastUser -= 1;
   if (lastUser === -1) return "";

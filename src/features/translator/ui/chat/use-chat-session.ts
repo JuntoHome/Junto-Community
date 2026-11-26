@@ -35,6 +35,7 @@ const AI_ROUTE = "/api/translator/ai";
  * The same hook runs the Results step's chat (TR-46): `opening` is its first line, `mode` is
  * "revise" (the confirmed brief is always the `currentBrief`, and a proposal that changes nothing
  * becomes a note), and `dismissProposal()` closes the card on Cancel or after a confirm.
+ * `addNote()` puts TR-47's explanation in the chat after a confirm: a note, never sent, no request.
  */
 export function useChatSession({
   records,
@@ -113,5 +114,9 @@ export function useChatSession({
     dispatch({ type: "dismiss-proposal" });
   }
 
-  return { state, send, edit, resetChat, removeChip, dismissProposal };
+  function addNote(content: string) {
+    dispatch({ type: "add-note", content });
+  }
+
+  return { state, send, edit, resetChat, removeChip, dismissProposal, addNote };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { type KeyboardEvent, useEffect, useId, useRef } from "react";
+import { type KeyboardEvent, type Ref, useEffect, useId, useImperativeHandle, useRef } from "react";
 import { buttonClasses } from "@/components/ui/button";
 import { textareaClasses } from "@/components/ui/form";
 import { cn } from "@/lib/cn";
@@ -15,6 +15,7 @@ import {
   chipMarks,
   diffBriefs,
   type FileSummary,
+  isAddedNote,
   latestAnnouncement,
   limitReached,
   MAX_USER_MESSAGE_CHARS,
@@ -23,6 +24,12 @@ import {
 import type { GroupedRecord } from "../../normalize/duplicates";
 import { ProposalCard } from "./proposal-card";
 import { useChatSession } from "./use-chat-session";
+
+/** What the Results step may do to its chat: add the explanation after a confirmed revision (TR-47). */
+export type ChatPanelHandle = {
+  /** Adds `text` as a note at the end of the chat, moves focus to it and has it announced. Never sent. */
+  addNote: (text: string) => void;
+};
 
 /**
  * Chat with AI (TR-44): the conversation, the message box, Send and Start over chat. It only
@@ -42,8 +49,12 @@ import { useChatSession } from "./use-chat-session";
  * still sent). The card compares the proposal with the confirmed brief (`diffBriefs()`), the
  * live region reads the changes after the reply, Cancel closes the card, and Confirm and rank
  * hands the proposal up and closes the card. Nothing is ranked before Confirm.
+ *
+ * `ref` gives `addNote()`: once the results re-rank, the Results step adds TR-47's explanation
+ * (`explainChange()`) as a note. It takes focus, and the live region reads only that note.
  */
 export function ChatPanel({
+  ref,
   records,
   layout,
   getCurrentBrief,
@@ -53,6 +64,7 @@ export function ChatPanel({
   onConfirmProposal,
   onEditProposal,
 }: {
+  ref?: Ref<ChatPanelHandle>;
   records: readonly GroupedRecord[];
   layout: FileSummary["layout"];
   /** The wizard's brief, read at send time: the pending one (Criteria step) or the confirmed one (Results step). */
@@ -67,7 +79,7 @@ export function ChatPanel({
   /** Edit in form on the proposal card, with the proposal as it is on screen. */
   onEditProposal: (brief: SearchBrief) => void;
 }) {
-  const { state, send, edit, resetChat, removeChip, dismissProposal } = useChatSession({
+  const { state, send, edit, resetChat, removeChip, dismissProposal, addNote } = useChatSession({
     records,
     layout,
     getCurrentBrief,
@@ -94,6 +106,22 @@ export function ChatPanel({
     const list = listRef.current;
     if (list) list.scrollTop = list.scrollHeight;
   }, [state.items.length, state.status]);
+
+  // After `addNote()`, focus goes to the note once it is on screen.
+  const addedNoteRef = useRef<HTMLLIElement>(null);
+  const focusAddedNote = useRef(false);
+  useEffect(() => {
+    if (!focusAddedNote.current || !addedNoteRef.current) return;
+    focusAddedNote.current = false;
+    addedNoteRef.current.focus();
+  });
+  useImperativeHandle(ref, () => ({
+    addNote: (text: string) => {
+      focusAddedNote.current = true;
+      addNote(text);
+    },
+  }));
+  const lastItemId = state.items.at(-1)?.id;
 
   const waiting = state.status === "waiting";
   const full = limitReached(state);
@@ -129,7 +157,11 @@ export function ChatPanel({
           )}
         >
           {shownItems.map((item) => (
-            <ChatBubble key={item.id} item={item} />
+            <ChatBubble
+              key={item.id}
+              item={item}
+              noteRef={isAddedNote(item) && item.id === lastItemId ? addedNoteRef : undefined}
+            />
           ))}
         </ol>
       )}
@@ -226,10 +258,21 @@ export function ChatPanel({
   );
 }
 
-/** One item: the user's on the right, the AI's on the left, notes as a small muted centred line. */
-function ChatBubble({ item }: { item: ChatItem }) {
+/**
+ * One item: the user's on the right, the AI's on the left, notes as a small muted centred line.
+ * `noteRef` marks the newest added note (TR-47), which takes focus.
+ */
+function ChatBubble({ item, noteRef }: { item: ChatItem; noteRef?: Ref<HTMLLIElement> }) {
   if (item.role === "note") {
-    return <li className="self-center px-2 text-center text-sm text-muted">{item.content}</li>;
+    return (
+      <li
+        ref={noteRef}
+        tabIndex={noteRef ? -1 : undefined}
+        className="self-center px-2 text-center text-sm text-muted focus:outline-none"
+      >
+        {item.content}
+      </li>
+    );
   }
   const mine = item.role === "user";
   return (

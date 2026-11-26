@@ -15,6 +15,7 @@ import {
   GREETING,
   initialChatState,
   interpretResponse,
+  isAddedNote,
   latestAnnouncement,
   limitReached,
   PROPOSAL_TEXT,
@@ -276,9 +277,53 @@ describe("the Results step's chat (TR-46)", () => {
     expect(changesAnnouncement([])).toBe("");
   });
 
-  it("names the new first row", () => {
-    expect(REVISE_TEXT.updated("Synthetic Company 0006", "SYN-0006")).toBe("Updated. Now first: Synthetic Company 0006 (SYN-0006).");
-    expect(REVISE_TEXT.updated(null, "SYN-0006")).toBe("Updated. Now first: SYN-0006.");
+  it("no longer has TR-46's Updated line: TR-47's explanation replaces it", () => {
+    expect(Object.keys(REVISE_TEXT)).not.toContain("updated");
+    expect(Object.keys(REVISE_TEXT)).not.toContain("updatedEmpty");
+  });
+});
+
+describe("add-note (TR-47)", () => {
+  const explanation = "Synthetic Company 0006 (SYN-0006) is now #1 with score 100: Title: Operations Manager (preferred).";
+  const revised = () =>
+    [send("favor operations managers instead"), received(1, { reply: "Done." }), { type: "dismiss-proposal" } as ChatAction].reduce(
+      chatReducer,
+      initialChatState(REVISE_TEXT.opening),
+    );
+
+  it("adds the explanation as a note at the end of the chat", () => {
+    const state = chatReducer(revised(), { type: "add-note", content: explanation });
+    const last = state.items.at(-1);
+    expect(last).toMatchObject({ role: "note", content: explanation });
+    expect(last && isAddedNote(last)).toBe(true);
+    expect(state.items.slice(0, -1)).toEqual(revised().items);
+  });
+
+  it("never sends the note to the AI", () => {
+    const state = chatReducer(revised(), { type: "add-note", content: explanation });
+    const request = buildChatRequest(chatReducer(state, send("Now Tempe")), EXAMPLE_SUMMARY, BUSINESS_OWNER_BRIEF);
+    expect(JSON.stringify(request)).not.toContain("SYN-0006");
+    expect(request.messages.map((m) => m.role)).toEqual(["assistant", "user", "assistant", "user"]);
+  });
+
+  it("is read on its own by the live region, without the reply again", () => {
+    const state = chatReducer(revised(), { type: "add-note", content: explanation });
+    expect(latestAnnouncement(revised())).toBe("AI: Done.");
+    expect(latestAnnouncement(state)).toBe(explanation);
+    // The next reply is read as usual.
+    const next = chatReducer(chatReducer(state, send("Now Tempe")), received(2, { reply: "Sure." }));
+    expect(latestAnnouncement(next)).toBe("AI: Sure.");
+  });
+
+  it("gives each added note its own id and ignores an empty one", () => {
+    let state = chatReducer(revised(), { type: "add-note", content: "First." });
+    state = chatReducer(state, { type: "add-note", content: "Second." });
+    const ids = state.items.map((item) => item.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(chatReducer(state, { type: "add-note", content: "  " })).toBe(state);
+    // A note the AI route sent is not an added note.
+    const routeNote = run(send("Owners"), received(1, { note: "A note." })).items.at(-1);
+    expect(routeNote && isAddedNote(routeNote)).toBe(false);
   });
 });
 
@@ -450,8 +495,6 @@ describe("REVISE_TEXT", () => {
       REVISE_TEXT.cancel,
       REVISE_TEXT.marks.new,
       REVISE_TEXT.marks.changed,
-      REVISE_TEXT.updated("x", "y"),
-      REVISE_TEXT.updatedEmpty,
     ];
     for (const text of texts) expect(text).not.toMatch(/[\u2013\u2014]/);
   });
