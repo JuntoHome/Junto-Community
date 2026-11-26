@@ -28,7 +28,19 @@ export {
 } from "./chat-session";
 export { type BriefChange, chipMarks, type ChipMark, DIFF_TEXT, diffBriefs } from "./diff-brief";
 export { EXPLAIN_TEXT, explainChange, type ExplainInput } from "./explain-change";
-export { INTRO_TEXT, type IntroFields, pickIntroFields, type PickedIntro } from "./intro";
+export { INTRO_TEXT, type IntroFields, MAX_INTRO_NOTE_CHARS, pickIntroFields, type PickedIntro } from "./intro";
+export {
+  buildIntroRequest,
+  type IntroAction,
+  type IntroDraft,
+  initialIntroState,
+  INTRO_PANEL_TEXT,
+  type IntroRequestInfo,
+  type IntroSessionState,
+  interpretIntroResponse,
+  introReducer,
+  placeholderCount,
+} from "./intro-session";
 export { MAX_MESSAGES, MAX_USER_MESSAGE_CHARS } from "./request-schema";
 export { buildFileSummary } from "./summary";
 export type { AiRequest, AiResponse, ChatMessage, FileSummary } from "./types";

@@ -4,7 +4,7 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { buttonClasses } from "@/components/ui/button";
 import { inputClasses } from "@/components/ui/form";
 import { cn } from "@/lib/cn";
-import { diffBriefs, explainChange, type FileSummary, REVISE_TEXT } from "../ai";
+import { diffBriefs, explainChange, type FileSummary, type IntroFields, REVISE_TEXT } from "../ai";
 import type { CriteriaForm } from "../criteria/from-form";
 import type { SearchBrief } from "../criteria/schema";
 import type { MappingRow } from "../import/describe-mapping";
@@ -15,11 +15,13 @@ import { buildCounts } from "../ranking/counts";
 import { diagnoseEmpty } from "../ranking/diagnose";
 import { checkPin, hasId, omit, type Overrides, pin, type PinContext, restore, unpin } from "../ranking/overrides";
 import { ChatPanel, type ChatPanelHandle } from "./chat/chat-panel";
+import { IntroPanel } from "./chat/intro-panel";
+import type { IntroDrafts } from "./chat/use-intro-drafts";
 import { CountsSummary } from "./counts-summary";
 import { errorText } from "./criteria-controls";
 import { CRITERIA_SUMMARY_HEADING_ID, CriteriaSummary, type CriteriaSummaryHandle } from "./criteria-summary";
 import { NoResults } from "./no-results";
-import { ResultsTable, type ResultsView, type RowControls } from "./results-table";
+import { type IntroControls, ResultsTable, type ResultsView, type RowControls } from "./results-table";
 
 /** "SYN-0001", "SYN-0001 and SYN-0016", "SYN-0001, SYN-0016 and SYN-0021". */
 function joinIds(ids: readonly string[]): string {
@@ -85,6 +87,11 @@ const buttonKey = (list: OverrideList, action: OverrideAction, recordId: string)
  * `explainChange()`, from the results before and after) is added to the chat as a note, takes
  * focus and is announced. The previous results are kept only until then. The summary's inline
  * edits keep working as before (both change the same confirmed brief) but add no explanation.
+ *
+ * With the AI on, each row has Draft intro (TR-49), which opens the intro panel for that business
+ * as a modal dialog. The drafts live in the wizard (`introDrafts`); the confirmed brief's intent is
+ * sent with each request. Closing the panel cancels a request in flight and puts focus back on
+ * the button that opened it.
  */
 export function ResultsStep({
   aiEnabled,
@@ -104,9 +111,12 @@ export function ResultsStep({
   onConfirm,
   onOverridesChange,
   onContinueToExport,
+  introDrafts,
 }: {
   /** Chat with AI may run: shows the chat for changes once there are results. */
   aiEnabled: boolean;
+  /** The intro drafts (TR-49), held by the wizard. Null when the AI is off: no Draft intro buttons. */
+  introDrafts: IntroDrafts | null;
   /** The workbook's layout id, for the file summary the chat sends. */
   layout: FileSummary["layout"];
   /** Confirm and rank on the chat's card: confirms `brief` and re-ranks (TR-46). */
@@ -156,6 +166,21 @@ export function ResultsStep({
     const lines = explainChange({ before: pending.before, after: results, changes: diffBriefs(pending.before.brief, results.brief) });
     chatRef.current?.addNote(lines.join(" "));
   }, [results]);
+
+  // The business whose intro panel is open (TR-49), and the button that opened it, for focus to return to.
+  const [introOpen, setIntroOpen] = useState<{ recordId: string; intro: IntroFields; opener: HTMLButtonElement } | null>(null);
+  const introControls: IntroControls | undefined = introDrafts
+    ? { onDraft: (recordId, picked, opener) => setIntroOpen({ recordId, intro: picked.intro, opener }) }
+    : undefined;
+
+  /** The intro panel closed: cancel a request in flight, and put focus back on its button. */
+  function closeIntro() {
+    const opener = introOpen?.opener;
+    introDrafts?.cancel();
+    setIntroOpen(null);
+    if (opener?.isConnected) opener.focus();
+    else resultsRef.current?.focus();
+  }
 
   const [pinId, setPinId] = useState("");
   // The Pin by Record ID message; `count` makes the same message be announced again.
@@ -336,7 +361,7 @@ export function ResultsStep({
             {diagnosis ? (
               <NoResults diagnosis={diagnosis} onEdit={(id) => summaryRef.current?.openItem(id)} />
             ) : (
-              <ResultsTable rows={shownRows} mapping={mapping} controls={rowControls} />
+              <ResultsTable rows={shownRows} mapping={mapping} controls={rowControls} intro={introControls} />
             )}
           </div>
 
@@ -385,6 +410,16 @@ export function ResultsStep({
             <span key={announcement.count}>{announcement.text}</span>
           </p>
         </div>
+      )}
+      {introDrafts && introOpen && results && (
+        <IntroPanel
+          key={introOpen.recordId}
+          recordId={introOpen.recordId}
+          intro={introOpen.intro}
+          intent={results.brief.intent}
+          session={introDrafts}
+          onClose={closeIntro}
+        />
       )}
     </div>
   );
