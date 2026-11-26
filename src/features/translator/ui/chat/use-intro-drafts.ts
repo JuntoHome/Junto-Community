@@ -7,11 +7,10 @@ import {
   type IntroFields,
   type IntroRequestInfo,
   initialIntroState,
-  interpretIntroResponse,
+  interpretIntroResult,
   introReducer,
+  postAi,
 } from "../../ai";
-
-const AI_ROUTE = "/api/translator/ai";
 
 /**
  * The intro drafts (TR-49) and their one network call. A thin wrapper: every rule is in
@@ -22,8 +21,11 @@ const AI_ROUTE = "/api/translator/ai";
  * The request is only `buildIntroRequest()`: `kind`, the six intro fields, the intent and the
  * optional note. It is aborted when the panel closes (`cancel()`) and when the wizard unmounts,
  * and the reducer drops any reply whose request number isn't the pending one.
+ *
+ * The request goes through `postAi()` (TR-50). A `503` calls `onUnavailable`, so the wizard turns
+ * the AI off for the session. The failure simulation (`?aiFail=1`) doesn't affect intro drafts.
  */
-export function useIntroDrafts() {
+export function useIntroDrafts({ onUnavailable }: { onUnavailable?: () => void } = {}) {
   const [state, dispatch] = useReducer(introReducer, initialIntroState);
   const inFlight = useRef<AbortController | null>(null);
 
@@ -38,24 +40,12 @@ export function useIntroDrafts() {
 
     const controller = new AbortController();
     inFlight.current = controller;
-    let status = 0;
-    let body: string | null = null;
-    try {
-      const response = await fetch(AI_ROUTE, {
-        method: "POST",
-        // The route reads JSON only and refuses anything else with a 400.
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildIntroRequest(info.intro, info.intent, info.goal)),
-        signal: controller.signal,
-      });
-      status = response.status;
-      body = await response.text();
-    } catch {
-      // A network failure (or an abort): a null body gives the "Couldn't reach the AI" message. Nothing is logged.
-    }
-    if (controller.signal.aborted) return;
+    // No content is logged, whatever happens.
+    const result = await postAi(fetch, buildIntroRequest(info.intro, info.intent, info.goal), controller.signal);
+    if (result.kind === "aborted" || controller.signal.aborted) return;
     inFlight.current = null;
-    dispatch({ ...interpretIntroResponse(status, body), requestId });
+    dispatch({ ...interpretIntroResult(result), requestId });
+    if (result.kind === "unavailable") onUnavailable?.();
   }
 
   /** Writes (or writes again) the draft for one record. */

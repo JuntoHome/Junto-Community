@@ -88,6 +88,11 @@ const buttonKey = (list: OverrideList, action: OverrideAction, recordId: string)
  * focus and is announced. The previous results are kept only until then. The summary's inline
  * edits keep working as before (both change the same confirmed brief) but add no explanation.
  *
+ * When the AI fails (TR-50) the chat shows the message with its buttons and never leaves the
+ * page on its own; Use the form opens the Criteria form filled in with the confirmed brief, with
+ * "Your current results haven't changed." A 503 turns the AI off: the chat and Draft intro go,
+ * and `aiOffNote` says why.
+ *
  * With the AI on, each row has Draft intro (TR-49), which opens the intro panel for that business
  * as a modal dialog. The drafts live in the wizard (`introDrafts`); the confirmed brief's intent is
  * sent with each request. Closing the panel cancels a request in flight and puts focus back on
@@ -112,7 +117,16 @@ export function ResultsStep({
   onOverridesChange,
   onContinueToExport,
   introDrafts,
+  aiOffNote,
+  simulateAiFailure,
+  onAiUnavailable,
 }: {
+  /** Why the AI went away this session (the route answered 503), or null (TR-50). */
+  aiOffNote: string | null;
+  /** TR-50 test mode: every chat message fails, without calling the route. */
+  simulateAiFailure: boolean;
+  /** The route said the AI isn't available (`503`). */
+  onAiUnavailable: () => void;
   /** Chat with AI may run: shows the chat for changes once there are results. */
   aiEnabled: boolean;
   /** The intro drafts (TR-49), held by the wizard. Null when the AI is off: no Draft intro buttons. */
@@ -123,8 +137,8 @@ export function ResultsStep({
   onConfirmRevision: (brief: SearchBrief) => void;
   /** Edit in form on the chat's card: opens the Criteria step's form filled in with `brief`. */
   onEditRevision: (brief: SearchBrief) => void;
-  /** Use the form, after a chat error: opens the Criteria step's form. */
-  onUseForm: () => void;
+  /** Use the form, after a chat failure: opens the Criteria step's form filled in with `brief` (the confirmed brief). */
+  onUseForm: (brief: SearchBrief | null) => void;
   records: readonly GroupedRecord[];
   /** `summarizeImport()` for the loaded workbook, for the counts summary. */
   importSummary: ImportSummary;
@@ -181,6 +195,10 @@ export function ResultsStep({
     if (opener?.isConnected) opener.focus();
     else resultsRef.current?.focus();
   }
+
+  // The AI turned off while the panel was open (a 503): the panel and the Draft intro buttons are
+  // gone, so forget which one was open. Done while rendering, like the wizard's dropped pins.
+  if (!introDrafts && introOpen) setIntroOpen(null);
 
   const [pinId, setPinId] = useState("");
   // The Pin by Record ID message; `count` makes the same message be announced again.
@@ -301,7 +319,9 @@ export function ResultsStep({
             mode="revise"
             opening={REVISE_TEXT.opening}
             getCurrentBrief={() => results.brief}
+            simulateFailure={simulateAiFailure}
             onUseForm={onUseForm}
+            onAiUnavailable={onAiUnavailable}
             onConfirmProposal={(brief) => {
               pendingRevision.current = { before: results, brief };
               onConfirmRevision(brief);
@@ -310,6 +330,12 @@ export function ResultsStep({
           />
         </section>
       )}
+      {/* Always rendered, so the note is announced when it appears. */}
+      <div role="status">
+        {aiOffNote && results && (
+          <p className="rounded-lg border border-gold bg-ivory p-3 text-base text-ink">{aiOffNote}</p>
+        )}
+      </div>
       {results && counts && (
         <div ref={resultsRef} tabIndex={-1} className="border-t border-sand pt-6 focus:outline-none">
           <CountsSummary counts={counts} />

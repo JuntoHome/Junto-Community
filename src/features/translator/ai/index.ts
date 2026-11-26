@@ -18,8 +18,11 @@ export {
   currentBriefFor,
   GREETING,
   initialChatState,
-  interpretResponse,
+  interpretAiResult,
+  aiTurnedOff,
+  fallbackBrief,
   isAddedNote,
+  shouldSwitchToForm,
   latestAnnouncement,
   limitReached,
   PROPOSAL_TEXT,
@@ -37,10 +40,12 @@ export {
   INTRO_PANEL_TEXT,
   type IntroRequestInfo,
   type IntroSessionState,
-  interpretIntroResponse,
+  interpretIntroResult,
   introReducer,
   placeholderCount,
 } from "./intro-session";
 export { MAX_MESSAGES, MAX_USER_MESSAGE_CHARS } from "./request-schema";
 export { buildFileSummary } from "./summary";
 export type { AiRequest, AiResponse, ChatMessage, FileSummary } from "./types";
+export { type FailureActions, failureActions, failureMessage, FALLBACK_TEXT, LOGIN_PATH } from "./fallback";
+export { AI_ROUTE, type AiFailureKind, countsAsAiFailure, failingFetch, type FetchFn, postAi, type PostAiResult } from "./post-ai";

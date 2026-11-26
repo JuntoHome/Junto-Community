@@ -12,6 +12,8 @@
 import { z } from "zod";
 import type { BriefIntent } from "../criteria/schema";
 import { type IntroFields, MAX_INTRO_NOTE_CHARS } from "./intro";
+import { FALLBACK_TEXT } from "./fallback";
+import type { PostAiResult } from "./post-ai";
 import type { AiRequest } from "./types";
 
 // Every string the intro panel shows. Plain language, no em-dashes.
@@ -131,30 +133,25 @@ export function buildIntroRequest(intro: IntroFields, intent: BriefIntent, goal:
   return { kind: "intro", intro, intent, ...(note && { goal: note }) };
 }
 
-/** What `interpretIntroResponse()` gives: a `received` or `failed` action, without the request it answers. */
+/** What `interpretIntroResult()` gives: a `received` or `failed` action, without the request it answers. */
 export type IntroOutcome =
   | Omit<Extract<IntroAction, { type: "received" }>, "requestId">
   | Omit<Extract<IntroAction, { type: "failed" }>, "requestId">;
 
 const introReplySchema = z.object({ ok: z.literal(true), kind: z.literal("intro"), draft: z.string().trim().min(1) });
-const errorReplySchema = z.object({ ok: z.literal(false), error: z.string().trim().min(1) });
 
 /**
- * Turns any route response into `received` or `failed`. `body` is the response's text, or null
- * when there was no response (a network failure). The route's own error text is shown as it is;
- * anything unreadable gives `cantReach`.
+ * Turns `postAi()`'s result (anything but `aborted`, which the hook drops) into `received` or
+ * `failed` (TR-50). The route's own error text is shown as it is; a login expiry gets the login
+ * message; anything else without text, or a `200` that isn't a usable draft, gives `cantReach`.
  */
-export function interpretIntroResponse(status: number, body: string | null): IntroOutcome {
-  let json: unknown;
-  try {
-    json = body === null ? null : JSON.parse(body);
-  } catch {
-    json = null;
+export function interpretIntroResult(result: Exclude<PostAiResult, { kind: "aborted" }>): IntroOutcome {
+  if (result.kind === "ok") {
+    const reply = introReplySchema.safeParse(result.json);
+    return reply.success ? { type: "received", draft: reply.data.draft } : { type: "failed", error: INTRO_PANEL_TEXT.cantReach };
   }
-  const reply = introReplySchema.safeParse(json);
-  if (status >= 200 && status < 300 && reply.success) return { type: "received", draft: reply.data.draft };
-  const error = errorReplySchema.safeParse(json);
-  return { type: "failed", error: error.success ? error.data.error : INTRO_PANEL_TEXT.cantReach };
+  if (result.kind === "session-expired") return { type: "failed", error: FALLBACK_TEXT.sessionExpired };
+  return { type: "failed", error: result.error ?? INTRO_PANEL_TEXT.cantReach };
 }
 
 /** A part in square brackets, such as `[Your name]` or `[contact details]`, on one line. */

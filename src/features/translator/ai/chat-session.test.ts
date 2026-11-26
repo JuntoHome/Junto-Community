@@ -14,7 +14,10 @@ import {
   currentBriefFor,
   GREETING,
   initialChatState,
-  interpretResponse,
+  aiTurnedOff,
+  fallbackBrief,
+  interpretAiResult,
+  shouldSwitchToForm,
   isAddedNote,
   latestAnnouncement,
   limitReached,
@@ -23,6 +26,7 @@ import {
   settleRevision,
 } from "./chat-session";
 import { diffBriefs } from "./diff-brief";
+import { FALLBACK_TEXT } from "./fallback";
 import { MAX_MESSAGES } from "./request-schema";
 
 /** Applies the actions in order, starting from a new chat. */
@@ -105,15 +109,13 @@ describe("chatReducer", () => {
   });
 
   it("failed removes the user item, keeps the server's text and puts the message back in the box", () => {
-    const failure = interpretResponse(
-      504,
-      JSON.stringify({ ok: false, error: "The AI took too long to answer. Try again, or use the form." }),
-    );
+    const failure = interpretAiResult({ kind: "rate-limited", error: "You've sent a lot of requests. Wait a few minutes and try again." });
     const state = run(send("Owners in Phoenix"), { ...failure, requestId: 1 } as ChatAction);
     expect(state.items).toEqual(initialChatState().items);
     expect(state).toMatchObject({
       status: "error",
-      error: "The AI took too long to answer. Try again, or use the form.",
+      error: "You've sent a lot of requests. Wait a few minutes and try again.",
+      failureKind: "rate-limited",
       draft: "Owners in Phoenix",
     });
     // Send retries it.
@@ -124,13 +126,14 @@ describe("chatReducer", () => {
     const state = run(send("Owners in Phoenix"), { type: "edit", text: "and Tempe" }, {
       type: "failed",
       requestId: 1,
-      error: CHAT_TEXT.cantReach,
+      error: FALLBACK_TEXT.aiFailure,
+      kind: "network",
     });
     expect(state.draft).toBe("Owners in Phoenix\nand Tempe");
   });
 
   it("send clears the last error", () => {
-    const state = run(send("Hi"), { type: "failed", requestId: 1, error: "Nope" }, send("Hi"));
+    const state = run(send("Hi"), { type: "failed", requestId: 1, error: "Nope", kind: "ai-failure" }, send("Hi"));
     expect(state).toMatchObject({ status: "waiting", error: null });
   });
 
@@ -142,7 +145,7 @@ describe("chatReducer", () => {
 
   it("ignores a stale failed after reset", () => {
     const afterReset = run(send("Owners in Phoenix"), { type: "reset" });
-    expect(chatReducer(afterReset, { type: "failed", requestId: 1, error: "Late" })).toBe(afterReset);
+    expect(chatReducer(afterReset, { type: "failed", requestId: 1, error: "Late", kind: "network" })).toBe(afterReset);
   });
 
   it("ignores a second reply to the same request", () => {
@@ -265,7 +268,7 @@ describe("the Results step's chat (TR-46)", () => {
     const changed = { ...same, proposal: opsManager };
     expect(settleRevision(changed, confirmed)).toBe(changed);
     expect(settleRevision(same, undefined)).toBe(same);
-    const failed = { type: "failed", error: "No." } as const;
+    const failed = { type: "failed", error: "No.", kind: "ai-failure" } as const;
     expect(settleRevision(failed, confirmed)).toBe(failed);
   });
 
@@ -387,16 +390,10 @@ describe("canSend", () => {
   });
 });
 
-describe("interpretResponse", () => {
+describe("interpretAiResult", () => {
   it("turns a reply into received", () => {
-    const body = JSON.stringify({
-      ok: true,
-      kind: "interview",
-      reply: "Here is what I'd use.",
-      proposal: BUSINESS_OWNER_BRIEF,
-      note: null,
-    });
-    expect(interpretResponse(200, body)).toEqual({
+    const json = { ok: true, kind: "interview", reply: "Here is what I'd use.", proposal: BUSINESS_OWNER_BRIEF, note: null };
+    expect(interpretAiResult({ kind: "ok", json })).toEqual({
       type: "received",
       reply: "Here is what I'd use.",
       proposal: BUSINESS_OWNER_BRIEF,
@@ -405,39 +402,86 @@ describe("interpretResponse", () => {
   });
 
   it("passes the route's note through", () => {
-    const body = JSON.stringify({ ok: true, kind: "interview", reply: "OK.", proposal: null, note: "A note." });
-    expect(interpretResponse(200, body)).toMatchObject({ type: "received", note: "A note.", proposal: null });
+    const json = { ok: true, kind: "interview", reply: "OK.", proposal: null, note: "A note." };
+    expect(interpretAiResult({ kind: "ok", json })).toMatchObject({ type: "received", note: "A note.", proposal: null });
   });
 
-  it("shows the route's error text as it is", () => {
-    const body = JSON.stringify({ ok: false, error: "Please log in as a JCA admin to use the AI assistant." });
-    expect(interpretResponse(401, body)).toEqual({
+  it("counts a 200 that isn't an interview reply as the AI failing", () => {
+    expect(interpretAiResult({ kind: "ok", json: { ok: true, hello: "world" } })).toEqual({
       type: "failed",
-      error: "Please log in as a JCA admin to use the AI assistant.",
+      kind: "ai-failure",
+      error: FALLBACK_TEXT.aiFailure,
     });
   });
 
-  it("gives the 'Couldn't reach the AI' text for a body that isn't JSON", () => {
-    expect(interpretResponse(502, "<html>Bad gateway</html>")).toEqual({ type: "failed", error: CHAT_TEXT.cantReach });
-    expect(interpretResponse(200, "")).toEqual({ type: "failed", error: CHAT_TEXT.cantReach });
-  });
-
-  it("gives the same text for a network error (no response)", () => {
-    expect(interpretResponse(0, null)).toEqual({ type: "failed", error: CHAT_TEXT.cantReach });
-    expect(CHAT_TEXT.cantReach).toBe("Couldn't reach the AI. Check your connection and try again.");
-  });
-
-  it("gives the same text for JSON with no reply and no error", () => {
-    expect(interpretResponse(500, JSON.stringify({ ok: false }))).toEqual({ type: "failed", error: CHAT_TEXT.cantReach });
-    expect(interpretResponse(200, JSON.stringify({ hello: "world" }))).toEqual({
-      type: "failed",
-      error: CHAT_TEXT.cantReach,
+  it("gives each kind its message: the AI text, the login text, or the route's own text", () => {
+    expect(interpretAiResult({ kind: "ai-failure", error: "The AI took too long to answer." })).toEqual({ type: "failed", kind: "ai-failure", error: FALLBACK_TEXT.aiFailure });
+    expect(interpretAiResult({ kind: "network", error: null })).toEqual({ type: "failed", kind: "network", error: FALLBACK_TEXT.aiFailure });
+    expect(interpretAiResult({ kind: "session-expired", error: "Please log in." })).toMatchObject({ error: FALLBACK_TEXT.sessionExpired });
+    expect(interpretAiResult({ kind: "unavailable", error: null })).toMatchObject({ error: FALLBACK_TEXT.unavailable });
+    expect(interpretAiResult({ kind: "too-long", error: "This conversation is too long. Start a new chat to keep going." })).toMatchObject({
+      error: "This conversation is too long. Start a new chat to keep going.",
     });
+    expect(interpretAiResult({ kind: "bad-request", error: null })).toMatchObject({ error: FALLBACK_TEXT.somethingWrong });
+  });
+});
+
+describe("when the AI fails (TR-50)", () => {
+  const failed = (requestId: number, kind: Extract<ChatAction, { type: "failed" }>["kind"]): ChatAction => ({
+    ...(interpretAiResult({ kind, error: null }) as Extract<ChatAction, { type: "failed" }>),
+    requestId,
   });
 
-  it("doesn't take a reply-shaped body with an error status as a reply", () => {
-    const body = JSON.stringify({ ok: true, kind: "interview", reply: "OK.", proposal: null, note: null });
-    expect(interpretResponse(500, body)).toEqual({ type: "failed", error: CHAT_TEXT.cantReach });
+  it("counts two AI failures after a proposal, keeps that proposal, and asks for the switch to the form", () => {
+    const state = run(send("Owners"), received(1, { proposal: BUSINESS_OWNER_BRIEF }), send("Mesa"), failed(2, "ai-failure"), send("Mesa"), failed(3, "network"));
+    expect(state.failures).toBe(2);
+    expect(state.lastValidBrief).toBe(BUSINESS_OWNER_BRIEF);
+    expect(fallbackBrief(state, null)).toBe(BUSINESS_OWNER_BRIEF);
+    expect(shouldSwitchToForm(state)).toBe(true);
+  });
+
+  it("asks for nothing after one failure", () => {
+    const state = run(send("Owners"), failed(1, "ai-failure"));
+    expect(state.failures).toBe(1);
+    expect(shouldSwitchToForm(state)).toBe(false);
+  });
+
+  it("resets the count on a reply: failure, success, failure gives 1", () => {
+    const state = run(send("A"), failed(1, "network"), send("A"), received(2), send("B"), failed(3, "ai-failure"));
+    expect(state.failures).toBe(1);
+    expect(shouldSwitchToForm(state)).toBe(false);
+  });
+
+  it("doesn't count a login expiry, a rate limit or a refusal", () => {
+    const expired = run(send("A"), failed(1, "session-expired"), send("A"), failed(2, "session-expired"));
+    expect(expired.failures).toBe(0);
+    expect(shouldSwitchToForm(expired)).toBe(false);
+    const others = run(send("A"), failed(1, "rate-limited"), send("A"), failed(2, "too-long"), send("A"), failed(3, "bad-request"));
+    expect(others.failures).toBe(0);
+  });
+
+  it("uses the confirmed brief on the Results step, and the pending brief on Criteria with no proposal", () => {
+    const state = run(send("Owners"), failed(1, "ai-failure"));
+    expect(fallbackBrief(state, BUSINESS_OWNER_BRIEF, "revise")).toBe(BUSINESS_OWNER_BRIEF);
+    expect(fallbackBrief(state, BUSINESS_OWNER_BRIEF, "criteria")).toBe(BUSINESS_OWNER_BRIEF);
+    expect(fallbackBrief(state, null)).toBeNull();
+    // On Results a proposal that was never confirmed doesn't replace the confirmed brief.
+    const proposal = { ...BUSINESS_OWNER_BRIEF, listSize: 30 };
+    const withProposal = run(send("30 rows"), received(1, { proposal }), send("Hm"), failed(2, "network"));
+    expect(fallbackBrief(withProposal, BUSINESS_OWNER_BRIEF, "revise")).toBe(BUSINESS_OWNER_BRIEF);
+    expect(fallbackBrief(withProposal, BUSINESS_OWNER_BRIEF, "criteria")).toBe(proposal);
+  });
+
+  it("turns the AI off on unavailable, without counting it", () => {
+    const state = run(send("A"), failed(1, "unavailable"));
+    expect(aiTurnedOff(state)).toBe(true);
+    expect(state.failures).toBe(0);
+    expect(aiTurnedOff(run(send("A"), failed(1, "network")))).toBe(false);
+  });
+
+  it("starts a fresh count after Start over chat", () => {
+    const state = run(send("A"), failed(1, "network"), { type: "reset" });
+    expect(state).toMatchObject({ failures: 0, failureKind: null, aiOff: false });
   });
 });
 
