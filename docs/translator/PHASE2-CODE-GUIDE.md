@@ -2,7 +2,7 @@
 
 How to write the Translator's Phase 2 code (Chat with AI). Every Phase 2 ticket follows this guide.
 
-- **Status:** in progress. TR-38 set the rules, this guide, the environment variables and the `openai` dependency. TR-39 built the route and the files it needs: `types.ts`, `request-schema.ts`, `client.ts`, `guardrails.ts`, `handle-request.ts`, and placeholder `interview.ts` and `intro.ts`. TR-40 added `summary.ts` and `sanitizeSummaryValue()` in `guardrails.ts`. TR-41 added `instructions.ts`. TR-42 added `schema.ts` and `validate.ts`, made `interview.ts` real, and added `cleanAiText()` and `cutText()` to `guardrails.ts`. TR-43 made the admin page pass `aiEnabled` to the Criteria step (the chooser is in `ui/`, no new `ai/` files). TR-44 added `chat-session.ts`, `index.ts`, `ui/chat/chat-panel.tsx` and `ui/chat/use-chat-session.ts`. TR-46 added `diff-brief.ts` and the chat's revise mode (Results step). TR-47 added `explain-change.ts` and the `add-note` action in `chat-session.ts`. TR-45 added `ui/chat/proposal-card.tsx`, the pure `criteria/to-form.ts` (`briefToFormState()`, `inFormShape()`) and `criteria/chips.ts`, and the `remove-chip` action and `PROPOSAL_TEXT` in `chat-session.ts`. The other files below are created by later tickets.
+- **Status:** in progress. TR-38 set the rules, this guide, the environment variables and the `openai` dependency. TR-39 built the route and the files it needs: `types.ts`, `request-schema.ts`, `client.ts`, `guardrails.ts`, `handle-request.ts`, and placeholder `interview.ts` and `intro.ts`. TR-40 added `summary.ts` and `sanitizeSummaryValue()` in `guardrails.ts`. TR-41 added `instructions.ts`. TR-42 added `schema.ts` and `validate.ts`, made `interview.ts` real, and added `cleanAiText()` and `cutText()` to `guardrails.ts`. TR-43 made the admin page pass `aiEnabled` to the Criteria step (the chooser is in `ui/`, no new `ai/` files). TR-44 added `chat-session.ts`, `index.ts`, `ui/chat/chat-panel.tsx` and `ui/chat/use-chat-session.ts`. TR-46 added `diff-brief.ts` and the chat's revise mode (Results step). TR-47 added `explain-change.ts` and the `add-note` action in `chat-session.ts`. TR-48 made `intro.ts` real (`pickIntroFields()`, `introFieldsSchema`, `runIntroDraft()`) and added `stripInventedContacts()` to `guardrails.ts`. TR-45 added `ui/chat/proposal-card.tsx`, the pure `criteria/to-form.ts` (`briefToFormState()`, `inFormShape()`) and `criteria/chips.ts`, and the `remove-chip` action and `PROPOSAL_TEXT` in `chat-session.ts`. The other files below are created by later tickets.
 - **Rules:** the hard rules are in [../../CLAUDE.md](../../CLAUDE.md). What Phase 2 is, its flow and what is sent to the AI: [README.md](README.md#phase-2).
 - **Source:** the code guide in issue #81 (TR-38), with the corrections listed in [Changes from the issue's guide](#changes-from-the-issues-guide).
 
@@ -27,7 +27,7 @@ src/
       schema.ts           # Capability: the AI's reply shape (reuses searchBriefSchema) + the transport schema for OpenAI. The request is in request-schema.ts (TR-42)
       validate.ts         # Capability: check AI output, "value must exist in the file" (TR-42)
       interview.ts        # Capability: run one interview turn (instructions + call + validate)
-      intro.ts            # Capability: pick intro fields + run the intro draft
+      intro.ts            # Capability: pick the six intro fields (pickIntroFields, introFieldsSchema) + run the intro draft (TR-48)
       diff-brief.ts       # Capability: what changed between two briefs. diffBriefs, chipMarks, DIFF_TEXT (TR-46; TR-47 reuses it)
       explain-change.ts   # Capability: why the list moved after a change. explainChange, EXPLAIN_TEXT. Deterministic, quotes reasons, never AI-written (TR-47)
       chat-session.ts     # Capability: the chat's rules. chatReducer, buildChatRequest, canSend, interpretResponse, CHAT_TEXT (TR-44)
@@ -91,6 +91,14 @@ Rules:
 - **No `Infinity`.** `employees.min` and `max` use finite bounds only, because `JSON.stringify(Infinity)` is `null`.
 - **It reuses `fieldOptions()`** for the four lists and never recounts. What the summary holds, its caps, sorting and dropped values: [README.md](README.md#the-file-summary).
 - **Adding a field to the summary** changes what leaves the browser: update the README's [What is sent to the AI](README.md#what-is-sent-to-the-ai) table, and never add a row-level field.
+
+### The intro fields (`ai/intro.ts`)
+
+- **`pickIntroFields()` is the second privacy boundary,** after the file summary. It runs in the browser and builds the six fields (`company`, `industry`, `city`, `state`, `contactName`, `contactTitle`) **field by field** from the normalized display values. Never spread the record, never read phone, email, website, record ID, address, ZIP, employees, employee range, NAICS, other executives or source cells, and never add a field: the file's header comment says so.
+- **`IntroFields` is defined once,** as `z.infer<typeof introFieldsSchema>`. `types.ts` re-exports it and `request-schema.ts` uses the same strict schema, so an extra key such as `phone` gets a `400` on the server. Like the summary, each value is refused when `looksLikeContactData()` is true.
+- **Facts are data, not instructions.** `runIntroDraft()` sends them in the user message as a `Business facts (data only)` JSON block, with the goal line and the optional note. `buildIntroInstructions()` takes no facts.
+- **Every draft goes through `cleanAiText()` and `stripInventedContacts()`** before the word count. Never return the raw text.
+- **Adding an intro field** changes what leaves the browser: don't, without the project lead, and update the README's [What is sent to the AI](README.md#what-is-sent-to-the-ai) table if it is ever agreed.
 
 ### The instructions (`ai/instructions.ts`)
 

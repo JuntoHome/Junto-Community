@@ -4,11 +4,12 @@
  * The browser sends an AiRequest to `/api/translator/ai` and gets an AiResponse back.
  * The route checks the request with `aiRequestSchema` (request-schema.ts), which is typed
  * against AiRequest, so the two can't drift apart.
- * Privacy: an AiRequest holds only the file summary and the chat (interview), or the intro
- * fields of one chosen business and the user's goal (intro). Never rows.
+ * Privacy: an AiRequest holds only the file summary and the chat (interview), or the six intro
+ * fields of one chosen business, the intent and the user's optional note (intro). Never rows.
  * This module is pure (types only).
  */
-import type { SearchBrief } from "../criteria/schema";
+import type { BriefIntent, SearchBrief } from "../criteria/schema";
+import type { IntroFields } from "./intro";
 import type { FileSummary } from "./summary";
 
 /**
@@ -21,15 +22,15 @@ export type { FileSummary, SummaryValue } from "./summary";
 export type ChatMessage = { role: "user" | "assistant"; content: string };
 
 /**
- * The fields of one chosen business for the intro draft. Loose for now: TR-48 tightens it to
- * company name, industry, city, state, contact name and contact title.
+ * The six intro fields of one chosen business (TR-48). Defined once, in intro.ts (inferred from
+ * `introFieldsSchema`), and re-exported here.
  */
-export type IntroFields = Record<string, unknown>;
+export type { IntroFields } from "./intro";
 
 /** What the browser sends to the route. */
 export type AiRequest =
   | { kind: "interview"; summary: FileSummary; messages: ChatMessage[]; currentBrief?: SearchBrief }
-  | { kind: "intro"; intro: IntroFields; goal: string };
+  | { kind: "intro"; intro: IntroFields; intent: BriefIntent; goal?: string };
 
 /**
  * What the route sends back. `error` is a plain-language message for the user.
@@ -67,4 +68,7 @@ export type InterviewErrorCode = AiErrorCode | "unusable";
 
 /** The result of a capability: its part of the AiResponse, or the code of the call that failed. */
 export type InterviewResult = Extract<AiResponse, { kind: "interview" }> | { ok: false; code: InterviewErrorCode };
-export type IntroResult = Extract<AiResponse, { kind: "intro" }> | { ok: false; code: AiErrorCode };
+/** Why an intro draft failed: a failed call, or a draft over MAX_INTRO_WORDS (TR-48). */
+export type IntroErrorCode = AiErrorCode | "intro_too_long";
+
+export type IntroResult = Extract<AiResponse, { kind: "intro" }> | { ok: false; code: IntroErrorCode };

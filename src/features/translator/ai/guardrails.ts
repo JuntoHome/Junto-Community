@@ -3,6 +3,8 @@
  * - `withTimeout()`: a promise's value, or a fallback when it takes too long.
  * - `sanitizeSummaryValue()`: one workbook value made safe for the file summary, or null to drop it.
  * - `cleanAiText()` and `cutText()`: AI text made fit to show (no em-dashes, one space, a length cap).
+ * - `stripInventedContacts()`: any email, website or phone number in an intro draft becomes
+ *   `[contact details]` (TR-48).
  * Privacy: `withTimeout()` handles no content. `sanitizeSummaryValue()` drops values that look
  * like contact data, so a column holding the wrong data can't leak an email, phone or website.
  * This module is pure (no React, no I/O).
@@ -47,16 +49,16 @@ export const looksLikeContactData = (text: string) =>
  *    `@`, `http` or `www.` (any case), or 7 or more digits in all ("602 555 0100" has 10).
  *    Checked on the whole value, before it is cut, and dropped rather than masked, so no part
  *    of it gets through.
- * 3. Cut to MAX_SUMMARY_VALUE_CHARS, without splitting an emoji or other two-unit character,
- *    and trimmed again.
+ * 3. Cut to `max` characters (MAX_SUMMARY_VALUE_CHARS unless given; the intro fields use 120,
+ *    TR-48), without splitting an emoji or other two-unit character, and trimmed again.
  */
-export function sanitizeSummaryValue(text: string): string | null {
+export function sanitizeSummaryValue(text: string, max: number = MAX_SUMMARY_VALUE_CHARS): string | null {
   const clean = text
     .replace(CONTROL_OR_LINE_BREAK, " ")
     .replace(/\s+/g, " ")
     .trim();
   if (clean === "" || looksLikeContactData(clean)) return null;
-  return cutText(clean, MAX_SUMMARY_VALUE_CHARS);
+  return cutText(clean, max);
 }
 
 /**
@@ -82,6 +84,37 @@ const INLINE_SPACES = new RegExp(`${INLINE_SPACE}+`, "g");
  */
 export function cleanAiText(text: string): string {
   return text.replace(DASH_WITH_SPACES, ", ").replace(INLINE_SPACES, " ").trim();
+}
+
+/** What an invented contact detail in an intro draft becomes. Brackets, like the prompt's placeholders. */
+export const CONTACT_PLACEHOLDER = "[contact details]";
+
+/** `name@domain.tld`. */
+const EMAIL = /[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}/gi;
+/** `http://`, `https://` or `www.` up to the next space, without a full stop or bracket that ends the sentence. */
+const URL_TEXT = /(?:https?:\/\/|www\.)\S*[^\s.,;:!?)\]'"]/gi;
+/** A bare domain ending in a common TLD: `example.com`, `shop.example.invalid`. */
+const BARE_DOMAIN = /\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|org|net|io|co|us|gov|edu|info|biz|invalid)\b/gi;
+/** A run that may be a phone number: digits with `+`, spaces, dots, dashes or round brackets between them. */
+const PHONE_CANDIDATE = /\+?\(?\d[\d\s().-]*\d/g;
+/** Fewest digits a phone number has. "10 to 99", "2026" and "3.5" have fewer. */
+const PHONE_MIN_DIGITS = 7;
+
+/**
+ * An intro draft with every email, URL, bare domain and phone number (7 or more digits, with
+ * optional `+`, spaces, dots, dashes or round brackets) replaced by `[contact details]`, any case
+ * (TR-48). Replaced rather than deleted, so the sentence still reads. The prompt's placeholders
+ * (`[Your name]`, `[Your business]`, `[Contact name]`), counts such as "10 to 99", years and
+ * decimals are left alone. Emails go first, so their domain isn't caught on its own.
+ */
+export function stripInventedContacts(draft: string): string {
+  return draft
+    .replace(EMAIL, CONTACT_PLACEHOLDER)
+    .replace(URL_TEXT, CONTACT_PLACEHOLDER)
+    .replace(BARE_DOMAIN, CONTACT_PLACEHOLDER)
+    .replace(PHONE_CANDIDATE, (match) =>
+      (match.match(/\d/g)?.length ?? 0) >= PHONE_MIN_DIGITS ? CONTACT_PLACEHOLDER : match,
+    );
 }
 
 /**

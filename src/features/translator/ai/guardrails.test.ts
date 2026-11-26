@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanAiText, cutText, MAX_SUMMARY_VALUE_CHARS, sanitizeSummaryValue, withTimeout } from "./guardrails";
+import {
+  cleanAiText,
+  CONTACT_PLACEHOLDER,
+  cutText,
+  MAX_SUMMARY_VALUE_CHARS,
+  sanitizeSummaryValue,
+  stripInventedContacts,
+  withTimeout,
+} from "./guardrails";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -38,6 +46,13 @@ describe("withTimeout", () => {
 describe("sanitizeSummaryValue", () => {
   it("keeps a plain value as it is", () => {
     expect(sanitizeSummaryValue("Operations Manager")).toBe("Operations Manager");
+  });
+
+  it("cuts to 80 characters by default, or to the cap given (120 for the intro fields, TR-48)", () => {
+    const long = "x".repeat(200);
+    expect(sanitizeSummaryValue(long)).toHaveLength(MAX_SUMMARY_VALUE_CHARS);
+    expect(sanitizeSummaryValue(long, 120)).toHaveLength(120);
+    expect(sanitizeSummaryValue("jane@example.invalid", 120)).toBeNull();
   });
 
   it("turns control characters and line breaks into single spaces and trims", () => {
@@ -105,5 +120,39 @@ describe("cleanAiText", () => {
 
   it("leaves clean text as it is", () => {
     expect(cleanAiText("Phoenix only, or also Tempe?")).toBe("Phoenix only, or also Tempe?");
+  });
+});
+
+describe("stripInventedContacts", () => {
+  const P = CONTACT_PLACEHOLDER;
+
+  it.each([
+    ["an email", "Write to jane@example.invalid today.", `Write to ${P} today.`],
+    ["an email in capitals", "Write to JANE.DOE@Example.COM.", `Write to ${P}.`],
+    ["a phone with brackets", "Call (602) 555-0100.", `Call ${P}.`],
+    ["a phone with dots", "Call 602.555.0100 now.", `Call ${P} now.`],
+    ["an international phone", "Call +1 602 555 0100.", `Call ${P}.`],
+    ["a 7-digit phone", "Call 555-0100 now.", `Call ${P} now.`],
+    ["a www address", "See www.example.invalid.", `See ${P}.`],
+    ["an https URL with a path", "See https://x.invalid/a today.", `See ${P} today.`],
+    ["an http URL in capitals", "See HTTP://Example.org/page?x=1, then call.", `See ${P}, then call.`],
+    ["a bare domain", "Visit example.com or shop.example.co.", `Visit ${P} or ${P}.`],
+  ])("replaces %s", (_, text, expected) => {
+    expect(stripInventedContacts(text)).toBe(expected);
+  });
+
+  it.each([
+    ["the placeholders", "Hi [Contact name], I'm [Your name] from [Your business]."],
+    ["a count range", "Firms of 10 to 99 employees."],
+    ["a year", "Since 2026."],
+    ["a decimal", "Rated 3.5 out of 5."],
+    ["a short number list", "Sizes 10, 20 and 50."],
+    ["an ordinary full stop between words", "We weld. Co-owners welcome."],
+  ])("leaves %s alone", (_, text) => {
+    expect(stripInventedContacts(text)).toBe(text);
+  });
+
+  it("keeps line breaks and the subject line", () => {
+    expect(stripInventedContacts("Subject: Hello\n\nCall 602-555-0100.")).toBe(`Subject: Hello\n\nCall ${P}.`);
   });
 });

@@ -8,9 +8,9 @@
  */
 import { AI_REQUEST_TIMEOUT_MS, withTimeout } from "./guardrails";
 import { runInterviewTurn } from "./interview";
-import { runIntroDraft } from "./intro";
+import { INTRO_TEXT, runIntroDraft } from "./intro";
 import { MAX_BODY_BYTES, parseAiRequest, type AiRequestProblem } from "./request-schema";
-import type { AiCall, AiResponse, InterviewErrorCode, InterviewResult, IntroResult } from "./types";
+import type { AiCall, AiResponse, InterviewErrorCode, InterviewResult, IntroErrorCode, IntroResult } from "./types";
 
 /** Requests one admin may make per rate-limit window (10 minutes, `src/lib/rate-limit.ts`). */
 export const AI_REQUESTS_PER_WINDOW = 30;
@@ -41,7 +41,7 @@ export type AiRouteDeps = {
 };
 
 /** Codes that may be logged. Nothing else is ever written to the console. */
-type LogCode = InterviewErrorCode | "rate_limited" | "bad_request";
+type LogCode = InterviewErrorCode | IntroErrorCode | "rate_limited" | "bad_request";
 
 const logCode = (code: LogCode) => console.error(`translator_ai_${code}`);
 
@@ -54,13 +54,15 @@ const PROBLEM_REPLY: Record<AiRequestProblem, [string, number]> = {
   "bad-request": [ROUTE_TEXT.badRequest, 400],
   "conversation-too-long": [ROUTE_TEXT.conversationTooLong, 413],
   "message-too-long": [ROUTE_TEXT.messageTooLong, 413],
+  "note-too-long": [INTRO_TEXT.noteTooLong, 413], // the intro note (TR-48)
 };
 
-const AI_FAILURE_REPLY: Record<InterviewErrorCode, [string, number]> = {
+const AI_FAILURE_REPLY: Record<InterviewErrorCode | IntroErrorCode, [string, number]> = {
   timeout: [ROUTE_TEXT.timeout, 504],
   upstream: [ROUTE_TEXT.noAnswer, 502],
   empty: [ROUTE_TEXT.noAnswer, 502],
   unusable: [ROUTE_TEXT.unusable, 502], // the reply didn't match the format twice (TR-42)
+  intro_too_long: [INTRO_TEXT.tooLong, 502], // the intro draft was over MAX_INTRO_WORDS (TR-48)
 };
 
 /** True when the request carries an Origin header from another site. */
