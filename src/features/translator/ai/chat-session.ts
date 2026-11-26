@@ -4,6 +4,9 @@
  * The chat on the Results step (TR-46) is the same chat in "revise" mode: its own opening line,
  * the confirmed brief as `currentBrief`, `settleRevision()` and `REVISE_TEXT`. After a revision
  * is confirmed, the `add-note` action puts TR-47's explanation (`explainChange()`) in the chat.
+ * When the AI fails (TR-50): `interpretAiResult()` turns `postAi()`'s result into an action, the
+ * state counts AI failures in a row, `shouldSwitchToForm()` and `aiTurnedOff()` say what the UI
+ * should do, and `fallbackBrief()` is the brief the form is filled in with.
  * Input: the chat state, the actions the hook dispatches, and the route's raw responses.
  * Output: the next chat state, the request body for `/api/translator/ai`, whether Send may run,
  * and what screen readers hear.
@@ -16,6 +19,8 @@ import { z } from "zod";
 import { removeChip } from "../criteria/chips";
 import { type SearchBrief, searchBriefSchema } from "../criteria/schema";
 import { type BriefChange, diffBriefs } from "./diff-brief";
+import { failureMessage } from "./fallback";
+import { type AiFailureKind, countsAsAiFailure, type PostAiResult } from "./post-ai";
 import { MAX_MESSAGES, MAX_USER_MESSAGE_CHARS } from "./request-schema";
 import type { FileSummary } from "./summary";
 import type { AiRequest, ChatMessage } from "./types";
@@ -35,7 +40,6 @@ export const CHAT_TEXT = {
   thinking: "Thinking...",
   startOver: "Start over chat",
   useForm: "Use the form",
-  cantReach: "Couldn't reach the AI. Check your connection and try again.",
   limitReached: "This chat is getting long. Start over chat to keep going, or use the form.",
 } as const;
 
@@ -83,6 +87,15 @@ export type ChatState = {
   status: "idle" | "waiting" | "error";
   /** The last failure's text, shown under the list. */
   error: string | null;
+  /** The last failure's kind (TR-50), which decides the buttons under the message. Null after a reply. */
+  failureKind: AiFailureKind | null;
+  /**
+   * AI failures in a row (`ai-failure` or `network`, TR-50). A reply resets it; a login expiry, a
+   * rate limit or another refusal leaves it as it is. At 2 the Criteria step switches to the form.
+   */
+  failures: number;
+  /** The route said the AI isn't available (`503`): the wizard turns the AI off for the session. */
+  aiOff: boolean;
   /**
    * The AI's latest proposal, shown on the proposal card (TR-45). Kept until a new one or a
    * reset. Removing a chip changes it here.
@@ -103,7 +116,7 @@ export type ChatAction =
   | { type: "edit"; text: string }
   | { type: "send"; text: string }
   | { type: "received"; requestId: number; reply: string; note: string | null; proposal: SearchBrief | null }
-  | { type: "failed"; requestId: number; error: string }
+  | { type: "failed"; requestId: number; error: string; kind: AiFailureKind }
   /** A chip removed on the proposal card: `chipId` is from `briefChips(state.proposal)`. No AI call. */
   | { type: "remove-chip"; chipId: string }
   /** The proposal card closes (TR-46): Cancel, or a revision confirmed. The chat is kept. */
@@ -115,7 +128,7 @@ export type ChatAction =
   | { type: "add-note"; content: string }
   | { type: "reset" };
 
-/** What `interpretResponse()` gives: a `received` or `failed` action, without the request it answers. */
+/** What `interpretAiResult()` gives: a `received` or `failed` action, without the request it answers. */
 export type ChatOutcome =
   | Omit<Extract<ChatAction, { type: "received" }>, "requestId">
   | Omit<Extract<ChatAction, { type: "failed" }>, "requestId">;
@@ -139,6 +152,9 @@ export function initialChatState(opening: string = GREETING): ChatState {
     items: [{ id: GREETING_ID, role: "assistant", content: opening }],
     status: "idle",
     error: null,
+    failureKind: null,
+    failures: 0,
+    aiOff: false,
     proposal: null,
     lastValidBrief: null,
     requestId: 0,
@@ -209,6 +225,8 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         items,
         status: "idle",
         error: null,
+        failureKind: null,
+        failures: 0,
         ...(action.proposal && { proposal: action.proposal, lastValidBrief: action.proposal }),
       };
     }
@@ -222,6 +240,9 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         items: state.items.filter((item) => item.id !== failedId),
         status: "error",
         error: action.error,
+        failureKind: action.kind,
+        failures: countsAsAiFailure(action.kind) ? state.failures + 1 : state.failures,
+        aiOff: state.aiOff || action.kind === "unavailable",
         // The failed message goes back in the box. Anything typed while waiting is kept after it.
         draft: [failed?.content, state.draft].filter(Boolean).join("\n"),
       };
@@ -303,28 +324,46 @@ const interviewReplySchema = z.object({
   note: z.string().min(1).nullable(),
 });
 
-const errorReplySchema = z.object({ ok: z.literal(false), error: z.string().trim().min(1) });
+/**
+ * Turns `postAi()`'s result (anything but `aborted`, which the hook drops) into `received` or
+ * `failed`. A failure carries its kind and the message for it (`failureMessage()`: the AI-failure
+ * text, the login text, or the route's own text for 413, 429 and 400). A `200` whose JSON isn't a
+ * usable interview reply counts as the AI failing.
+ */
+export function interpretAiResult(result: Exclude<PostAiResult, { kind: "aborted" }>): ChatOutcome {
+  if (result.kind === "ok") {
+    const reply = interviewReplySchema.safeParse(result.json);
+    if (reply.success) {
+      const { reply: text, note, proposal } = reply.data;
+      return { type: "received", reply: text, note, proposal };
+    }
+    return { type: "failed", kind: "ai-failure", error: failureMessage("ai-failure", null) };
+  }
+  return { type: "failed", kind: result.kind, error: failureMessage(result.kind, result.error) };
+}
 
 /**
- * Turns any route response into `received` or `failed`. `body` is the response's text, or null
- * when the request didn't get a response (a network failure). A body that isn't JSON, or that
- * has neither a usable reply nor an `error`, gives `CHAT_TEXT.cantReach`. The route's own error
- * text is shown as it is. The status isn't needed: the body says what happened.
+ * True right after the second AI failure in a row (TR-50): the Criteria step then switches to the
+ * form on its own. The Results step never does; it shows the message with Use the form.
  */
-export function interpretResponse(status: number, body: string | null): ChatOutcome {
-  let json: unknown;
-  try {
-    json = body === null ? null : JSON.parse(body);
-  } catch {
-    json = null;
-  }
-  const reply = interviewReplySchema.safeParse(json);
-  if (status >= 200 && status < 300 && reply.success) {
-    const { reply: text, note, proposal } = reply.data;
-    return { type: "received", reply: text, note, proposal };
-  }
-  const error = errorReplySchema.safeParse(json);
-  return { type: "failed", error: error.success ? error.data.error : CHAT_TEXT.cantReach };
+export function shouldSwitchToForm(state: ChatState): boolean {
+  return state.status === "error" && state.failures >= 2;
+}
+
+/** True once the route has said the AI isn't available (`503`): the wizard turns the AI off. */
+export function aiTurnedOff(state: ChatState): boolean {
+  return state.aiOff;
+}
+
+/**
+ * The brief the form is filled in with after Use the form or the automatic switch (TR-50):
+ * - `criteria`: the AI's last proposal that passed the checks, else `base` (the pending brief).
+ * - `revise` (the Results step): always `base`, the confirmed brief, so the form shows what the
+ *   results on screen were ranked with. A proposal there was never confirmed.
+ * Null when there is none (the form is then left as it is).
+ */
+export function fallbackBrief(state: ChatState, base: SearchBrief | null, mode: ChatMode = "criteria"): SearchBrief | null {
+  return mode === "revise" ? base : (state.lastValidBrief ?? base);
 }
 
 /**

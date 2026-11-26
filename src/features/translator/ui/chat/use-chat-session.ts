@@ -10,14 +10,14 @@ import {
   type ChatMode,
   currentBriefFor,
   type FileSummary,
+  failingFetch,
   GREETING,
   initialChatState,
-  interpretResponse,
+  interpretAiResult,
+  postAi,
   settleRevision,
 } from "../../ai";
 import type { GroupedRecord } from "../../normalize/duplicates";
-
-const AI_ROUTE = "/api/translator/ai";
 
 /**
  * The chat's state and its one network call (TR-44). A thin wrapper: every rule is in
@@ -36,6 +36,11 @@ const AI_ROUTE = "/api/translator/ai";
  * "revise" (the confirmed brief is always the `currentBrief`, and a proposal that changes nothing
  * becomes a note), and `dismissProposal()` closes the card on Cancel or after a confirm.
  * `addNote()` puts TR-47's explanation in the chat after a confirm: a note, never sent, no request.
+ *
+ * The request goes through `postAi()` (TR-50), which says what kind of failure it was;
+ * `interpretAiResult()` turns that into the action. With `simulateFailure` (`?aiFail=1` where the
+ * simulation is allowed), `failingFetch` stands in for `fetch`: every message fails as a network
+ * failure after 1.5 seconds, and the route is never called.
  */
 export function useChatSession({
   records,
@@ -43,6 +48,7 @@ export function useChatSession({
   getCurrentBrief,
   opening = GREETING,
   mode = "criteria",
+  simulateFailure = false,
 }: {
   records: readonly GroupedRecord[];
   layout: FileSummary["layout"];
@@ -54,6 +60,8 @@ export function useChatSession({
   /** The chat's first assistant message. */
   opening?: string;
   mode?: ChatMode;
+  /** TR-50 test mode: every message fails after 1.5 seconds, without calling the route. */
+  simulateFailure?: boolean;
 }) {
   const [state, dispatch] = useReducer(chatReducer, opening, initialChatState);
   // Built once per file: the same records always give the same summary.
@@ -73,25 +81,11 @@ export function useChatSession({
 
     const controller = new AbortController();
     inFlight.current = controller;
-    let status = 0;
-    let body: string | null = null;
-    try {
-      const response = await fetch(AI_ROUTE, {
-        method: "POST",
-        // The route reads JSON only and refuses anything else with a 400.
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildChatRequest(sending, summary, currentBrief)),
-        signal: controller.signal,
-      });
-      status = response.status;
-      body = await response.text();
-    } catch {
-      // A network failure (or an abort): `interpretResponse` turns a null body into the
-      // "Couldn't reach the AI" message. Nothing is logged.
-    }
-    if (controller.signal.aborted) return;
+    // No content is logged, whatever happens.
+    const result = await postAi(simulateFailure ? failingFetch : fetch, buildChatRequest(sending, summary, currentBrief), controller.signal);
+    if (result.kind === "aborted" || controller.signal.aborted) return;
     inFlight.current = null;
-    const outcome = interpretResponse(status, body);
+    const outcome = interpretAiResult(result);
     // On the Results step, compared with the brief this request carried.
     dispatch({ ...(mode === "revise" ? settleRevision(outcome, currentBrief) : outcome), requestId: sending.requestId });
   }

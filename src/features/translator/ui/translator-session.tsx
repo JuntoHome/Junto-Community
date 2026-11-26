@@ -24,9 +24,17 @@ type Session = { key: number; files: readonly File[] | null; cleared: boolean };
  *
  * The announcement region sits outside the wizard, so it survives the remount and screen
  * readers hear "Everything was cleared." The wizard uses it too, through `onAnnounce` (TR-43).
- * `aiEnabled` comes from the server page and is passed to every new wizard.
+ * `aiEnabled` comes from the server page and is passed to every new wizard, so Start over
+ * resets a session that turned the AI off (TR-50) to the server's value. `simulateAiFailure` is
+ * the TR-50 test mode, also decided on the server.
  */
-export function TranslatorSession({ aiEnabled }: { aiEnabled: boolean }) {
+export function TranslatorSession({
+  aiEnabled,
+  simulateAiFailure = false,
+}: {
+  aiEnabled: boolean;
+  simulateAiFailure?: boolean;
+}) {
   const [session, setSession] = useState<Session>({ key: 0, files: null, cleared: false });
   const [announcement, setAnnouncement] = useState("");
 
@@ -53,6 +61,7 @@ export function TranslatorSession({ aiEnabled }: { aiEnabled: boolean }) {
       <TranslatorWizard
         key={session.key}
         aiEnabled={aiEnabled}
+        simulateAiFailure={simulateAiFailure}
         initialFiles={session.files}
         focusOnMount={session.cleared}
         onStartOver={startOver}

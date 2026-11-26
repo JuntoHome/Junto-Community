@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { FALLBACK_TEXT } from "../ai";
 import type { ExportSource } from "../export/criteria-rows";
 import { type CriteriaForm, EMPTY_CRITERIA_FORM } from "../criteria/from-form";
 import type { SearchBrief } from "../criteria/schema";
@@ -59,6 +60,7 @@ function toFiles(input: WorkbookFileInput): readonly File[] {
  */
 export function TranslatorWizard({
   aiEnabled,
+  simulateAiFailure,
   initialFiles,
   focusOnMount,
   onStartOver,
@@ -67,6 +69,8 @@ export function TranslatorWizard({
 }: {
   /** Chat with AI may run (`aiEnabled()` on the server page). Off: the form shows directly, as in Phase 1. */
   aiEnabled: boolean;
+  /** TR-50 test mode (`?aiFail=1` where allowed): every chat message fails, without calling the route. */
+  simulateAiFailure: boolean;
   /** Files chosen in the previous session, loaded as soon as this one starts. */
   initialFiles: readonly File[] | null;
   /** After Start over: move focus to the Upload heading on mount. */
@@ -93,6 +97,12 @@ export function TranslatorWizard({
   // How the Criteria step is filled in (TR-43): the chooser, the chat or the form. Kept here, so
   // going back to Criteria shows the mode already chosen and the remount resets it.
   const [criteriaMode, setCriteriaMode] = useState<CriteriaMode>(() => initialCriteriaMode(aiEnabled));
+  // Whether the AI may be used this session (TR-50): the server's `aiEnabled`, until the route
+  // answers 503. Then the chooser, both chats and the Draft intro buttons go, and the form shows.
+  // Start over (the remount) sets it back to the server's value.
+  const [aiAvailable, setAiAvailable] = useState(aiEnabled);
+  // The note above the Criteria form (TR-50): why the form opened, or null.
+  const [formNote, setFormNote] = useState<string | null>(null);
   // The brief waiting to be ranked: set by Continue on Criteria and by a Save in the criteria
   // summary (TR-16), with the form that produced it, so the summary's editors start from that form.
   const [pendingBrief, setPendingBrief] = useState<SearchBrief | null>(null);
@@ -113,7 +123,7 @@ export function TranslatorWizard({
   const [unpinned, setUnpinned] = useState<string[]>([]);
   // The intro drafts (TR-49), by Record ID, as the user left them. Here, so Start over and a new
   // file clear them through the remount; TR-52 will export them. Never stored or logged.
-  const introDrafts = useIntroDrafts();
+  const introDrafts = useIntroDrafts({ onUnavailable: turnAiOff });
   // Counts workbook attempts, so a slow check can't override a newer choice.
   const attempt = useRef(0);
 
@@ -246,9 +256,23 @@ export function TranslatorWizard({
     setBriefSource("ai");
   }
 
-  /** Opens the Criteria step's form, filled in with `brief` when one is given (Edit in form on the Results step's card). */
-  function openCriteriaForm(brief?: SearchBrief) {
+  /**
+   * Turns the AI off for the session (TR-50): the route answered 503. The form shows with the
+   * `unavailable` note; the chats, the "Chat with AI instead" link and Draft intro go.
+   */
+  function turnAiOff() {
+    setAiAvailable(false);
+    setCriteriaMode("form");
+    setFormNote(FALLBACK_TEXT.unavailable);
+  }
+
+  /**
+   * Opens the Criteria step's form, filled in with `brief` when one is given (Edit in form on the
+   * Results step's card, Use the form on its chat), with `note` above it (TR-50).
+   */
+  function openCriteriaForm(brief?: SearchBrief | null, note: string | null = null) {
     if (brief) setCriteriaForm(briefToFormState(brief));
+    setFormNote(note);
     setCriteriaMode("form");
     focusHeading.current = true;
     setCurrent("criteria");
@@ -302,7 +326,11 @@ export function TranslatorWizard({
           />
         ) : step.id === "criteria" && workbook ? (
           <CriteriaStep
-            aiEnabled={aiEnabled}
+            aiEnabled={aiAvailable}
+            simulateAiFailure={simulateAiFailure}
+            formNote={formNote}
+            onFormNoteChange={setFormNote}
+            onAiUnavailable={turnAiOff}
             layout={workbook.parsed.layout.id}
             pendingBrief={pendingBrief}
             mode={criteriaMode}
@@ -314,6 +342,7 @@ export function TranslatorWizard({
             onFormChange={setCriteriaForm}
             onContinue={(next, form) => {
               // A new brief from the form replaces the pending one and has to be confirmed again.
+              setFormNote(null);
               setPendingBrief(next);
               setPendingForm(form);
               setConfirmedBrief(null);
@@ -332,12 +361,15 @@ export function TranslatorWizard({
           />
         ) : step.id === "results" && workbook && importSummary && pendingBrief && pendingForm ? (
           <ResultsStep
-            aiEnabled={aiEnabled}
-            introDrafts={aiEnabled ? introDrafts : null}
+            aiEnabled={aiAvailable}
+            aiOffNote={aiEnabled && !aiAvailable ? FALLBACK_TEXT.unavailable : null}
+            simulateAiFailure={simulateAiFailure}
+            onAiUnavailable={turnAiOff}
+            introDrafts={aiAvailable ? introDrafts : null}
             layout={workbook.parsed.layout.id}
             onConfirmRevision={confirmAiBrief}
             onEditRevision={openCriteriaForm}
-            onUseForm={() => openCriteriaForm()}
+            onUseForm={(brief) => openCriteriaForm(brief, FALLBACK_TEXT.resultsUnchanged)}
             records={workbook.records}
             importSummary={importSummary}
             pendingBrief={pendingBrief}

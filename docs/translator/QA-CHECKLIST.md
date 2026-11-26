@@ -155,6 +155,22 @@ Where: the phone for 11.1 to 11.3; Chrome for 11.4 and 11.5.
 | 11.4 | Keyboard only (Tab, Shift+Tab, Space, Enter): load the sample, fill the form, rank, omit a row, export | Everything can be reached and used; the focus outline is visible |
 | 11.5 | Zoom the browser to 200% on Results | Text stays readable; the table scrolls inside its own box |
 
+## 12. Phase 2: when the AI fails (demo)
+
+Runs on staging or a branch preview, never on the live site, where `?aiFail=1` does nothing. Background: [README.md](README.md#when-the-ai-fails).
+
+| # | Do | Expected |
+|---|---|---|
+| 12.1 | Open `/admin/translator?aiFail=1` | A red banner: "Test mode: AI failures are simulated. Remove ?aiFail=1 from the address to turn it off." |
+| 12.2 | Load the sample, Continue to criteria, Chat with AI, send "owners in Phoenix" | After about 1.5 seconds: "The AI didn't respond. Your criteria so far are kept. You can try again or use the form." with Try again and Use the form. Your message is back in the box. In DevTools, Network: no request to `/api/translator/ai` |
+| 12.3 | Press Try again | After about 1.5 seconds the form opens on its own with "The AI isn't responding, so we switched to the form. Your criteria so far are filled in." above it |
+| 12.4 | Press Chat with AI instead | The same chat, with your earlier messages |
+| 12.5 | Without `?aiFail=1`: chat until "Here's what I understood" shows, then Confirm and rank. Add `?aiFail=1` and reload, run the business owner walkthrough through the chat again, then on Results send "favor operations managers" twice to the "Want to change something?" chat | You stay on Results, the shortlist doesn't change, and the message shows with Use the form |
+| 12.6 | Press Use the form | The Criteria form, filled in with the business owner criteria, with "Your current results haven't changed." above it |
+| 12.7 | Open `/admin/translator` without the parameter | No banner; the chat works normally |
+| 12.8 | On the live site, open `/admin/translator?aiFail=1` | No banner; nothing is simulated |
+| 12.9 | Log out in another tab, then send a chat message | "Your login has expired. Log in again to keep using the AI." Log in again opens the login page in a new tab. Log in there, come back, press Try again: it works, and nothing on the page was lost |
+
 ## Reporting bugs
 
 Open one GitHub issue per bug, in milestone "Data Axle Translator Phase 1", with:

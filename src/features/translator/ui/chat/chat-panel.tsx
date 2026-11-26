@@ -6,6 +6,7 @@ import { textareaClasses } from "@/components/ui/form";
 import { cn } from "@/lib/cn";
 import type { SearchBrief } from "../../criteria/schema";
 import {
+  aiTurnedOff,
   canSend,
   changesAnnouncement,
   CHAT_TEXT,
@@ -14,12 +15,17 @@ import {
   characterCount,
   chipMarks,
   diffBriefs,
+  failureActions,
+  fallbackBrief,
+  FALLBACK_TEXT,
   type FileSummary,
   isAddedNote,
   latestAnnouncement,
   limitReached,
+  LOGIN_PATH,
   MAX_USER_MESSAGE_CHARS,
   REVISE_TEXT,
+  shouldSwitchToForm,
 } from "../../ai";
 import type { GroupedRecord } from "../../normalize/duplicates";
 import { ProposalCard } from "./proposal-card";
@@ -52,6 +58,12 @@ export type ChatPanelHandle = {
  *
  * `ref` gives `addNote()`: once the results re-rank, the Results step adds TR-47's explanation
  * (`explainChange()`) as a note. It takes focus, and the live region reads only that note.
+ *
+ * When the AI fails (TR-50) the message and its buttons come from `failureActions()`: Try again
+ * (sends the failed message again, which is back in the box), Use the form (with
+ * `fallbackBrief()`), Log in again (a new tab, so nothing here is lost), Start over chat. After
+ * the second AI failure in a row, `onTwoFailures` gets the same brief (the Criteria step switches
+ * to the form); a `503` calls `onAiUnavailable` (the wizard turns the AI off).
  */
 export function ChatPanel({
   ref,
@@ -61,6 +73,9 @@ export function ChatPanel({
   mode = "criteria",
   opening,
   onUseForm,
+  onTwoFailures,
+  onAiUnavailable,
+  simulateFailure = false,
   onConfirmProposal,
   onEditProposal,
 }: {
@@ -72,8 +87,14 @@ export function ChatPanel({
   mode?: ChatMode;
   /** The chat's first assistant message (the greeting by default). */
   opening?: string;
-  /** Switches to the form. */
-  onUseForm: () => void;
+  /** Use the form, after a failure: `brief` is `fallbackBrief()`, to fill the form with (null: leave it as it is). */
+  onUseForm: (brief: SearchBrief | null) => void;
+  /** The second AI failure in a row, with `fallbackBrief()`. The Criteria step switches to the form; Results leaves it out. */
+  onTwoFailures?: (brief: SearchBrief | null) => void;
+  /** The route said the AI isn't available (`503`). */
+  onAiUnavailable: () => void;
+  /** TR-50 test mode: every message fails after 1.5 seconds, without calling the route. */
+  simulateFailure?: boolean;
   /** Confirm and rank on the proposal card, with the proposal as it is on screen. */
   onConfirmProposal: (brief: SearchBrief) => void;
   /** Edit in form on the proposal card, with the proposal as it is on screen. */
@@ -85,6 +106,7 @@ export function ChatPanel({
     getCurrentBrief,
     opening,
     mode,
+    simulateFailure,
   });
   const { proposal } = state;
   const revise = mode === "revise";
@@ -122,6 +144,18 @@ export function ChatPanel({
     },
   }));
   const lastItemId = state.items.at(-1)?.id;
+
+  // After a failure: two AI failures in a row, or the AI turned off. Once per failure.
+  const failureKey = state.status === "error" ? state.requestId : -1;
+  useEffect(() => {
+    if (failureKey === -1) return;
+    const brief = fallbackBrief(state, getCurrentBrief(), mode);
+    // After this render: switching announces the change, and the announcer can't flush mid-render.
+    if (aiTurnedOff(state)) queueMicrotask(onAiUnavailable);
+    else if (shouldSwitchToForm(state)) queueMicrotask(() => onTwoFailures?.(brief));
+    // Only when a new failure arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [failureKey]);
 
   const waiting = state.status === "waiting";
   const full = limitReached(state);
@@ -201,13 +235,15 @@ export function ChatPanel({
           />
         ))}
 
-      {state.error && (
-        <div role="alert" className="flex flex-col items-start gap-3 rounded-xl border border-red-700 bg-red-50 p-4 text-base">
-          <p className="text-red-800">{state.error}</p>
-          <button type="button" onClick={onUseForm} className={buttonClasses("outline", "sm", "cursor-pointer")}>
-            {CHAT_TEXT.useForm}
-          </button>
-        </div>
+      {state.error && state.failureKind && (
+        <FailureMessage
+          message={state.error}
+          actions={failureActions(state.failureKind)}
+          waiting={waiting}
+          onTryAgain={submit}
+          onUseForm={() => onUseForm(fallbackBrief(state, getCurrentBrief(), mode))}
+          onStartOver={startOver}
+        />
       )}
 
       {full && (
@@ -253,6 +289,56 @@ export function ChatPanel({
         <button type="button" onClick={startOver} className={buttonClasses("outline", "sm", "cursor-pointer")}>
           {CHAT_TEXT.startOver}
         </button>
+      </div>
+    </div>
+  );
+}
+
+/** A failure's message and its buttons (TR-50). In an alert, so it is read out when it appears. */
+function FailureMessage({
+  message,
+  actions,
+  waiting,
+  onTryAgain,
+  onUseForm,
+  onStartOver,
+}: {
+  message: string;
+  actions: ReturnType<typeof failureActions>;
+  waiting: boolean;
+  onTryAgain: () => void;
+  onUseForm: () => void;
+  onStartOver: () => void;
+}) {
+  const button = buttonClasses("outline", "sm", "cursor-pointer");
+  return (
+    <div role="alert" className="flex flex-col items-start gap-3 rounded-xl border border-red-700 bg-red-50 p-4 text-base">
+      <p className="text-red-800">{message}</p>
+      {actions.logIn && (
+        <div className="flex flex-col items-start gap-1">
+          {/* A new tab, so this page and everything on it stay as they are. */}
+          <a href={LOGIN_PATH} target="_blank" rel="noopener noreferrer" className={buttonClasses("navy", "sm")}>
+            {FALLBACK_TEXT.logInAgain}
+          </a>
+          <p className="text-sm text-ink">{FALLBACK_TEXT.logInHelp}</p>
+        </div>
+      )}
+      <div className="flex flex-wrap gap-3">
+        {actions.tryAgain && (
+          <button type="button" onClick={onTryAgain} disabled={waiting} className={button}>
+            {FALLBACK_TEXT.tryAgain}
+          </button>
+        )}
+        {actions.startOverChat && (
+          <button type="button" onClick={onStartOver} className={button}>
+            {FALLBACK_TEXT.startOverChat}
+          </button>
+        )}
+        {actions.useForm && (
+          <button type="button" onClick={onUseForm} className={button}>
+            {FALLBACK_TEXT.useForm}
+          </button>
+        )}
       </div>
     </div>
   );

@@ -10,7 +10,7 @@ import {
   initialIntroState,
   INTRO_PANEL_TEXT,
   type IntroSessionState,
-  interpretIntroResponse,
+  interpretIntroResult,
   introReducer,
   placeholderCount,
 } from "./intro-session";
@@ -128,23 +128,31 @@ describe("introReducer", () => {
   });
 });
 
-describe("interpretIntroResponse", () => {
+describe("interpretIntroResult", () => {
   it("reads a draft", () => {
-    expect(interpretIntroResponse(200, JSON.stringify({ ok: true, kind: "intro", draft: "Hello." }))).toEqual({ type: "received", draft: "Hello." });
+    expect(interpretIntroResult({ kind: "ok", json: { ok: true, kind: "intro", draft: "Hello." } })).toEqual({ type: "received", draft: "Hello." });
   });
 
   it("shows the route's error text as it is", () => {
-    const body = JSON.stringify({ ok: false, error: "The draft came back too long. Try again." });
-    expect(interpretIntroResponse(502, body)).toEqual({ type: "failed", error: "The draft came back too long. Try again." });
+    expect(interpretIntroResult({ kind: "ai-failure", error: "The draft came back too long. Try again." })).toEqual({
+      type: "failed",
+      error: "The draft came back too long. Try again.",
+    });
+  });
+
+  it("gives the login message for an expired session", () => {
+    expect(interpretIntroResult({ kind: "session-expired", error: "Please log in as a JCA admin to use the AI assistant." })).toEqual({
+      type: "failed",
+      error: "Your login has expired. Log in again to keep using the AI.",
+    });
   });
 
   it.each([
-    ["no response", 0, null],
-    ["not JSON", 200, "<html>"],
-    ["an interview reply", 200, JSON.stringify({ ok: true, kind: "interview", reply: "Hi", proposal: null, note: null })],
-    ["an empty draft", 200, JSON.stringify({ ok: true, kind: "intro", draft: "  " })],
-  ])("gives the cant-reach message for %s", (_, status, body) => {
-    expect(interpretIntroResponse(status, body)).toEqual({ type: "failed", error: INTRO_PANEL_TEXT.cantReach });
+    ["no response", { kind: "network", error: null }],
+    ["an interview reply", { kind: "ok", json: { ok: true, kind: "interview", reply: "Hi", proposal: null, note: null } }],
+    ["an empty draft", { kind: "ok", json: { ok: true, kind: "intro", draft: "  " } }],
+  ] as const)("gives the cant-reach message for %s", (_, result) => {
+    expect(interpretIntroResult(result)).toEqual({ type: "failed", error: INTRO_PANEL_TEXT.cantReach });
   });
 });
 

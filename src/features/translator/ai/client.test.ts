@@ -20,7 +20,7 @@ vi.mock("openai", () => ({
   APIConnectionTimeoutError: sdk.APIConnectionTimeoutError,
 }));
 
-import { aiEnabled, aiModel, createOpenAiCall } from "./client";
+import { aiEnabled, aiFailureSimulationAllowed, aiModel, createOpenAiCall } from "./client";
 
 const CALL = { instructions: "Reply briefly.", messages: [{ role: "user" as const, content: "Hello" }], format: "text" as const };
 
@@ -49,6 +49,23 @@ describe("aiEnabled", () => {
     vi.stubEnv("OPENAI_API_KEY", key);
     vi.stubEnv("TRANSLATOR_AI", flag);
     expect(aiEnabled()).toBe(expected);
+  });
+});
+
+describe("aiFailureSimulationAllowed (TR-50)", () => {
+  it.each([
+    ["production", "production", false],
+    ["production", "development", false],
+    ["preview", "production", true],
+    ["development", "production", true],
+    [undefined, "development", true],
+    [undefined, "test", true],
+    [undefined, "production", false],
+    ["something-else", "development", false],
+  ])("VERCEL_ENV %s with NODE_ENV %s gives %s", (vercelEnv, nodeEnv, expected) => {
+    vi.stubEnv("VERCEL_ENV", vercelEnv);
+    vi.stubEnv("NODE_ENV", nodeEnv);
+    expect(aiFailureSimulationAllowed()).toBe(expected);
   });
 });
 

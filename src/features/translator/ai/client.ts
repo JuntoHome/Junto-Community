@@ -19,6 +19,20 @@ export function aiEnabled(): boolean {
   return hasKey && !switchedOff;
 }
 
+/**
+ * Whether the TR-50 failure simulation (`?aiFail=1`) may run: on Vercel previews and in
+ * development (`VERCEL_ENV` "preview" or "development"), and locally when `VERCEL_ENV` is unset
+ * and `NODE_ENV` isn't "production". Never in production. `VERCEL_ENV`, not `NODE_ENV`, because
+ * Vercel builds previews in production mode.
+ */
+export function aiFailureSimulationAllowed(): boolean {
+  const vercelEnv = process.env.VERCEL_ENV?.trim();
+  if (vercelEnv === "production") return false;
+  if (vercelEnv === "preview" || vercelEnv === "development") return true;
+  if (vercelEnv) return false;
+  return process.env.NODE_ENV !== "production";
+}
+
 /** The model to use: `OPENAI_MODEL`, or gpt-4o-mini when it is empty. */
 export function aiModel(): string {
   return process.env.OPENAI_MODEL?.trim() || DEFAULT_MODEL;
