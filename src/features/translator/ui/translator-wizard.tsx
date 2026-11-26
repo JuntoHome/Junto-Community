@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ExportSource } from "../export/criteria-rows";
 import { type CriteriaForm, EMPTY_CRITERIA_FORM } from "../criteria/from-form";
 import type { SearchBrief } from "../criteria/schema";
+import { briefToFormState } from "../criteria/to-form";
 import type { WorkbookFileInput } from "../import/check-file";
 import { describeMapping } from "../import/describe-mapping";
 import type { GatedWorkbook } from "../import/file-gate";
@@ -36,6 +37,12 @@ import { isStepAvailable, STEPS, type StepId } from "./steps";
  * issue from both steps, sorted by row then code.
  */
 type LoadedWorkbook = GatedWorkbook & ImportState;
+
+/**
+ * Where the confirmed criteria came from (TR-45), for the export (TR-52). Session state only:
+ * never part of `SearchBrief`.
+ */
+export type BriefSource = "ai" | "form";
 
 /** What a workbook input holds, as a list: one File, a FileList or an array. */
 function toFiles(input: WorkbookFileInput): readonly File[] {
@@ -91,6 +98,13 @@ export function TranslatorWizard({
   const [pendingForm, setPendingForm] = useState<CriteriaForm | null>(null);
   // The brief the user confirmed with "Confirm and rank". Only this one is ranked.
   const [confirmedBrief, setConfirmedBrief] = useState<SearchBrief | null>(null);
+  // Where the brief came from: "ai" only after Confirm and rank on the AI's proposal card;
+  // "form" by default and after Continue on the form (also when the form was filled by Edit in
+  // form). Start over resets it with the remount. A Save in the criteria summary on Results
+  // doesn't change it: TR-52 decides how to report an AI brief edited by hand.
+  // Nothing reads it yet: the export's "Criteria set by" line (TR-52) will.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [briefSource, setBriefSource] = useState<BriefSource>("form");
   // The user's pins and omits (TR-21), two lists of Record IDs. They survive brief edits.
   const [overrides, setOverrides] = useState<Overrides>(NO_OVERRIDES);
   // Pins the last brief change removed because those rows stopped matching, for a notice on Results.
@@ -272,6 +286,22 @@ export function TranslatorWizard({
               setPendingBrief(next);
               setPendingForm(form);
               setConfirmedBrief(null);
+              setBriefSource("form");
+              setDone(new Set<StepId>(["upload", "preview", "criteria"]));
+              focusHeading.current = true;
+              setCurrent("results");
+            }}
+            onConfirmProposal={(next) => {
+              // The form's path in one go (TR-45): Continue (the form, so the criteria summary's
+              // editors and the form show the proposal, and the pending brief), then Confirm and
+              // rank. The brief ranked is the proposal as shown on the card, unchanged.
+              const form = briefToFormState(next);
+              setCriteriaForm(form);
+              setPendingBrief(next);
+              setPendingForm(form);
+              setUnpinned([]);
+              setConfirmedBrief(next);
+              setBriefSource("ai");
               setDone(new Set<StepId>(["upload", "preview", "criteria"]));
               focusHeading.current = true;
               setCurrent("results");

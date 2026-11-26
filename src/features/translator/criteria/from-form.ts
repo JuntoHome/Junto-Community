@@ -13,6 +13,8 @@ import {
  * Turns what the criteria form holds into a SearchBrief (TR-14, TR-15). The form never builds a
  * second shape: it keeps the user's choices, and `toBrief()` writes them as a candidate brief
  * and checks it with `searchBriefSchema`, the same check the Phase 2 AI's briefs will get.
+ * `briefToFormState()` in `to-form.ts` is the way back (TR-45). The two are the only way between
+ * form state and a brief.
  *
  * Pure: no React, no I/O.
  */
@@ -61,6 +63,13 @@ export type CriteriaForm = {
   exclusions: Record<ExclusionField, readonly string[]>;
   /** As typed in the number box, e.g. "40". */
   listSize: string;
+  /**
+   * The brief's assumptions (TR-45), passed through to the brief unchanged. The form never shows
+   * or edits them, and the Phase 1 form always has none. They are here so a brief from the AI
+   * keeps them through `briefToFormState()` and `toBrief()`: "Edit in form" and a Save in the
+   * criteria summary never drop them.
+   */
+  assumptions: readonly string[];
 };
 
 /** The form's inputs, which errors are keyed by. */
@@ -78,7 +87,7 @@ export type ToBriefResult = { ok: true; brief: SearchBrief } | { ok: false; fiel
 const EMPTY_PICKED = { mode: "none", picked: [] } as const satisfies CriteriaForm["preferences"]["industry"];
 const EMPTY_EMPLOYEES = { mode: "none", from: "", to: "" } as const satisfies CriteriaForm["preferences"]["employees"];
 
-/** A form with nothing chosen: no goal, no must-haves, No preference everywhere, nothing left out, 40 rows. */
+/** A form with nothing chosen: no goal, no must-haves, No preference everywhere, nothing left out, 40 rows, no assumptions. */
 export const EMPTY_CRITERIA_FORM: CriteriaForm = {
   intent: null,
   mustHaves: { city: [], state: [], industry: [], title: [] },
@@ -87,6 +96,7 @@ export const EMPTY_CRITERIA_FORM: CriteriaForm = {
   importanceOrder: PREFERENCE_DIMENSIONS,
   exclusions: { industry: [], title: [], city: [] },
   listSize: String(LIST_SIZE_DEFAULT),
+  assumptions: [],
 };
 
 /** Messages for the form, in place of the schema's, which are written for code. */
@@ -195,6 +205,7 @@ function issueField(
  * Lists are in a fixed order: must-haves city, state, industry, title; preferences industry,
  * title, employees; exclusions industry, title, city. `priorityOrder` is the active preferences
  * in importance order, and only there when "Rank my preferences by importance" is ticked.
+ * `assumptions` are passed through as the form holds them.
  * On failure, each form input gets the first message about it.
  */
 export function toBrief(form: CriteriaForm, options: Record<MustHaveField, readonly PickerOption[]>): ToBriefResult {
@@ -230,6 +241,7 @@ export function toBrief(form: CriteriaForm, options: Record<MustHaveField, reado
     exclusions,
     ...(form.rankByImportance && priorityOrder.length > 0 ? { priorityOrder } : {}),
     listSize: typedNumber(form.listSize),
+    assumptions: [...form.assumptions],
   };
 
   const result = searchBriefSchema.safeParse(candidate);

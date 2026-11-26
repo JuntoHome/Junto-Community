@@ -1,6 +1,6 @@
 /**
  * Capability: the chat's rules (TR-44). The chat panel and `use-chat-session.ts` only render
- * and wire these up.
+ * and wire these up. The proposal card (TR-45) uses `PROPOSAL_TEXT` and the `remove-chip` action.
  * Input: the chat state, the actions the hook dispatches, and the route's raw responses.
  * Output: the next chat state, the request body for `/api/translator/ai`, whether Send may run,
  * and what screen readers hear.
@@ -10,6 +10,7 @@
  * This module is pure (zod only, no React, no I/O).
  */
 import { z } from "zod";
+import { removeChip } from "../criteria/chips";
 import { type SearchBrief, searchBriefSchema } from "../criteria/schema";
 import { MAX_MESSAGES, MAX_USER_MESSAGE_CHARS } from "./request-schema";
 import type { FileSummary } from "./summary";
@@ -32,8 +33,18 @@ export const CHAT_TEXT = {
   useForm: "Use the form",
   cantReach: "Couldn't reach the AI. Check your connection and try again.",
   limitReached: "This chat is getting long. Start over chat to keep going, or use the form.",
-  // TODO(TR-45): replaced by the confirm view.
-  proposalReady: "The AI has suggested criteria. You'll review them next.",
+} as const;
+
+// The proposal card's strings (TR-45). Plain language, no em-dashes.
+export const PROPOSAL_TEXT = {
+  heading: "Here's what I understood",
+  assumptionsHelp: "These are guesses. Remove any that are wrong.",
+  remove: (label: string) => `Remove ${label}`,
+  removed: (label: string) => `Removed ${label}.`,
+  confirm: "Confirm and rank",
+  needsCriterion: "Add at least one must-have or preference, or use the form.",
+  keepChatting: "Keep chatting",
+  editInForm: "Edit in form",
 } as const;
 
 /** The character counter shows from this many characters. */
@@ -46,9 +57,15 @@ export type ChatState = {
   status: "idle" | "waiting" | "error";
   /** The last failure's text, shown under the list. */
   error: string | null;
-  /** The AI's latest proposal, for the confirm view (TR-45). Kept until a new one or a reset. */
+  /**
+   * The AI's latest proposal, shown on the proposal card (TR-45). Kept until a new one or a
+   * reset. Removing a chip changes it here.
+   */
   proposal: SearchBrief | null;
-  /** The last brief the AI proposed that passed the checks, sent back as `currentBrief`. */
+  /**
+   * The last brief the AI proposed that passed the checks, sent back as `currentBrief`. A chip
+   * removal changes it too, so the AI's next turn starts from the edited brief.
+   */
   lastValidBrief: SearchBrief | null;
   /** Counts requests. A reply is used only if it carries the current one, so a late reply is dropped. */
   requestId: number;
@@ -61,6 +78,8 @@ export type ChatAction =
   | { type: "send"; text: string }
   | { type: "received"; requestId: number; reply: string; note: string | null; proposal: SearchBrief | null }
   | { type: "failed"; requestId: number; error: string }
+  /** A chip removed on the proposal card: `chipId` is from `briefChips(state.proposal)`. No AI call. */
+  | { type: "remove-chip"; chipId: string }
   | { type: "reset" };
 
 /** What `interpretResponse()` gives: a `received` or `failed` action, without the request it answers. */
@@ -164,6 +183,12 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         // The failed message goes back in the box. Anything typed while waiting is kept after it.
         draft: [failed?.content, state.draft].filter(Boolean).join("\n"),
       };
+    }
+
+    case "remove-chip": {
+      if (!state.proposal) return state;
+      const proposal = removeChip(state.proposal, action.chipId);
+      return proposal === state.proposal ? state : { ...state, proposal, lastValidBrief: proposal };
     }
 
     case "reset":

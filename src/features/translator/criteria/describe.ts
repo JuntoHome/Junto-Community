@@ -1,8 +1,9 @@
+import { FIELD_LABELS } from "../import/fields";
 import { type BriefCriterion, type BriefDimension, type BriefField, FIELD_DIMENSION, type SearchBrief } from "./schema";
 
 /**
- * A SearchBrief in plain language, for the criteria summary (TR-16) and the export's Criteria
- * sheet (TR-26). Every value is passed through as plain text, never as HTML: the caller renders
+ * A SearchBrief in plain language, for the criteria summary (TR-16), the export's Criteria
+ * sheet (TR-26) and the AI proposal's chips (TR-45, `chips.ts`). Every value is passed through as plain text, never as HTML: the caller renders
  * it as text.
  *
  * Pure: no React, no I/O. The same brief always gives the same items in the same order.
@@ -45,10 +46,15 @@ export type BriefItem = { id: BriefItemId; section: BriefSection; text: string }
 /** One line of the summary: a sentence and the items it is made of (each can be changed on its own). */
 export type BriefLine = { section: BriefSection; text: string; items: BriefItem[] };
 
-const GOALS: Record<SearchBrief["intent"], string> = {
-  business_owner: "Goal: find prospective customers or partners.",
-  job_seeker: "Goal: find potential employers.",
+/** What each goal is called on its own, as a proposal chip shows it: "Find potential employers". */
+export const GOAL_NAMES: Record<SearchBrief["intent"], string> = {
+  business_owner: "Find prospective customers or partners",
+  job_seeker: "Find potential employers",
 };
+
+/** The goal sentence: "Goal: find potential employers." */
+const goalSentence = (intent: SearchBrief["intent"]) =>
+  `Goal: ${GOAL_NAMES[intent].charAt(0).toLowerCase()}${GOAL_NAMES[intent].slice(1)}.`;
 
 /** What each dimension is called in the importance order. Match reasons (TR-20) use the same names. */
 export const DIMENSION_NAMES: Record<BriefDimension, string> = {
@@ -58,12 +64,24 @@ export const DIMENSION_NAMES: Record<BriefDimension, string> = {
   employees: "Company size",
 };
 
+/** What each field is called next to one of its values, as in "City: Phoenix" or "Company size: 10 to 99 employees". */
+export const CRITERION_FIELD_NAMES: Record<BriefField, string> = {
+  city: FIELD_LABELS.city,
+  state: FIELD_LABELS.state,
+  industry: FIELD_LABELS.industry,
+  title: FIELD_LABELS.title,
+  employees: DIMENSION_NAMES.employees,
+};
+
 /** "A", "A or B", "A, B or C". */
 function orList(items: readonly string[]): string {
   return items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} or ${items.at(-1)}`;
 }
 
 const number = (n: number) => n.toLocaleString("en-US");
+
+/** The list size without a full stop: "Show 40". */
+export const listSizeText = (listSize: number) => `Show ${number(listSize)}`;
 
 /**
  * One criterion's values as words: "Phoenix or Tempe", "10 to 99 employees". Values are the
@@ -113,10 +131,11 @@ function preferredDimensions(brief: SearchBrief): BriefDimension[] {
 const isOrdered = (brief: SearchBrief) => (brief.priorityOrder ?? []).length > 0;
 
 /**
- * The preferences in the order the summary shows them: the priority order when there is one,
- * then any preferred dimension it doesn't list; otherwise the order of `preferences`.
+ * The preferences in the order the summary (and the proposal's chips) show them: the priority
+ * order when there is one, then any preferred dimension it doesn't list; otherwise the order of
+ * `preferences`.
  */
-function preferenceOrder(brief: SearchBrief): BriefDimension[] {
+export function preferenceOrder(brief: SearchBrief): BriefDimension[] {
   const preferred = preferredDimensions(brief);
   if (!isOrdered(brief)) return preferred;
   const ranked = brief.priorityOrder ?? [];
@@ -161,7 +180,7 @@ export function summaryItemFor(stage: FilterSection, field: BriefField): BriefIt
  * ("No assumptions.").
  */
 export function describeBrief(brief: SearchBrief): BriefItem[] {
-  const items: BriefItem[] = [{ id: "goal", section: "intent", text: GOALS[brief.intent] }];
+  const items: BriefItem[] = [{ id: "goal", section: "intent", text: goalSentence(brief.intent) }];
   const push = (id: BriefItemId, section: BriefSection, text: string | null) => {
     if (text !== null) items.push({ id, section, text });
   };
@@ -187,7 +206,7 @@ export function describeBrief(brief: SearchBrief): BriefItem[] {
     push(id, "exclusions", values && `Leave out ${values}.`);
   }
 
-  push("list-size", "listSize", `Show ${number(brief.listSize)}.`);
+  push("list-size", "listSize", `${listSizeText(brief.listSize)}.`);
 
   const assumptions = brief.assumptions.filter((assumption) => assumption !== "");
   if (assumptions.length === 0) push("assumptions", "assumptions", "No assumptions.");

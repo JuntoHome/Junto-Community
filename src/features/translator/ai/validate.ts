@@ -18,7 +18,12 @@
  *      `matchKey()`, and takes the summary's spelling ("phoenix" becomes "Phoenix"). That is the
  *      same value, so it is a spelling fix, not a change. Anything else is never changed;
  *    - duplicates in an "in" list are removed, and an "in" with one value left becomes "equals";
- *    - the corrected brief passes `searchBriefSchema` again.
+ *    - the corrected brief passes `searchBriefSchema` again;
+ *    - it is put in the form's shape with `inFormShape()` (criteria/to-form.ts, TR-45): the
+ *      form's field order, "in" values in the pickers' order, a full importance order. None of
+ *      that changes the ranking, and it makes `toBrief(briefToFormState(proposal))` give back
+ *      exactly the proposal, so the chips, the form and the ranked brief all agree. A brief the
+ *      form can't hold (two criteria on one field in one part) gets the "can't edit" note.
  *    Any part that fails drops the whole proposal (null) with a note. Nothing is applied in part.
  *
  * Privacy: reads only the AI's reply and the file summary. Never logs (the caller logs codes only).
@@ -26,6 +31,7 @@
  */
 import { EXCLUSION_FIELDS, MUST_HAVE_FIELDS, PREFERENCE_DIMENSIONS } from "../criteria/from-form";
 import { searchBriefSchema, type BriefCriterion, type BriefField, type SearchBrief } from "../criteria/schema";
+import { inFormShape } from "../criteria/to-form";
 import { matchKey } from "../normalize/match-key";
 import { cleanAiText, cutText, MAX_SUMMARY_VALUE_CHARS } from "./guardrails";
 import { fromTransport, interviewReplySchema, type InterviewReply } from "./schema";
@@ -163,7 +169,9 @@ function checkProposal(proposal: SearchBrief, summary: FileSummary): { proposal:
   }
 
   const rechecked = searchBriefSchema.safeParse(corrected);
-  return rechecked.success ? { proposal: rechecked.data, note: null } : { proposal: null, note: VALIDATE_TEXT.doesNotFit };
+  if (!rechecked.success) return { proposal: null, note: VALIDATE_TEXT.doesNotFit };
+  const shaped = inFormShape(rechecked.data);
+  return shaped.ok ? { proposal: shaped.brief, note: null } : { proposal: null, note: VALIDATE_TEXT.notEditable };
 }
 
 export function parseInterviewReply(raw: unknown, summary: FileSummary): ParsedInterviewReply {
