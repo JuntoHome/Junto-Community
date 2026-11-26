@@ -4,6 +4,7 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { buttonClasses } from "@/components/ui/button";
 import { inputClasses } from "@/components/ui/form";
 import { cn } from "@/lib/cn";
+import { type FileSummary, REVISE_TEXT } from "../ai";
 import type { CriteriaForm } from "../criteria/from-form";
 import type { SearchBrief } from "../criteria/schema";
 import type { MappingRow } from "../import/describe-mapping";
@@ -13,6 +14,7 @@ import type { RankedRow, RankResult } from "../ranking";
 import { buildCounts } from "../ranking/counts";
 import { diagnoseEmpty } from "../ranking/diagnose";
 import { checkPin, hasId, omit, type Overrides, pin, type PinContext, restore, unpin } from "../ranking/overrides";
+import { ChatPanel } from "./chat/chat-panel";
 import { CountsSummary } from "./counts-summary";
 import { errorText } from "./criteria-controls";
 import { CRITERIA_SUMMARY_HEADING_ID, CriteriaSummary, type CriteriaSummaryHandle } from "./criteria-summary";
@@ -74,8 +76,20 @@ const buttonKey = (list: OverrideList, action: OverrideAction, recordId: string)
  *
  * The summary describes `results.brief` once there are results, the exact brief `rank()` got,
  * and the pending brief before that. It is never rebuilt from form state.
+ *
+ * With the AI on and results showing, "Want to change something? Tell me." (TR-46) sits under
+ * the summary: a compact chat of its own (not the Criteria step's), whose proposals are compared
+ * with the confirmed brief. Nothing re-ranks until Confirm and rank on its card, which goes
+ * through the same wizard path as the Criteria step's card (`onConfirmRevision`). Then the card
+ * closes and "Updated. Now first: ..." names the new first row, takes focus and is announced.
+ * The summary's inline edits keep working as before: both change the same confirmed brief.
  */
 export function ResultsStep({
+  aiEnabled,
+  layout,
+  onConfirmRevision,
+  onEditRevision,
+  onUseForm,
   records,
   importSummary,
   pendingBrief,
@@ -89,6 +103,16 @@ export function ResultsStep({
   onOverridesChange,
   onContinueToExport,
 }: {
+  /** Chat with AI may run: shows the chat for changes once there are results. */
+  aiEnabled: boolean;
+  /** The workbook's layout id, for the file summary the chat sends. */
+  layout: FileSummary["layout"];
+  /** Confirm and rank on the chat's card: confirms `brief` and re-ranks (TR-46). */
+  onConfirmRevision: (brief: SearchBrief) => void;
+  /** Edit in form on the chat's card: opens the Criteria step's form filled in with `brief`. */
+  onEditRevision: (brief: SearchBrief) => void;
+  /** Use the form, after a chat error: opens the Criteria step's form. */
+  onUseForm: () => void;
   records: readonly GroupedRecord[];
   /** `summarizeImport()` for the loaded workbook, for the counts summary. */
   importSummary: ImportSummary;
@@ -117,6 +141,24 @@ export function ResultsStep({
     focusResults.current = false;
     resultsRef.current?.focus();
   }, [results]);
+
+  // The brief a chat change confirmed (TR-46). While the results come from it, "Updated. Now
+  // first: ..." shows under the chat; a summary Save (a new brief) or a pin or omit clears it.
+  const [revisedBrief, setRevisedBrief] = useState<SearchBrief | null>(null);
+  const updatedRef = useRef<HTMLParagraphElement>(null);
+  const focusUpdated = useRef(false);
+  useEffect(() => {
+    if (!focusUpdated.current || !updatedRef.current) return;
+    focusUpdated.current = false;
+    updatedRef.current.focus();
+  });
+  const first = results?.shortlist[0];
+  const updatedText =
+    results && revisedBrief === results.brief
+      ? first
+        ? REVISE_TEXT.updated(first.record.normalized.company.known ? first.record.normalized.company.value : null, first.record.normalized.recordId)
+        : REVISE_TEXT.updatedEmpty
+      : null;
 
   const [pinId, setPinId] = useState("");
   // The Pin by Record ID message; `count` makes the same message be announced again.
@@ -159,6 +201,7 @@ export function ResultsStep({
 
   /** Applies an override button's change, announces it and keeps focus on its row. */
   function press(at: PendingFocus, change: (current: Overrides) => Overrides, message: string) {
+    setRevisedBrief(null);
     onOverridesChange(change);
     setAnnouncement((a) => ({ text: message, count: a.count + 1 }));
     focusNext.current = at;
@@ -204,6 +247,7 @@ export function ResultsStep({
       : hasId(results.overrides.omitted, recordId)
         ? TEXT.pinnedAndRestored(recordId)
         : TEXT.pinned(recordId);
+    setRevisedBrief(null);
     onOverridesChange((current) => pin(current, recordId));
     setPinMessage((m) => ({ text, error: false, count: m.count + 1 }));
     setPinId("");
@@ -225,6 +269,35 @@ export function ResultsStep({
           onConfirm();
         }}
       />
+      {aiEnabled && results && (
+        <section aria-labelledby="translator-revise-heading" className="flex flex-col gap-3 border-t border-sand pt-6">
+          <h3 id="translator-revise-heading" className="font-serif text-xl font-bold text-navy">
+            {REVISE_TEXT.opening}
+          </h3>
+          <ChatPanel
+            records={records}
+            layout={layout}
+            mode="revise"
+            opening={REVISE_TEXT.opening}
+            getCurrentBrief={() => results.brief}
+            onUseForm={onUseForm}
+            onConfirmProposal={(brief) => {
+              setRevisedBrief(brief);
+              focusUpdated.current = true;
+              onConfirmRevision(brief);
+            }}
+            onEditProposal={onEditRevision}
+          />
+          {/* Always rendered, so the line is announced when it appears. */}
+          <div role="status">
+            {updatedText && (
+              <p ref={updatedRef} tabIndex={-1} className="font-semibold text-navy focus:outline-none">
+                {updatedText}
+              </p>
+            )}
+          </div>
+        </section>
+      )}
       {results && counts && (
         <div ref={resultsRef} tabIndex={-1} className="border-t border-sand pt-6 focus:outline-none">
           <CountsSummary counts={counts} />

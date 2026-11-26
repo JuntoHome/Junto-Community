@@ -5,9 +5,11 @@
 export {
   buildChatRequest,
   canSend,
+  changesAnnouncement,
   CHAT_TEXT,
   type ChatAction,
   type ChatItem,
+  type ChatMode,
   type ChatOutcome,
   chatReducer,
   type ChatState,
@@ -20,7 +22,10 @@ export {
   latestAnnouncement,
   limitReached,
   PROPOSAL_TEXT,
+  REVISE_TEXT,
+  settleRevision,
 } from "./chat-session";
+export { type BriefChange, chipMarks, type ChipMark, DIFF_TEXT, diffBriefs } from "./diff-brief";
 export { MAX_MESSAGES, MAX_USER_MESSAGE_CHARS } from "./request-schema";
 export { buildFileSummary } from "./summary";
 export type { AiRequest, AiResponse, ChatMessage, FileSummary } from "./types";

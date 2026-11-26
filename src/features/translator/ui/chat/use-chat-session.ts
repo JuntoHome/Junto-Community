@@ -7,10 +7,13 @@ import {
   buildFileSummary,
   canSend,
   chatReducer,
+  type ChatMode,
   currentBriefFor,
   type FileSummary,
+  GREETING,
   initialChatState,
   interpretResponse,
+  settleRevision,
 } from "../../ai";
 import type { GroupedRecord } from "../../normalize/duplicates";
 
@@ -28,18 +31,30 @@ const AI_ROUTE = "/api/translator/ai";
  * `removeChip()` (TR-45) removes a chip from the proposal card. It changes `proposal` and
  * `lastValidBrief` together, so the next message sends the edited brief as `currentBrief`. It
  * makes no request.
+ *
+ * The same hook runs the Results step's chat (TR-46): `opening` is its first line, `mode` is
+ * "revise" (the confirmed brief is always the `currentBrief`, and a proposal that changes nothing
+ * becomes a note), and `dismissProposal()` closes the card on Cancel or after a confirm.
  */
 export function useChatSession({
   records,
   layout,
-  pendingBrief,
+  getCurrentBrief,
+  opening = GREETING,
+  mode = "criteria",
 }: {
   records: readonly GroupedRecord[];
   layout: FileSummary["layout"];
-  /** The wizard's brief waiting to be ranked, sent as `currentBrief` until the AI proposes one. */
-  pendingBrief: SearchBrief | null;
+  /**
+   * The wizard's brief, read when a message is sent: the pending one on the Criteria step, the
+   * confirmed one on the Results step. `currentBriefFor()` decides what is sent.
+   */
+  getCurrentBrief: () => SearchBrief | null;
+  /** The chat's first assistant message. */
+  opening?: string;
+  mode?: ChatMode;
 }) {
-  const [state, dispatch] = useReducer(chatReducer, undefined, initialChatState);
+  const [state, dispatch] = useReducer(chatReducer, opening, initialChatState);
   // Built once per file: the same records always give the same summary.
   const summary = useMemo(() => buildFileSummary(records, layout), [records, layout]);
   // The request in flight, if any. Set at once, so a double click can't send twice.
@@ -53,6 +68,7 @@ export function useChatSession({
     // The state the reducer is about to make, so the request holds exactly what is on screen.
     const sending = chatReducer(state, action);
     dispatch(action);
+    const currentBrief = currentBriefFor(sending, getCurrentBrief(), mode);
 
     const controller = new AbortController();
     inFlight.current = controller;
@@ -63,7 +79,7 @@ export function useChatSession({
         method: "POST",
         // The route reads JSON only and refuses anything else with a 400.
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildChatRequest(sending, summary, currentBriefFor(sending, pendingBrief))),
+        body: JSON.stringify(buildChatRequest(sending, summary, currentBrief)),
         signal: controller.signal,
       });
       status = response.status;
@@ -74,7 +90,9 @@ export function useChatSession({
     }
     if (controller.signal.aborted) return;
     inFlight.current = null;
-    dispatch({ ...interpretResponse(status, body), requestId: sending.requestId });
+    const outcome = interpretResponse(status, body);
+    // On the Results step, compared with the brief this request carried.
+    dispatch({ ...(mode === "revise" ? settleRevision(outcome, currentBrief) : outcome), requestId: sending.requestId });
   }
 
   function resetChat() {
@@ -91,5 +109,9 @@ export function useChatSession({
     dispatch({ type: "remove-chip", chipId });
   }
 
-  return { state, send, edit, resetChat, removeChip };
+  function dismissProposal() {
+    dispatch({ type: "dismiss-proposal" });
+  }
+
+  return { state, send, edit, resetChat, removeChip, dismissProposal };
 }

@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { buttonClasses } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
+import { cn } from "@/lib/cn";
 import {
   briefChips,
   type Chip,
@@ -13,7 +14,7 @@ import {
   hasAnyCriterion,
 } from "../../criteria/chips";
 import type { SearchBrief } from "../../criteria/schema";
-import { PROPOSAL_TEXT } from "../../ai";
+import { type BriefChange, type ChipMark, PROPOSAL_TEXT, REVISE_TEXT } from "../../ai";
 import { SwitchLink } from "../criteria-chooser";
 
 /**
@@ -24,6 +25,11 @@ import { SwitchLink } from "../criteria-chooser";
  *
  * After a chip is removed, focus goes to the next chip's remove button (or the group's heading,
  * or the card's heading when the group is gone), and a live region says "Removed City: Phoenix."
+ *
+ * On the Results step (TR-46, `revise`), the card shows what the proposal changes compared with
+ * the confirmed brief: a "Changed:" list (with a warning when there is more than one change),
+ * new and changed chips marked with a colour and a "(new)" or "(changed)" label, and Confirm and
+ * rank, Cancel and Edit in form. Removed values have no chip: they are only in the list.
  */
 export function ProposalCard({
   proposal,
@@ -31,16 +37,19 @@ export function ProposalCard({
   onConfirm,
   onKeepChatting,
   onEditInForm,
+  revise,
 }: {
   proposal: SearchBrief;
   /** Removes one chip (its id from `briefChips(proposal)`). No AI call. */
   onRemove: (chipId: string) => void;
   /** Ranks `proposal` the way the form's Continue and Confirm and rank do. */
   onConfirm: () => void;
-  /** Back to the message box. The card stays. */
-  onKeepChatting: () => void;
+  /** Back to the message box. The card stays. Not on the Results step. */
+  onKeepChatting?: () => void;
   /** Opens the form filled in with `proposal`. */
   onEditInForm: () => void;
+  /** The Results step's revise mode: the changes (`diffBriefs()`), the chip marks (`chipMarks()`) and Cancel. */
+  revise?: { changes: readonly BriefChange[]; marks: Readonly<Record<string, ChipMark>>; onCancel: () => void };
 }) {
   const groups = briefChips(proposal);
   const canConfirm = hasAnyCriterion(proposal);
@@ -86,6 +95,20 @@ export function ProposalCard({
         {PROPOSAL_TEXT.heading}
       </h4>
 
+      {revise && (
+        <div className="flex flex-col gap-2 rounded-lg border border-gold bg-ivory p-3">
+          <p className="font-semibold text-navy">{REVISE_TEXT.changed}</p>
+          <ul className="flex list-disc flex-col gap-1 pl-5 text-ink">
+            {revise.changes.map((change) => (
+              <li key={change.text} className="wrap-anywhere">
+                {change.text}
+              </li>
+            ))}
+          </ul>
+          {revise.changes.length > 1 && <p className="font-medium text-ink">{REVISE_TEXT.several}</p>}
+        </div>
+      )}
+
       {groups.map((group) => (
         <div key={group.group} className="flex min-w-0 flex-col gap-2">
           <h5
@@ -102,16 +125,21 @@ export function ProposalCard({
           {group.group === "assumptions" && <p className="text-sm text-muted">{PROPOSAL_TEXT.assumptionsHelp}</p>}
           {group.note && <p className="text-sm text-muted">{group.note}</p>}
           <ul aria-labelledby={groupHeadingId(group.group)} className="flex min-w-0 flex-wrap gap-2">
-            {group.chips.map((chip) => (
+            {group.chips.map((chip) => {
+              const mark = revise?.marks[chip.id];
+              return (
               <li
                 key={chip.id}
-                className={
-                  chip.removable
-                    ? "inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-sand bg-ivory py-1 pr-1 pl-3 text-ink"
-                    : "inline-flex min-w-0 max-w-full items-center rounded-full border border-sand bg-ivory px-3 py-1.5 text-ink"
-                }
+                className={cn(
+                  "inline-flex min-w-0 max-w-full items-center rounded-full border text-ink",
+                  chip.removable ? "gap-1 py-1 pr-1 pl-3" : "px-3 py-1.5",
+                  mark ? "border-2 border-gold bg-gold-light text-on-gold" : "border-sand bg-ivory",
+                )}
               >
-                <span className="min-w-0 wrap-anywhere">{chip.label}</span>
+                <span className="min-w-0 wrap-anywhere">
+                  {chip.label}
+                  {mark && <span className="font-semibold"> {REVISE_TEXT.marks[mark]}</span>}
+                </span>
                 {chip.removable && (
                   <button
                     type="button"
@@ -127,7 +155,8 @@ export function ProposalCard({
                   </button>
                 )}
               </li>
-            ))}
+              );
+            })}
           </ul>
         </div>
       ))}
@@ -148,9 +177,17 @@ export function ProposalCard({
           >
             {PROPOSAL_TEXT.confirm}
           </button>
-          <button type="button" onClick={onKeepChatting} className={buttonClasses("outline", "sm", "cursor-pointer")}>
-            {PROPOSAL_TEXT.keepChatting}
-          </button>
+          {revise ? (
+            <button type="button" onClick={revise.onCancel} className={buttonClasses("outline", "sm", "cursor-pointer")}>
+              {REVISE_TEXT.cancel}
+            </button>
+          ) : (
+            onKeepChatting && (
+              <button type="button" onClick={onKeepChatting} className={buttonClasses("outline", "sm", "cursor-pointer")}>
+                {PROPOSAL_TEXT.keepChatting}
+              </button>
+            )
+          )}
           <SwitchLink onClick={onEditInForm}>{PROPOSAL_TEXT.editInForm}</SwitchLink>
         </div>
       </div>

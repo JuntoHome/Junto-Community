@@ -2,7 +2,19 @@ import { readFileSync } from "node:fs";
 import { beforeAll, describe, expect, it } from "vitest";
 import { importWorkbook } from "./__fixtures__/import-pipeline";
 import { SAMPLE_PATH } from "./__fixtures__/records";
-import { buildFileSummary, chatReducer, type FileSummary, initialChatState } from "./ai";
+import {
+  buildChatRequest,
+  buildFileSummary,
+  chatReducer,
+  currentBriefFor,
+  diffBriefs,
+  type FileSummary,
+  initialChatState,
+  REVISE_TEXT,
+  settleRevision,
+} from "./ai";
+import { runInterviewTurn } from "./ai/interview";
+import type { AiCall } from "./ai/types";
 import { parseInterviewReply } from "./ai/validate";
 import { briefChips, removeChip } from "./criteria/chips";
 import { BUSINESS_OWNER_BRIEF } from "./criteria/examples";
@@ -138,5 +150,89 @@ describe("AI path = form path", () => {
     expect(confirmed.preferences.map((c) => c.field)).toEqual(["industry", "employees"]);
     expect(confirmed).toEqual(fromForm);
     expect(rows(confirmed)).toEqual(rows(fromForm));
+  });
+});
+
+/**
+ * Change one thing through chat (TR-46), with a fake AI. The business owner brief is confirmed;
+ * the Results step's chat sends "favor operations managers instead" with that brief as
+ * `currentBrief`; the fake AI answers with the brief changed to title Operations Manager, which
+ * goes through the real interview turn and reply check; the diff has exactly that one change;
+ * Confirm and rank ranks the proposal: the Phase 1 role change walkthrough.
+ */
+describe("Change one thing through chat", () => {
+  /** A fake AI call that answers with `proposal`, and records what it was given. */
+  function fakeAi(proposal: SearchBrief) {
+    const calls: Parameters<AiCall>[0][] = [];
+    const call: AiCall = async (input) => {
+      calls.push(input);
+      return { ok: true, value: JSON.stringify({ message: "I changed the title preference.", proposal: { ...proposal, priorityOrder: null } }) };
+    };
+    return { call, calls };
+  }
+
+  const opsManager: SearchBrief = {
+    ...BUSINESS_OWNER_BRIEF,
+    preferences: BUSINESS_OWNER_BRIEF.preferences.map((c) =>
+      c.field === "title" ? { field: "title", operator: "equals", value: "Operations Manager" } : c,
+    ),
+  };
+
+  /** One revise turn: the request the panel builds, the fake AI, the reply check and settleRevision. */
+  async function reviseTurn(confirmed: SearchBrief, answer: SearchBrief) {
+    let state = chatReducer(initialChatState(REVISE_TEXT.opening), { type: "send", text: "favor operations managers instead" });
+    const currentBrief = currentBriefFor(state, confirmed, "revise");
+    const request = buildChatRequest(state, summary, currentBrief);
+    const ai = fakeAi(answer);
+    const turn = await runInterviewTurn({ summary: request.summary, messages: request.messages, currentBrief: request.currentBrief }, ai.call);
+    if (!turn.ok) throw new Error("the interview turn failed");
+    const outcome = settleRevision({ type: "received", reply: turn.reply, note: turn.note, proposal: turn.proposal }, currentBrief);
+    state = chatReducer(state, { ...outcome, requestId: state.requestId });
+    return { state, request, calls: ai.calls };
+  }
+
+  it("proposes only the title change, and after Confirm SYN-0006 is first at 100 with the six 100s in TR-30 order", async () => {
+    const confirmed = formBrief(businessOwnerForm());
+    const before = rank(records, confirmed);
+    const { state, request, calls } = await reviseTurn(confirmed, opsManager);
+
+    expect(Object.keys(request).sort()).toEqual(["currentBrief", "kind", "messages", "summary"]);
+    expect(request.currentBrief).toBe(confirmed);
+    expect(request.messages[0]).toEqual({ role: "assistant", content: "Want to change something? Tell me." });
+    expect(calls[0].instructions).toContain('"value":"Owner"');
+
+    const proposal = state.proposal;
+    if (!proposal) throw new Error("no proposal");
+    expect(diffBriefs(confirmed, proposal).map((change) => change.text)).toEqual(["Title preference: Owner to Operations Manager"]);
+    // Nothing is re-ranked before Confirm: the results still come from the confirmed brief.
+    expect(before.shortlist[0].record.normalized.recordId).toBe("SYN-0001");
+
+    // Confirm and rank: the wizard's confirmAiBrief() ranks the proposal itself.
+    expect(formBrief(briefToFormState(proposal))).toEqual(proposal);
+    const after = rank(records, proposal);
+    const hundreds = after.shortlist.filter((row) => row.displayScore === 100).map((row) => row.record.normalized.recordId);
+    expect(after.shortlist[0]).toMatchObject({ displayScore: 100 });
+    expect(hundreds).toEqual(["SYN-0006", "SYN-0026", "SYN-0126", "SYN-0226", "SYN-0326", "SYN-0426"]);
+    expect(REVISE_TEXT.updated("Synthetic Company 0006", after.shortlist[0].record.normalized.recordId)).toBe(
+      "Updated. Now first: Synthetic Company 0006 (SYN-0006).",
+    );
+    expect(after.shortlist[0].record.normalized.company).toMatchObject({ known: true, value: "Synthetic Company 0006" });
+  });
+
+  it("gives the nothing-to-update note and no card when the AI changes nothing", async () => {
+    const confirmed = formBrief(businessOwnerForm());
+    const { state } = await reviseTurn(confirmed, confirmed);
+    expect(state.proposal).toBeNull();
+    expect(state.items.at(-1)).toMatchObject({ role: "note", content: "Your criteria are the same, so nothing to update." });
+  });
+
+  it("keeps pins through the change: SYN-0496 stays first", async () => {
+    const confirmed = formBrief(businessOwnerForm());
+    const { state } = await reviseTurn(confirmed, opsManager);
+    const overrides = { pinned: ["SYN-0496"], omitted: [] };
+    expect(rank(records, confirmed, overrides).shortlist[0].record.normalized.recordId).toBe("SYN-0496");
+    const after = rank(records, state.proposal ?? confirmed, overrides);
+    expect(after.shortlist.map((row) => row.record.normalized.recordId).slice(0, 2)).toEqual(["SYN-0496", "SYN-0006"]);
+    expect(after.droppedPins).toEqual([]);
   });
 });

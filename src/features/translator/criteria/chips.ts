@@ -43,14 +43,22 @@ export type Chip = { id: string; group: ChipGroup; label: string; removable: boo
  */
 export type ChipGroupView = { group: ChipGroup; chips: Chip[]; note: string | null };
 
-type CriteriaPart = "mustHaves" | "preferences" | "exclusions";
-const CRITERIA_PARTS: readonly CriteriaPart[] = ["mustHaves", "preferences", "exclusions"];
+/** The brief's lists of criteria, in the order the card shows them. */
+export type CriteriaPart = "mustHaves" | "preferences" | "exclusions";
+export const CRITERIA_PARTS: readonly CriteriaPart[] = ["mustHaves", "preferences", "exclusions"];
+
+/** The id of the chip for value `valueIndex` of criterion `index` in `part` (0 for `equals` and a range). */
+export const criterionChipId = (part: CriteriaPart, index: number, valueIndex: number) => `${part}.${index}.${valueIndex}`;
+
+/** The goal's and the list size's chip ids. */
+export const GOAL_CHIP_ID = "goal";
+export const LIST_SIZE_CHIP_ID = "list-size";
 
 /** The chips for one criterion: one per value of an `in`, one for `equals` or a range. */
 function criterionChips(part: CriteriaPart, criterion: BriefCriterion, index: number): Chip[] {
   const name = CRITERION_FIELD_NAMES[criterion.field];
   const chip = (valueIndex: number, text: string): Chip => ({
-    id: `${part}.${index}.${valueIndex}`,
+    id: criterionChipId(part, index, valueIndex),
     group: part,
     label: `${name}: ${text}`,
     removable: true,
@@ -70,7 +78,7 @@ export function briefChips(brief: SearchBrief): ChipGroupView[] {
   const groups: ChipGroupView[] = [
     {
       group: "goal",
-      chips: [{ id: "goal", group: "goal", label: GOAL_NAMES[brief.intent], removable: false }],
+      chips: [{ id: GOAL_CHIP_ID, group: "goal", label: GOAL_NAMES[brief.intent], removable: false }],
       note: null,
     },
   ];
@@ -88,7 +96,7 @@ export function briefChips(brief: SearchBrief): ChipGroupView[] {
 
   groups.push({
     group: "listSize",
-    chips: [{ id: "list-size", group: "listSize", label: listSizeText(brief.listSize), removable: false }],
+    chips: [{ id: LIST_SIZE_CHIP_ID, group: "listSize", label: listSizeText(brief.listSize), removable: false }],
     note: null,
   });
 

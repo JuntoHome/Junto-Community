@@ -2,7 +2,7 @@
 
 How to write the Translator's Phase 2 code (Chat with AI). Every Phase 2 ticket follows this guide.
 
-- **Status:** in progress. TR-38 set the rules, this guide, the environment variables and the `openai` dependency. TR-39 built the route and the files it needs: `types.ts`, `request-schema.ts`, `client.ts`, `guardrails.ts`, `handle-request.ts`, and placeholder `interview.ts` and `intro.ts`. TR-40 added `summary.ts` and `sanitizeSummaryValue()` in `guardrails.ts`. TR-41 added `instructions.ts`. TR-42 added `schema.ts` and `validate.ts`, made `interview.ts` real, and added `cleanAiText()` and `cutText()` to `guardrails.ts`. TR-43 made the admin page pass `aiEnabled` to the Criteria step (the chooser is in `ui/`, no new `ai/` files). TR-44 added `chat-session.ts`, `index.ts`, `ui/chat/chat-panel.tsx` and `ui/chat/use-chat-session.ts`. TR-45 added `ui/chat/proposal-card.tsx`, the pure `criteria/to-form.ts` (`briefToFormState()`, `inFormShape()`) and `criteria/chips.ts`, and the `remove-chip` action and `PROPOSAL_TEXT` in `chat-session.ts`. The other files below are created by later tickets.
+- **Status:** in progress. TR-38 set the rules, this guide, the environment variables and the `openai` dependency. TR-39 built the route and the files it needs: `types.ts`, `request-schema.ts`, `client.ts`, `guardrails.ts`, `handle-request.ts`, and placeholder `interview.ts` and `intro.ts`. TR-40 added `summary.ts` and `sanitizeSummaryValue()` in `guardrails.ts`. TR-41 added `instructions.ts`. TR-42 added `schema.ts` and `validate.ts`, made `interview.ts` real, and added `cleanAiText()` and `cutText()` to `guardrails.ts`. TR-43 made the admin page pass `aiEnabled` to the Criteria step (the chooser is in `ui/`, no new `ai/` files). TR-44 added `chat-session.ts`, `index.ts`, `ui/chat/chat-panel.tsx` and `ui/chat/use-chat-session.ts`. TR-46 added `diff-brief.ts` and the chat's revise mode (Results step). TR-45 added `ui/chat/proposal-card.tsx`, the pure `criteria/to-form.ts` (`briefToFormState()`, `inFormShape()`) and `criteria/chips.ts`, and the `remove-chip` action and `PROPOSAL_TEXT` in `chat-session.ts`. The other files below are created by later tickets.
 - **Rules:** the hard rules are in [../../CLAUDE.md](../../CLAUDE.md). What Phase 2 is, its flow and what is sent to the AI: [README.md](README.md#phase-2).
 - **Source:** the code guide in issue #81 (TR-38), with the corrections listed in [Changes from the issue's guide](#changes-from-the-issues-guide).
 
@@ -28,7 +28,7 @@ src/
       validate.ts         # Capability: check AI output, "value must exist in the file" (TR-42)
       interview.ts        # Capability: run one interview turn (instructions + call + validate)
       intro.ts            # Capability: pick intro fields + run the intro draft
-      diff-brief.ts       # Capability: what changed between two briefs
+      diff-brief.ts       # Capability: what changed between two briefs. diffBriefs, chipMarks, DIFF_TEXT (TR-46; TR-47 reuses it)
       explain-change.ts   # Capability: plain sentence on why the list moved (no AI)
       chat-session.ts     # Capability: the chat's rules. chatReducer, buildChatRequest, canSend, interpretResponse, CHAT_TEXT (TR-44)
       guardrails.ts       # Capability: limits (withTimeout, AI_ATTEMPT_TIMEOUT_MS, AI_REQUEST_TIMEOUT_MS), sanitising values (sanitizeSummaryValue), cleaning AI text (cleanAiText, cutText), stripping invented contacts
@@ -216,8 +216,8 @@ The chat is the pattern for any stateful AI feature. The rules are a pure reduce
 
 | Piece | File | Holds |
 |---|---|---|
-| Rules | `ai/chat-session.ts` (pure) | `ChatState`, `chatReducer` (`edit`, `send`, `received`, `failed`, `remove-chip`, `reset`), `buildChatRequest()`, `canSend()`, `limitReached()`, `currentBriefFor()`, `interpretResponse()`, `latestAnnouncement()`, `characterCount()`, `GREETING`, `CHAT_TEXT`, `PROPOSAL_TEXT` |
-| Wiring | `ui/chat/use-chat-session.ts` | `useReducer(chatReducer)`, the memoised `buildFileSummary()`, the one `fetch`, the `AbortController` |
+| Rules | `ai/chat-session.ts` (pure) | `ChatState`, `chatReducer` (`edit`, `send`, `received`, `failed`, `remove-chip`, `dismiss-proposal`, `reset`), `buildChatRequest()`, `canSend()`, `limitReached()`, `currentBriefFor()`, `settleRevision()`, `changesAnnouncement()`, `interpretResponse()`, `latestAnnouncement()`, `characterCount()`, `GREETING`, `CHAT_TEXT`, `PROPOSAL_TEXT`, `REVISE_TEXT` |
+| Wiring | `ui/chat/use-chat-session.ts` | `useReducer(chatReducer)`, the memoised `buildFileSummary()`, the one `fetch`, the `AbortController`. Options: `getCurrentBrief`, `opening`, `mode` (TR-46) |
 | View | `ui/chat/chat-panel.tsx`, `ui/chat/proposal-card.tsx` | Markup, focus, scrolling, key handling. Every decision comes from the rules (the chips' from `criteria/chips.ts`) |
 
 - **The request.** `fetch("/api/translator/ai", { method: "POST", headers: { "Content-Type": "application/json" }, body, signal })`. The header is required: the route reads JSON only and answers anything else with `400`. The body is `buildChatRequest(state, summary, currentBrief)` and nothing else; build it from the state the reducer makes for the `send` (the hook runs `chatReducer` on the current state to get it), so the request holds exactly what is on screen.
@@ -226,6 +226,8 @@ The chat is the pattern for any stateful AI feature. The rules are a pure reduce
 - **Limits come from `request-schema.ts`.** `MAX_MESSAGES` and `MAX_USER_MESSAGE_CHARS` are imported, never copied, so the UI's limits can't drift from the route's.
 - **Notes aren't sent.** Only `user` and `assistant` items become `messages`.
 - **A chip removal edits the brief the AI sees** (TR-45). `remove-chip` changes `proposal` and `lastValidBrief` together, so the next request's `currentBrief` is the edited brief. It makes no request.
+- **One hook, two chats (TR-46).** The Results step's chat for changes is the same hook, not a fork. `opening` sets the first assistant message (`GREETING` by default; `initialChatState(opening)`, and reset keeps it). `getCurrentBrief()` is read when a message is sent: the pending brief on the Criteria step, the confirmed brief on Results. `mode` decides what is sent (`currentBriefFor()`): `"criteria"` follows the AI's last proposal, `"revise"` always sends the confirmed brief, and a revise reply goes through `settleRevision()`, which turns a proposal that changes nothing into a note. `dismissProposal()` closes the card.
+- **`diffBriefs(before, after)`** (`ai/diff-brief.ts`) is the one way to say what changed between two briefs: per part and field (the chips' granularity), values by `matchKey()`, a fixed order, the wording in `DIFF_TEXT`. The revise card uses it for the "Changed:" list and `chipMarks()` for the "(new)" and "(changed)" chips; TR-47 reuses it. Never compare briefs any other way in the UI.
 - **The wizard owns what happens next.** Confirm and rank and Edit in form hand the proposal up (`ChatPanel` to `CriteriaStep` to `TranslatorWizard`). The wizard sets the form with `briefToFormState()`, the pending and confirmed brief, and `briefSource` (`"ai" | "form"`, session state, never in `SearchBrief`). No ranking code in `ui/chat/`.
 - **The message box is in the state** (`draft`, changed with `edit`), so `failed` can put the failed message back for a retry inside the reducer.
 
