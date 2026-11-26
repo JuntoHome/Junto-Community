@@ -43,7 +43,35 @@ export type AiRouteDeps = {
 /** Codes that may be logged. Nothing else is ever written to the console. */
 type LogCode = InterviewErrorCode | IntroErrorCode | "rate_limited" | "bad_request";
 
-const logCode = (code: LogCode) => console.error(`translator_ai_${code}`);
+/**
+ * Writes `translator_ai_<code>`. One string literal per code, never built from a value, so the
+ * static test (`__tests__/no-content-logging.test.ts`, TR-51) can prove nothing else is logged.
+ */
+function logCode(code: LogCode): void {
+  switch (code) {
+    case "timeout":
+      console.error("translator_ai_timeout");
+      return;
+    case "upstream":
+      console.error("translator_ai_upstream");
+      return;
+    case "empty":
+      console.error("translator_ai_empty");
+      return;
+    case "unusable":
+      console.error("translator_ai_unusable");
+      return;
+    case "intro_too_long":
+      console.error("translator_ai_intro_too_long");
+      return;
+    case "rate_limited":
+      console.error("translator_ai_rate_limited");
+      return;
+    case "bad_request":
+      console.error("translator_ai_bad_request");
+      return;
+  }
+}
 
 const json = (body: AiResponse, status: number) =>
   Response.json(body, { status, headers: { "Cache-Control": "no-store" } });

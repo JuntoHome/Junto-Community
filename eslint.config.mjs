@@ -5,6 +5,12 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  // The Translator never logs content (TR-51): only console.error, and the static test
+  // (src/features/translator/__tests__/no-content-logging.test.ts) checks it carries a fixed code.
+  {
+    files: ["src/features/translator/**", "src/app/api/translator/**"],
+    rules: { "no-console": ["error", { allow: ["error"] }] },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

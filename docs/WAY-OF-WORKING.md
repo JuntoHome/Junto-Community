@@ -84,6 +84,7 @@ npm run test      # Vitest unit tests (TR-29)
 - Tests sit beside the code as `*.test.ts`. `npm run test:watch` re-runs them on save. Translator fixtures and their rules: [translator/README.md](translator/README.md#tests).
 - Translator tests must lock in the expected results in [translator/README.md](translator/README.md#expected-results) and [../CLAUDE.md](../CLAUDE.md).
 - The walkthrough golden files (`src/features/translator/__fixtures__/walkthroughs/*.json`) are reviewed by hand, not regenerated. If a change makes them fail, don't edit them to fit: find out why first. Change one only on purpose, and say in the PR description which rows changed and why.
+- **The Translator's AI safety tests must not be skipped or loosened** without the project lead's OK: `src/features/translator/__tests__/no-content-logging.test.ts`, `__tests__/key-safety.test.ts`, `ai/injection.test.ts` and `ai/value-cleaning.test.ts` (TR-51). They check that nothing logs content, nothing is stored in the browser, the OpenAI key stays on the server, workbook values stay inside data blocks and value caps hold. When one fails, fix the code, not the test ([translator/README.md](translator/README.md#guardrails)).
 - `npm run build` needs the Supabase variables (see [TROUBLESHOOTING.md](TROUBLESHOOTING.md#local-development)).
 
 ## Deploying

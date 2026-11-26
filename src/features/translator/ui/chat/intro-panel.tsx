@@ -32,8 +32,14 @@ export function IntroPanel({
   intro,
   intent,
   session,
+  aiNotice,
+  atAiLimit,
   onClose,
 }: {
+  /** The session limit's count or message (TR-51), or null. */
+  aiNotice: string | null;
+  /** The session's AI limit is reached: Write is disabled. */
+  atAiLimit: boolean;
   recordId: string;
   /** From `pickIntroFields()`: exactly what the request will carry. */
   intro: IntroFields;
@@ -60,7 +66,7 @@ export function IntroPanel({
   }, []);
 
   function write() {
-    if (waiting) return;
+    if (waiting || atAiLimit) return;
     setCopy((c) => ({ kind: "idle", count: c.count }));
     session.write(recordId, intro, intent, note);
   }
@@ -144,17 +150,21 @@ export function IntroPanel({
             type="button"
             onClick={write}
             // aria-disabled, not disabled, so focus stays on the button while it waits.
-            aria-disabled={waiting || undefined}
-            className={buttonClasses("navy", "md", cn("cursor-pointer", waiting && "cursor-wait opacity-60"))}
+            aria-disabled={waiting || atAiLimit || undefined}
+            className={buttonClasses("navy", "md", cn("cursor-pointer", (waiting || atAiLimit) && "cursor-not-allowed opacity-60"))}
           >
             {writeLabel}
           </button>
         </div>
+        {/* Always rendered, so the count and the limit message are announced when they appear. */}
+        <p role="status" className={aiNotice ? "text-base font-semibold text-navy" : "sr-only"}>
+          {aiNotice}
+        </p>
 
         {error && (
           <div role="alert" className="flex flex-col items-start gap-3 rounded-xl border border-red-700 bg-red-50 p-4 text-base">
             <p className="text-red-800">{error.message}</p>
-            <button type="button" onClick={session.retry} className={buttonClasses("outline", "sm", "cursor-pointer")}>
+            <button type="button" onClick={session.retry} disabled={atAiLimit} className={buttonClasses("outline", "sm", "cursor-pointer")}>
               {TEXT.tryAgain}
             </button>
           </div>

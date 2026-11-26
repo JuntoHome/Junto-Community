@@ -4,7 +4,7 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { buttonClasses } from "@/components/ui/button";
 import { inputClasses } from "@/components/ui/form";
 import { cn } from "@/lib/cn";
-import { diffBriefs, explainChange, type FileSummary, type IntroFields, REVISE_TEXT } from "../ai";
+import { canUseAi, diffBriefs, explainChange, type FileSummary, type IntroFields, limitNotice, REVISE_TEXT, SESSION_LIMIT_TEXT } from "../ai";
 import type { CriteriaForm } from "../criteria/from-form";
 import type { SearchBrief } from "../criteria/schema";
 import type { MappingRow } from "../import/describe-mapping";
@@ -14,7 +14,7 @@ import type { RankedRow, RankResult } from "../ranking";
 import { buildCounts } from "../ranking/counts";
 import { diagnoseEmpty } from "../ranking/diagnose";
 import { checkPin, hasId, omit, type Overrides, pin, type PinContext, restore, unpin } from "../ranking/overrides";
-import { ChatPanel, type ChatPanelHandle } from "./chat/chat-panel";
+import { type AiBudget, ChatPanel, type ChatPanelHandle } from "./chat/chat-panel";
 import { IntroPanel } from "./chat/intro-panel";
 import type { IntroDrafts } from "./chat/use-intro-drafts";
 import { CountsSummary } from "./counts-summary";
@@ -120,7 +120,10 @@ export function ResultsStep({
   aiOffNote,
   simulateAiFailure,
   onAiUnavailable,
+  aiBudget,
 }: {
+  /** The session's AI request count (TR-51): at the limit the chat and Draft intro are disabled. */
+  aiBudget: AiBudget;
   /** Why the AI went away this session (the route answered 503), or null (TR-50). */
   aiOffNote: string | null;
   /** TR-50 test mode: every chat message fails, without calling the route. */
@@ -183,8 +186,13 @@ export function ResultsStep({
 
   // The business whose intro panel is open (TR-49), and the button that opened it, for focus to return to.
   const [introOpen, setIntroOpen] = useState<{ recordId: string; intro: IntroFields; opener: HTMLButtonElement } | null>(null);
+  const atAiLimit = !canUseAi(aiBudget.used);
+  const limitMessageId = "translator-ai-limit";
   const introControls: IntroControls | undefined = introDrafts
-    ? { onDraft: (recordId, picked, opener) => setIntroOpen({ recordId, intro: picked.intro, opener }) }
+    ? {
+        onDraft: (recordId, picked, opener) => setIntroOpen({ recordId, intro: picked.intro, opener }),
+        limitMessageId: atAiLimit ? limitMessageId : null,
+      }
     : undefined;
 
   /** The intro panel closed: cancel a request in flight, and put focus back on its button. */
@@ -320,6 +328,7 @@ export function ResultsStep({
             opening={REVISE_TEXT.opening}
             getCurrentBrief={() => results.brief}
             simulateFailure={simulateAiFailure}
+            aiBudget={aiBudget}
             onUseForm={onUseForm}
             onAiUnavailable={onAiUnavailable}
             onConfirmProposal={(brief) => {
@@ -383,6 +392,12 @@ export function ResultsStep({
             )}
           </div>
 
+          {introDrafts && atAiLimit && (
+            <p id={limitMessageId} className="mt-4 rounded-lg border border-gold bg-ivory p-3 text-base text-ink">
+              {SESSION_LIMIT_TEXT.reached}
+            </p>
+          )}
+
           <div className="mt-4">
             {diagnosis ? (
               <NoResults diagnosis={diagnosis} onEdit={(id) => summaryRef.current?.openItem(id)} />
@@ -444,6 +459,8 @@ export function ResultsStep({
           intro={introOpen.intro}
           intent={results.brief.intent}
           session={introDrafts}
+          aiNotice={limitNotice(aiBudget.used)}
+          atAiLimit={atAiLimit}
           onClose={closeIntro}
         />
       )}

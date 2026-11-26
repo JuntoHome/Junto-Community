@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
+import { createFakeAi } from "../__fixtures__/fake-ai";
 import { EXAMPLE_SUMMARY } from "../__fixtures__/summary";
 import { BUSINESS_OWNER_BRIEF } from "../criteria/examples";
 import { AI_ATTEMPT_TIMEOUT_MS, AI_REQUEST_TIMEOUT_MS } from "./guardrails";
@@ -14,12 +15,8 @@ const ok = (value: unknown): AiCallResult => ({ ok: true, value: typeof value ==
 const QUESTION = ok({ message: "Where are your customers?", proposal: null });
 const BAD_SHAPE = ok("Where are your customers?"); // plain text, not the format
 
-/** A fake AiCall that gives these results in order. */
-const scripted = (...results: AiCallResult[]) => {
-  const fn = vi.fn<AiCall>();
-  for (const result of results) fn.mockResolvedValueOnce(result);
-  return fn;
-};
+/** A fake AiCall that gives these results in order (the shared fake AI, TR-51). */
+const scripted = (...results: AiCallResult[]) => createFakeAi(results);
 
 let consoleSpies: MockInstance[];
 

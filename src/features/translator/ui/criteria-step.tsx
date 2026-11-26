@@ -20,7 +20,7 @@ import {
   useCriteriaOptions,
 } from "./criteria-controls";
 import { FALLBACK_TEXT, type FileSummary } from "../ai";
-import { ChatPanel } from "./chat/chat-panel";
+import { type AiBudget, ChatPanel } from "./chat/chat-panel";
 import { CHOOSER_TEXT, CriteriaChooser, SwitchLink } from "./criteria-chooser";
 import { type CriteriaMode, MODE_ANNOUNCEMENT } from "./criteria-mode";
 
@@ -92,8 +92,11 @@ export function CriteriaStep({
   onFormNoteChange,
   onAiUnavailable,
   simulateAiFailure,
+  aiBudget,
   ...formProps
 }: CriteriaFormProps & {
+  /** The session's AI request count (TR-51). */
+  aiBudget: AiBudget;
   /** The AI may be used: on from the server and not turned off this session (TR-50). */
   aiEnabled: boolean;
   /** The note above the form (TR-50), or null. */
@@ -177,6 +180,7 @@ export function CriteriaStep({
           pendingBrief={pendingBrief}
           records={formProps.records}
           simulateAiFailure={simulateAiFailure}
+          aiBudget={aiBudget}
           onUseForm={(brief) => fallBackToForm(brief, null)}
           onTwoFailures={(brief) => fallBackToForm(brief, FALLBACK_TEXT.switchedToForm)}
           onAiUnavailable={onAiUnavailable}
@@ -200,6 +204,7 @@ function ChatSection({
   pendingBrief,
   records,
   simulateAiFailure,
+  aiBudget,
   onUseForm,
   onTwoFailures,
   onAiUnavailable,
@@ -213,6 +218,7 @@ function ChatSection({
   pendingBrief: SearchBrief | null;
   records: readonly GroupedRecord[];
   simulateAiFailure: boolean;
+  aiBudget: AiBudget;
   onUseForm: (brief: SearchBrief | null) => void;
   onTwoFailures: (brief: SearchBrief | null) => void;
   onAiUnavailable: () => void;
@@ -235,6 +241,7 @@ function ChatSection({
         layout={layout}
         getCurrentBrief={() => pendingBrief}
         simulateFailure={simulateAiFailure}
+        aiBudget={aiBudget}
         onUseForm={onUseForm}
         onTwoFailures={onTwoFailures}
         onAiUnavailable={onAiUnavailable}

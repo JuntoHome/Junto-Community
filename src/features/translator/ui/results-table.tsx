@@ -145,6 +145,11 @@ export type RowControls = {
  */
 export type IntroControls = {
   onDraft: (recordId: string, picked: Extract<PickedIntro, { ok: true }>, opener: HTMLButtonElement) => void;
+  /**
+   * The session's AI limit is reached (TR-51): every Draft intro is disabled, described by the
+   * limit message the Results step shows once, with this id.
+   */
+  limitMessageId: string | null;
 };
 
 /** The two renderings of the shortlist. Only one is visible at a time. */
@@ -262,6 +267,14 @@ function DraftIntroButton({ view, intro, compact = false }: { view: RowView; int
           {INTRO_PANEL_TEXT.noCompany}
         </p>
       </div>
+    );
+  }
+  if (intro.limitMessageId) {
+    return (
+      <button type="button" disabled aria-describedby={intro.limitMessageId} className={classes}>
+        {INTRO_PANEL_TEXT.draftIntro}
+        <span className="sr-only"> {view.id}</span>
+      </button>
     );
   }
   return (

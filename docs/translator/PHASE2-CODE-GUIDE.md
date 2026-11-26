@@ -2,7 +2,7 @@
 
 How to write the Translator's Phase 2 code (Chat with AI). Every Phase 2 ticket follows this guide.
 
-- **Status:** in progress. TR-38 set the rules, this guide, the environment variables and the `openai` dependency. TR-39 built the route and the files it needs: `types.ts`, `request-schema.ts`, `client.ts`, `guardrails.ts`, `handle-request.ts`, and placeholder `interview.ts` and `intro.ts`. TR-40 added `summary.ts` and `sanitizeSummaryValue()` in `guardrails.ts`. TR-41 added `instructions.ts`. TR-42 added `schema.ts` and `validate.ts`, made `interview.ts` real, and added `cleanAiText()` and `cutText()` to `guardrails.ts`. TR-43 made the admin page pass `aiEnabled` to the Criteria step (the chooser is in `ui/`, no new `ai/` files). TR-44 added `chat-session.ts`, `index.ts`, `ui/chat/chat-panel.tsx` and `ui/chat/use-chat-session.ts`. TR-46 added `diff-brief.ts` and the chat's revise mode (Results step). TR-47 added `explain-change.ts` and the `add-note` action in `chat-session.ts`. TR-48 made `intro.ts` real (`pickIntroFields()`, `introFieldsSchema`, `runIntroDraft()`) and added `stripInventedContacts()` to `guardrails.ts`. TR-49 added `intro-session.ts`, `ui/chat/intro-panel.tsx` and `ui/chat/use-intro-drafts.ts`. TR-50 added `post-ai.ts`, `fallback.ts`, `aiFailureSimulationAllowed()` in `client.ts` and `ui/simulation-banner.tsx`. TR-45 added `ui/chat/proposal-card.tsx`, the pure `criteria/to-form.ts` (`briefToFormState()`, `inFormShape()`) and `criteria/chips.ts`, and the `remove-chip` action and `PROPOSAL_TEXT` in `chat-session.ts`. The other files below are created by later tickets.
+- **Status:** in progress. TR-38 set the rules, this guide, the environment variables and the `openai` dependency. TR-39 built the route and the files it needs: `types.ts`, `request-schema.ts`, `client.ts`, `guardrails.ts`, `handle-request.ts`, and placeholder `interview.ts` and `intro.ts`. TR-40 added `summary.ts` and `sanitizeSummaryValue()` in `guardrails.ts`. TR-41 added `instructions.ts`. TR-42 added `schema.ts` and `validate.ts`, made `interview.ts` real, and added `cleanAiText()` and `cutText()` to `guardrails.ts`. TR-43 made the admin page pass `aiEnabled` to the Criteria step (the chooser is in `ui/`, no new `ai/` files). TR-44 added `chat-session.ts`, `index.ts`, `ui/chat/chat-panel.tsx` and `ui/chat/use-chat-session.ts`. TR-46 added `diff-brief.ts` and the chat's revise mode (Results step). TR-47 added `explain-change.ts` and the `add-note` action in `chat-session.ts`. TR-48 made `intro.ts` real (`pickIntroFields()`, `introFieldsSchema`, `runIntroDraft()`) and added `stripInventedContacts()` to `guardrails.ts`. TR-49 added `intro-session.ts`, `ui/chat/intro-panel.tsx` and `ui/chat/use-intro-drafts.ts`. TR-50 added `post-ai.ts`, `fallback.ts`, `aiFailureSimulationAllowed()` in `client.ts` and `ui/simulation-banner.tsx`. TR-51 added `session-limit.ts`, `__fixtures__/fake-ai.ts` and the static safety tests in `__tests__/`. TR-45 added `ui/chat/proposal-card.tsx`, the pure `criteria/to-form.ts` (`briefToFormState()`, `inFormShape()`) and `criteria/chips.ts`, and the `remove-chip` action and `PROPOSAL_TEXT` in `chat-session.ts`. The other files below are created by later tickets.
 - **Rules:** the hard rules are in [../../CLAUDE.md](../../CLAUDE.md). What Phase 2 is, its flow and what is sent to the AI: [README.md](README.md#phase-2).
 - **Source:** the code guide in issue #81 (TR-38), with the corrections listed in [Changes from the issue's guide](#changes-from-the-issues-guide).
 
@@ -31,6 +31,7 @@ src/
       diff-brief.ts       # Capability: what changed between two briefs. diffBriefs, chipMarks, DIFF_TEXT (TR-46; TR-47 reuses it)
       explain-change.ts   # Capability: why the list moved after a change. explainChange, EXPLAIN_TEXT. Deterministic, quotes reasons, never AI-written (TR-47)
       intro-session.ts    # Capability: the intro panel's rules. introReducer, buildIntroRequest, interpretIntroResult, placeholderCount, INTRO_PANEL_TEXT (TR-49)
+      session-limit.ts    # Capability: the browser's 40 requests per session. canUseAi, remaining, limitNotice (TR-51)
       post-ai.ts          # Capability: one request to the route, classified (postAi), and the failure simulation's failingFetch (TR-50)
       fallback.ts         # Capability: the message and buttons for each failure kind. FALLBACK_TEXT (TR-50)
       chat-session.ts     # Capability: the chat's rules. chatReducer, buildChatRequest, canSend, interpretAiResult, fallbackBrief, CHAT_TEXT (TR-44, TR-50)
@@ -46,7 +47,7 @@ src/
       empty.ts            # Stands in for "server-only" in tests (vitest.config.ts alias)
       summary.ts          # EXAMPLE_SUMMARY: a small valid FileSummary for route and interview tests (TR-40)
       instructions/       # interview.txt, intro.txt: the prompts as text fixtures (TR-41)
-      fake-ai.ts          # Scripted fake for tests
+      fake-ai.ts          # createFakeAi(script): the scripted AiCall every AI test uses; records each call (TR-51)
       walkthroughs/ai-*.json
 ```
 
@@ -258,6 +259,13 @@ The chat is the pattern for any stateful AI feature. The rules are a pure reduce
 - Types: nouns (`FileSummary`, `IntroFields`, `InterviewResult`).
 - Branches: `tr-<number>-<short-name>`, off `translator`, PR back into `translator`, `Closes #<issue>` in the PR.
 
+### Safety checks that run as tests (TR-51)
+
+- **The fake AI.** `__fixtures__/fake-ai.ts`: `createFakeAi(script)` returns an `AiCall` (a `vi.fn`) that plays back the script in order (a string is a text answer, an object is answered as JSON, `fail(code)` is a failed call) and keeps every call's `instructions`, `messages` and `format` in `calls`. Running past the script throws. Use it for every AI test; never call OpenAI from a committed test. TR-53 extends it.
+- **The only allowed `console.error` calls** in `src/features/translator/` and `src/app/api/translator/` have exactly one string literal: `console.error("translator_ai_<code>")` (the route, `handle-request.ts`) or `console.error("[translator] <code>")` (the UI, `log-error.ts`). Both helpers write one literal per code in a `switch`, on purpose: a template string such as `` `translator_ai_${code}` `` would make the static test unable to prove nothing else is logged. Any other `console` method is an ESLint error (`no-console`, only `error` allowed, for those two folders).
+- **The static tests** in `src/features/translator/__tests__/` read the source with `fs`: `no-content-logging.test.ts` (the console rule above, and no `localStorage`, `sessionStorage`, `indexedDB`, `document.cookie`, `caches.` or Supabase import) and `key-safety.test.ts` (no client module or `ui/` file touches the key, `process.env`, `openai` or `ai/client`; no public OpenAI variable in the repo; `process.env` only in `ai/client.ts`). `ai/injection.test.ts` and `ai/value-cleaning.test.ts` check data blocks and value caps. When one fails, fix the code, never the test: don't loosen a pattern, add an exception or skip a file without the project lead's OK ([WAY-OF-WORKING.md](../WAY-OF-WORKING.md#testing)).
+- **The session limit** (`ai/session-limit.ts`) is counted in `TranslatorWizard`; the hooks call `onSent` once per request really sent (not for a simulated failure) and refuse to send at the limit.
+
 ## 8. Never do
 
 - Never import `openai` or read `process.env` outside `ai/client.ts`.
@@ -268,6 +276,7 @@ The chat is the pattern for any stateful AI feature. The rules are a pure reduce
 - Never let the AI rank, score, filter or sort. Ranking is Phase 1 code.
 - Never let the AI explain a ranking or reword a match reason. `explainChange()` quotes the rows' `reasons`.
 - Never create a second criteria shape. Always `SearchBrief`.
+- Never skip or loosen the static safety tests in `__tests__/`, or log with anything but one fixed string literal.
 - Never lift the file gate or use real exports. Synthetic files only, as in Phase 1.
 
 ## Changes from the issue's guide

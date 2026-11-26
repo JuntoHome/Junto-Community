@@ -8,6 +8,7 @@ import type { SearchBrief } from "../../criteria/schema";
 import {
   aiTurnedOff,
   canSend,
+  canUseAi,
   changesAnnouncement,
   CHAT_TEXT,
   type ChatItem,
@@ -21,6 +22,7 @@ import {
   type FileSummary,
   isAddedNote,
   latestAnnouncement,
+  limitNotice,
   limitReached,
   LOGIN_PATH,
   MAX_USER_MESSAGE_CHARS,
@@ -64,6 +66,9 @@ export type ChatPanelHandle = {
  * `fallbackBrief()`), Log in again (a new tab, so nothing here is lost), Start over chat. After
  * the second AI failure in a row, `onTwoFailures` gets the same brief (the Criteria step switches
  * to the form); a `503` calls `onAiUnavailable` (the wizard turns the AI off).
+ *
+ * `aiBudget` is the session's AI request count (TR-51): with 5 or fewer left the count shows
+ * near the message box, and at the limit the box and Send are disabled with the limit message.
  */
 export function ChatPanel({
   ref,
@@ -76,6 +81,7 @@ export function ChatPanel({
   onTwoFailures,
   onAiUnavailable,
   simulateFailure = false,
+  aiBudget,
   onConfirmProposal,
   onEditProposal,
 }: {
@@ -95,6 +101,8 @@ export function ChatPanel({
   onAiUnavailable: () => void;
   /** TR-50 test mode: every message fails after 1.5 seconds, without calling the route. */
   simulateFailure?: boolean;
+  /** The session's AI requests so far and how to count one (TR-51). */
+  aiBudget: AiBudget;
   /** Confirm and rank on the proposal card, with the proposal as it is on screen. */
   onConfirmProposal: (brief: SearchBrief) => void;
   /** Edit in form on the proposal card, with the proposal as it is on screen. */
@@ -107,7 +115,11 @@ export function ChatPanel({
     opening,
     mode,
     simulateFailure,
+    onSent: aiBudget.onSent,
+    limitReached: !canUseAi(aiBudget.used),
   });
+  const atLimit = !canUseAi(aiBudget.used);
+  const budgetNotice = limitNotice(aiBudget.used);
   const { proposal } = state;
   const revise = mode === "revise";
   // On the Results step: what the proposal changes, compared with the confirmed brief now.
@@ -162,7 +174,7 @@ export function ChatPanel({
   const counter = characterCount(state.draft);
 
   function submit() {
-    if (!canSend(state, state.draft)) return;
+    if (atLimit || !canSend(state, state.draft)) return;
     void send();
     inputRef.current?.focus();
   }
@@ -239,7 +251,7 @@ export function ChatPanel({
         <FailureMessage
           message={state.error}
           actions={failureActions(state.failureKind)}
-          waiting={waiting}
+          waiting={waiting || atLimit}
           onTryAgain={submit}
           onUseForm={() => onUseForm(fallbackBrief(state, getCurrentBrief(), mode))}
           onStartOver={startOver}
@@ -259,9 +271,14 @@ export function ChatPanel({
         <p id={helpId} className="text-sm text-muted">
           {CHAT_TEXT.messageHelp}
         </p>
+        {/* Always rendered, so the count and the limit message are announced when they appear. */}
+        <p role="status" className={budgetNotice ? "text-base font-semibold text-navy" : "sr-only"}>
+          {budgetNotice}
+        </p>
         <textarea
           id={inputId}
           ref={inputRef}
+          disabled={atLimit}
           value={state.draft}
           onChange={(event) => edit(event.target.value)}
           onKeyDown={onKeyDown}
@@ -281,7 +298,7 @@ export function ChatPanel({
         <button
           type="button"
           onClick={submit}
-          disabled={!canSend(state, state.draft)}
+          disabled={atLimit || !canSend(state, state.draft)}
           className={buttonClasses("navy", "md", "cursor-pointer")}
         >
           {waiting ? CHAT_TEXT.thinking : CHAT_TEXT.send}
@@ -293,6 +310,9 @@ export function ChatPanel({
     </div>
   );
 }
+
+/** The session's AI requests so far, and the call that counts one more (TR-51). Held by the wizard. */
+export type AiBudget = { used: number; onSent: () => void };
 
 /** A failure's message and its buttons (TR-50). In an alert, so it is read out when it appears. */
 function FailureMessage({
