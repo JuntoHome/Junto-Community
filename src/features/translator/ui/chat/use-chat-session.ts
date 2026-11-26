@@ -24,6 +24,10 @@ const AI_ROUTE = "/api/translator/ai";
  * The request is aborted on Start over chat and when the panel unmounts (switching to the form,
  * or leaving the step), so a late reply never shows up. The reducer also drops any reply whose
  * request number isn't the current one.
+ *
+ * `removeChip()` (TR-45) removes a chip from the proposal card. It changes `proposal` and
+ * `lastValidBrief` together, so the next message sends the edited brief as `currentBrief`. It
+ * makes no request.
  */
 export function useChatSession({
   records,
@@ -83,5 +87,9 @@ export function useChatSession({
     dispatch({ type: "edit", text });
   }
 
-  return { state, send, edit, resetChat };
+  function removeChip(chipId: string) {
+    dispatch({ type: "remove-chip", chipId });
+  }
+
+  return { state, send, edit, resetChat, removeChip };
 }

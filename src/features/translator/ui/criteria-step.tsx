@@ -4,6 +4,7 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { buttonClasses } from "@/components/ui/button";
 import { type CriteriaForm, type CriteriaFormErrors, EXCLUSION_FIELDS, type MustHaveField, toBrief } from "../criteria/from-form";
 import type { SearchBrief } from "../criteria/schema";
+import { briefToFormState } from "../criteria/to-form";
 import type { GroupedRecord } from "../normalize/duplicates";
 import {
   CRITERIA_TEXT,
@@ -65,6 +66,11 @@ type CriteriaFormProps = {
  * The chat (TR-44) keeps its conversation while it is on screen. Switching to the form or
  * leaving the step unmounts it: the request in flight is aborted and the chat starts again
  * from the greeting next time.
+ *
+ * The proposal card (TR-45): Confirm and rank hands the proposal to `onConfirmProposal` (the
+ * wizard ranks it the way Continue and Confirm and rank do for the form). Edit in form fills
+ * the form with `briefToFormState(proposal)` and switches to it; Continue from there is a form
+ * brief like any other.
  */
 export function CriteriaStep({
   aiEnabled,
@@ -74,6 +80,7 @@ export function CriteriaStep({
   onModeChange,
   onAnnounce,
   focusStepHeading,
+  onConfirmProposal,
   ...formProps
 }: CriteriaFormProps & {
   aiEnabled: boolean;
@@ -87,6 +94,8 @@ export function CriteriaStep({
   onAnnounce: (text: string) => void;
   /** Moves focus to the step's "Criteria" heading, the heading above the form. */
   focusStepHeading: () => void;
+  /** Confirm and rank on the AI's proposal card (TR-45). */
+  onConfirmProposal: (brief: SearchBrief) => void;
 }) {
   const chatHeadingRef = useRef<HTMLHeadingElement>(null);
   // Counts choices and switches, so focus moves after one but not when the step first shows.
@@ -138,6 +147,11 @@ export function CriteriaStep({
         layout={layout}
         pendingBrief={pendingBrief}
         onUseForm={() => switchTo("form")}
+        onConfirmProposal={onConfirmProposal}
+        onEditProposal={(brief) => {
+          formProps.onFormChange(briefToFormState(brief));
+          switchTo("form");
+        }}
       />
       <SwitchLink onClick={() => switchTo("form")}>{CHOOSER_TEXT.useForm}</SwitchLink>
     </section>

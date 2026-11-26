@@ -16,6 +16,7 @@ import {
   MAX_USER_MESSAGE_CHARS,
 } from "../../ai";
 import type { GroupedRecord } from "../../normalize/duplicates";
+import { ProposalCard } from "./proposal-card";
 import { useChatSession } from "./use-chat-session";
 
 /**
@@ -26,20 +27,31 @@ import { useChatSession } from "./use-chat-session";
  * Screen readers: a separate, visually hidden live region says only the newest AI reply and its
  * note, so the history isn't read again. Errors use `role="alert"`. After sending, focus goes
  * back to the message box.
+ *
+ * When the AI has proposed a brief, the proposal card (TR-45) shows it under the conversation.
+ * Its chips edit the proposal in the chat state; Confirm and rank and Edit in form hand the
+ * current proposal to the Criteria step.
  */
 export function ChatPanel({
   records,
   layout,
   pendingBrief,
   onUseForm,
+  onConfirmProposal,
+  onEditProposal,
 }: {
   records: readonly GroupedRecord[];
   layout: FileSummary["layout"];
   pendingBrief: SearchBrief | null;
   /** Switches the Criteria step to the form. */
   onUseForm: () => void;
+  /** Confirm and rank on the proposal card, with the proposal as it is on screen. */
+  onConfirmProposal: (brief: SearchBrief) => void;
+  /** Edit in form on the proposal card, with the proposal as it is on screen. */
+  onEditProposal: (brief: SearchBrief) => void;
 }) {
-  const { state, send, edit, resetChat } = useChatSession({ records, layout, pendingBrief });
+  const { state, send, edit, resetChat, removeChip } = useChatSession({ records, layout, pendingBrief });
+  const { proposal } = state;
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const listRef = useRef<HTMLOListElement>(null);
   const inputId = useId();
@@ -90,9 +102,14 @@ export function ChatPanel({
         {latestAnnouncement(state)}
       </div>
 
-      {state.proposal && (
-        // TODO(TR-45): replace this line with the confirm view.
-        <p className="text-base font-semibold text-navy">{CHAT_TEXT.proposalReady}</p>
+      {proposal && (
+        <ProposalCard
+          proposal={proposal}
+          onRemove={removeChip}
+          onConfirm={() => onConfirmProposal(proposal)}
+          onKeepChatting={() => inputRef.current?.focus()}
+          onEditInForm={() => onEditProposal(proposal)}
+        />
       )}
 
       {state.error && (

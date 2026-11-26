@@ -4,12 +4,17 @@ import { importWorkbook } from "../__fixtures__/import-pipeline";
 import { SAMPLE_PATH } from "../__fixtures__/records";
 import { BUSINESS_OWNER_BRIEF } from "../criteria/examples";
 import { searchBriefSchema, type SearchBrief } from "../criteria/schema";
+import { toBrief } from "../criteria/from-form";
+import { briefToFormState } from "../criteria/to-form";
+import { fieldOptions } from "../normalize/field-options";
+import type { GroupedRecord } from "../normalize/duplicates";
 import { buildFileSummary, type FileSummary } from "./summary";
 import { MAX_ASSUMPTION_CHARS, MAX_ASSUMPTIONS, parseInterviewReply, VALIDATE_TEXT } from "./validate";
 
 // The synthetic sample's summary (TR-40): cities Glendale, Mesa, Phoenix, Tempe, Scottsdale; state AZ;
 // industries Business Services, Fabrication, Logistics, Technology, Retail. Flagstaff and Mining aren't in it.
 let summary: FileSummary;
+let records: readonly GroupedRecord[];
 
 beforeAll(async () => {
   const bytes = readFileSync(SAMPLE_PATH);
@@ -17,6 +22,7 @@ beforeAll(async () => {
     bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
   );
   summary = buildFileSummary(grouping.records, workbook.layout.id);
+  records = grouping.records;
 });
 
 const MESSAGE = "Here is a brief. Does it look right?";
@@ -54,9 +60,18 @@ describe("parseInterviewReply: shape", () => {
     expect(parse({ message: MESSAGE, proposal: brief() }).reply.proposal).toEqual(BUSINESS_OWNER_BRIEF);
   });
 
-  it("keeps a priority order the AI gave", () => {
-    const proposal = parse(reply(brief({ priorityOrder: ["title", "industry"] }))).reply.proposal;
-    expect(proposal?.priorityOrder).toEqual(["title", "industry"]);
+  it("keeps a priority order the AI gave, with any preference it left out added at the end (TR-45)", () => {
+    expect(parse(reply(brief({ priorityOrder: ["title", "industry", "employees"] }))).reply.proposal?.priorityOrder).toEqual([
+      "title",
+      "industry",
+      "employees",
+    ]);
+    // The ranking already weights an unlisted preference last (weightsFor), so this changes no weight.
+    expect(parse(reply(brief({ priorityOrder: ["title", "industry"] }))).reply.proposal?.priorityOrder).toEqual([
+      "title",
+      "industry",
+      "employees",
+    ]);
   });
 
   it.each([
@@ -116,9 +131,9 @@ describe("parseInterviewReply: values must be in the file", () => {
     expect(proposal?.mustHaves).toEqual([city("Phoenix")]);
   });
 
-  it("removes duplicates from an in list and keeps the order", () => {
+  it("removes duplicates from an in list and puts it in the pickers' order", () => {
     const proposal = parse(reply(brief({ mustHaves: [city(["tempe", "Phoenix", "Tempe"], "in")] }))).reply.proposal;
-    expect(proposal?.mustHaves).toEqual([city(["Tempe", "Phoenix"], "in")]);
+    expect(proposal?.mustHaves).toEqual([city(["Phoenix", "Tempe"], "in")]);
   });
 
   it("accepts Scottsdale, which is in the file", () => {
@@ -177,6 +192,51 @@ describe("parseInterviewReply: only parts the form can edit", () => {
       reply: { message: MESSAGE, proposal: null },
       note: VALIDATE_TEXT.notEditable,
     });
+  });
+});
+
+describe("parseInterviewReply: the form's shape (TR-45)", () => {
+  it("puts criteria in the form's field order", () => {
+    const state = { field: "state", operator: "equals", value: "AZ" };
+    const title = { field: "title", operator: "equals", value: "Owner" };
+    const proposal = parse(
+      reply(brief({ mustHaves: [state, city("Phoenix")], preferences: [title, ...BUSINESS_OWNER_BRIEF.preferences.slice(0, 1), BUSINESS_OWNER_BRIEF.preferences[2]] })),
+    ).reply.proposal;
+    expect(proposal).toEqual(BUSINESS_OWNER_BRIEF);
+  });
+
+  it("leaves out an empty priority order", () => {
+    expect(parse(reply(brief({ priorityOrder: [] }))).reply.proposal).toEqual(BUSINESS_OWNER_BRIEF);
+  });
+
+  it("drops a proposal with two criteria on one field, which one picker can't hold", () => {
+    expect(parse(reply(brief({ mustHaves: [city("Phoenix"), city("Tempe")] })))).toEqual({
+      ok: true,
+      reply: { message: MESSAGE, proposal: null },
+      note: VALIDATE_TEXT.notEditable,
+    });
+  });
+
+  it("gives a proposal the form gives back exactly: toBrief(briefToFormState(proposal))", () => {
+    const options = {
+      city: fieldOptions(records, "city"),
+      state: fieldOptions(records, "state"),
+      industry: fieldOptions(records, "industry"),
+      title: fieldOptions(records, "title"),
+    };
+    const proposals = [
+      brief(),
+      brief({ mustHaves: [{ field: "state", operator: "equals", value: "az" }, city(["tempe", "Phoenix"], "in")], priorityOrder: ["title"] }),
+      brief({
+        exclusions: [{ field: "title", operator: "in", value: ["General Manager", "operations manager"] }, city("Mesa")],
+        assumptions: ["Owners taken as a preference."],
+      }),
+    ];
+    for (const raw of proposals) {
+      const proposal = parse(reply(raw)).reply.proposal;
+      if (!proposal) throw new Error("expected a proposal");
+      expect(toBrief(briefToFormState(proposal), options)).toEqual({ ok: true, brief: proposal });
+    }
   });
 });
 

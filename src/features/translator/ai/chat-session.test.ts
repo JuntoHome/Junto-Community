@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { EXAMPLE_SUMMARY } from "../__fixtures__/summary";
+import { briefChips } from "../criteria/chips";
 import { BUSINESS_OWNER_BRIEF } from "../criteria/examples";
 import {
   buildChatRequest,
@@ -15,6 +16,7 @@ import {
   interpretResponse,
   latestAnnouncement,
   limitReached,
+  PROPOSAL_TEXT,
 } from "./chat-session";
 import { MAX_MESSAGES } from "./request-schema";
 
@@ -184,6 +186,37 @@ describe("buildChatRequest", () => {
   });
 });
 
+describe("remove-chip (TR-45)", () => {
+  const withProposal = () => run(send("Owners in Phoenix"), received(1, { proposal: BUSINESS_OWNER_BRIEF }));
+  const chipId = (label: string) =>
+    briefChips(BUSINESS_OWNER_BRIEF)
+      .flatMap((group) => group.chips)
+      .find((chip) => chip.label === label)?.id ?? "";
+
+  it("changes the proposal and the last valid brief together, so the next request sends the edited brief", () => {
+    const state = chatReducer(withProposal(), { type: "remove-chip", chipId: chipId("City: Phoenix") });
+    const edited = { ...BUSINESS_OWNER_BRIEF, mustHaves: [{ field: "state", operator: "equals", value: "AZ" }] };
+    expect(state.proposal).toEqual(edited);
+    expect(state.lastValidBrief).toBe(state.proposal);
+    const next = chatReducer(state, send("also Tempe"));
+    expect(buildChatRequest(next, EXAMPLE_SUMMARY, currentBriefFor(next, null)).currentBrief).toEqual(edited);
+  });
+
+  it("keeps the chat, the status and the request number", () => {
+    const before = withProposal();
+    const state = chatReducer(before, { type: "remove-chip", chipId: chipId("Title: Owner") });
+    expect(state.items).toBe(before.items);
+    expect(state).toMatchObject({ status: before.status, requestId: before.requestId, draft: before.draft });
+  });
+
+  it("does nothing without a proposal, or for a chip that can't be removed", () => {
+    const empty = initialChatState();
+    expect(chatReducer(empty, { type: "remove-chip", chipId: "mustHaves.0.0" })).toBe(empty);
+    const state = withProposal();
+    expect(chatReducer(state, { type: "remove-chip", chipId: "goal" })).toBe(state);
+  });
+});
+
 describe("currentBriefFor", () => {
   const pending = { ...BUSINESS_OWNER_BRIEF, listSize: 30 };
 
@@ -326,5 +359,17 @@ describe("CHAT_TEXT", () => {
   it("has the limit text and no em-dashes", () => {
     expect(CHAT_TEXT.limitReached).toBe("This chat is getting long. Start over chat to keep going, or use the form.");
     for (const text of Object.values(CHAT_TEXT)) expect(text).not.toMatch(/[\u2013\u2014]/);
+  });
+});
+
+describe("PROPOSAL_TEXT", () => {
+  it("has the card's wording and no em-dashes", () => {
+    expect(PROPOSAL_TEXT.heading).toBe("Here's what I understood");
+    expect(PROPOSAL_TEXT.assumptionsHelp).toBe("These are guesses. Remove any that are wrong.");
+    expect(PROPOSAL_TEXT.needsCriterion).toBe("Add at least one must-have or preference, or use the form.");
+    expect(PROPOSAL_TEXT.remove("City: Phoenix")).toBe("Remove City: Phoenix");
+    expect(PROPOSAL_TEXT.removed("City: Phoenix")).toBe("Removed City: Phoenix.");
+    const texts = Object.values(PROPOSAL_TEXT).map((text) => (typeof text === "function" ? text("x") : text));
+    for (const text of texts) expect(text).not.toMatch(/[–—]/);
   });
 });

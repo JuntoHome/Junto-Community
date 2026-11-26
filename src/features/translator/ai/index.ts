@@ -19,6 +19,7 @@ export {
   interpretResponse,
   latestAnnouncement,
   limitReached,
+  PROPOSAL_TEXT,
 } from "./chat-session";
 export { MAX_MESSAGES, MAX_USER_MESSAGE_CHARS } from "./request-schema";
 export { buildFileSummary } from "./summary";
