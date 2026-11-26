@@ -19,6 +19,7 @@ export {
   GREETING,
   initialChatState,
   interpretResponse,
+  isAddedNote,
   latestAnnouncement,
   limitReached,
   PROPOSAL_TEXT,
@@ -26,6 +27,7 @@ export {
   settleRevision,
 } from "./chat-session";
 export { type BriefChange, chipMarks, type ChipMark, DIFF_TEXT, diffBriefs } from "./diff-brief";
+export { EXPLAIN_TEXT, explainChange, type ExplainInput } from "./explain-change";
 export { MAX_MESSAGES, MAX_USER_MESSAGE_CHARS } from "./request-schema";
 export { buildFileSummary } from "./summary";
 export type { AiRequest, AiResponse, ChatMessage, FileSummary } from "./types";

@@ -4,7 +4,7 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { buttonClasses } from "@/components/ui/button";
 import { inputClasses } from "@/components/ui/form";
 import { cn } from "@/lib/cn";
-import { type FileSummary, REVISE_TEXT } from "../ai";
+import { diffBriefs, explainChange, type FileSummary, REVISE_TEXT } from "../ai";
 import type { CriteriaForm } from "../criteria/from-form";
 import type { SearchBrief } from "../criteria/schema";
 import type { MappingRow } from "../import/describe-mapping";
@@ -14,7 +14,7 @@ import type { RankedRow, RankResult } from "../ranking";
 import { buildCounts } from "../ranking/counts";
 import { diagnoseEmpty } from "../ranking/diagnose";
 import { checkPin, hasId, omit, type Overrides, pin, type PinContext, restore, unpin } from "../ranking/overrides";
-import { ChatPanel } from "./chat/chat-panel";
+import { ChatPanel, type ChatPanelHandle } from "./chat/chat-panel";
 import { CountsSummary } from "./counts-summary";
 import { errorText } from "./criteria-controls";
 import { CRITERIA_SUMMARY_HEADING_ID, CriteriaSummary, type CriteriaSummaryHandle } from "./criteria-summary";
@@ -81,8 +81,10 @@ const buttonKey = (list: OverrideList, action: OverrideAction, recordId: string)
  * the summary: a compact chat of its own (not the Criteria step's), whose proposals are compared
  * with the confirmed brief. Nothing re-ranks until Confirm and rank on its card, which goes
  * through the same wizard path as the Criteria step's card (`onConfirmRevision`). Then the card
- * closes and "Updated. Now first: ..." names the new first row, takes focus and is announced.
- * The summary's inline edits keep working as before: both change the same confirmed brief.
+ * closes and, once the results have re-ranked, the explanation of how the list moved (TR-47,
+ * `explainChange()`, from the results before and after) is added to the chat as a note, takes
+ * focus and is announced. The previous results are kept only until then. The summary's inline
+ * edits keep working as before (both change the same confirmed brief) but add no explanation.
  */
 export function ResultsStep({
   aiEnabled,
@@ -142,23 +144,18 @@ export function ResultsStep({
     resultsRef.current?.focus();
   }, [results]);
 
-  // The brief a chat change confirmed (TR-46). While the results come from it, "Updated. Now
-  // first: ..." shows under the chat; a summary Save (a new brief) or a pin or omit clears it.
-  const [revisedBrief, setRevisedBrief] = useState<SearchBrief | null>(null);
-  const updatedRef = useRef<HTMLParagraphElement>(null);
-  const focusUpdated = useRef(false);
+  // A chat change being confirmed (TR-46): the results it replaces and the brief it confirmed.
+  // Once the results come from that brief, the chat gets the explanation (TR-47) and this is
+  // cleared. Nothing else keeps the old results, and nothing is sent anywhere.
+  const chatRef = useRef<ChatPanelHandle>(null);
+  const pendingRevision = useRef<{ before: RankResult; brief: SearchBrief } | null>(null);
   useEffect(() => {
-    if (!focusUpdated.current || !updatedRef.current) return;
-    focusUpdated.current = false;
-    updatedRef.current.focus();
-  });
-  const first = results?.shortlist[0];
-  const updatedText =
-    results && revisedBrief === results.brief
-      ? first
-        ? REVISE_TEXT.updated(first.record.normalized.company.known ? first.record.normalized.company.value : null, first.record.normalized.recordId)
-        : REVISE_TEXT.updatedEmpty
-      : null;
+    const pending = pendingRevision.current;
+    if (!pending || !results || results.brief !== pending.brief) return;
+    pendingRevision.current = null;
+    const lines = explainChange({ before: pending.before, after: results, changes: diffBriefs(pending.before.brief, results.brief) });
+    chatRef.current?.addNote(lines.join(" "));
+  }, [results]);
 
   const [pinId, setPinId] = useState("");
   // The Pin by Record ID message; `count` makes the same message be announced again.
@@ -201,7 +198,6 @@ export function ResultsStep({
 
   /** Applies an override button's change, announces it and keeps focus on its row. */
   function press(at: PendingFocus, change: (current: Overrides) => Overrides, message: string) {
-    setRevisedBrief(null);
     onOverridesChange(change);
     setAnnouncement((a) => ({ text: message, count: a.count + 1 }));
     focusNext.current = at;
@@ -247,7 +243,6 @@ export function ResultsStep({
       : hasId(results.overrides.omitted, recordId)
         ? TEXT.pinnedAndRestored(recordId)
         : TEXT.pinned(recordId);
-    setRevisedBrief(null);
     onOverridesChange((current) => pin(current, recordId));
     setPinMessage((m) => ({ text, error: false, count: m.count + 1 }));
     setPinId("");
@@ -275,6 +270,7 @@ export function ResultsStep({
             {REVISE_TEXT.opening}
           </h3>
           <ChatPanel
+            ref={chatRef}
             records={records}
             layout={layout}
             mode="revise"
@@ -282,20 +278,11 @@ export function ResultsStep({
             getCurrentBrief={() => results.brief}
             onUseForm={onUseForm}
             onConfirmProposal={(brief) => {
-              setRevisedBrief(brief);
-              focusUpdated.current = true;
+              pendingRevision.current = { before: results, brief };
               onConfirmRevision(brief);
             }}
             onEditProposal={onEditRevision}
           />
-          {/* Always rendered, so the line is announced when it appears. */}
-          <div role="status">
-            {updatedText && (
-              <p ref={updatedRef} tabIndex={-1} className="font-semibold text-navy focus:outline-none">
-                {updatedText}
-              </p>
-            )}
-          </div>
         </section>
       )}
       {results && counts && (

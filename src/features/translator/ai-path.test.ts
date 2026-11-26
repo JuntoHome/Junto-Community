@@ -8,6 +8,7 @@ import {
   chatReducer,
   currentBriefFor,
   diffBriefs,
+  explainChange,
   type FileSummary,
   initialChatState,
   REVISE_TEXT,
@@ -213,10 +214,11 @@ describe("Change one thing through chat", () => {
     const hundreds = after.shortlist.filter((row) => row.displayScore === 100).map((row) => row.record.normalized.recordId);
     expect(after.shortlist[0]).toMatchObject({ displayScore: 100 });
     expect(hundreds).toEqual(["SYN-0006", "SYN-0026", "SYN-0126", "SYN-0226", "SYN-0326", "SYN-0426"]);
-    expect(REVISE_TEXT.updated("Synthetic Company 0006", after.shortlist[0].record.normalized.recordId)).toBe(
-      "Updated. Now first: Synthetic Company 0006 (SYN-0006).",
-    );
-    expect(after.shortlist[0].record.normalized.company).toMatchObject({ known: true, value: "Synthetic Company 0006" });
+    // TR-47: the note the Results chat gets after Confirm, from the results before and after.
+    expect(explainChange({ before, after, changes: diffBriefs(confirmed, proposal) })).toEqual([
+      "Synthetic Company 0006 (SYN-0006) is now #1 with score 100: Title: Operations Manager (preferred). It's tied with 5 others at 100; ties are ordered by Record ID.",
+      "Synthetic Company 0001 (SYN-0001) is now #7 with score 64: Title: Owner (not preferred).",
+    ]);
   });
 
   it("gives the nothing-to-update note and no card when the AI changes nothing", async () => {
