@@ -145,7 +145,7 @@ export function CriteriaStep({
       <ChatPanel
         records={formProps.records}
         layout={layout}
-        pendingBrief={pendingBrief}
+        getCurrentBrief={() => pendingBrief}
         onUseForm={() => switchTo("form")}
         onConfirmProposal={onConfirmProposal}
         onEditProposal={(brief) => {

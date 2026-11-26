@@ -5,6 +5,7 @@ import { BUSINESS_OWNER_BRIEF } from "../criteria/examples";
 import {
   buildChatRequest,
   canSend,
+  changesAnnouncement,
   CHAT_TEXT,
   type ChatAction,
   chatReducer,
@@ -17,7 +18,10 @@ import {
   latestAnnouncement,
   limitReached,
   PROPOSAL_TEXT,
+  REVISE_TEXT,
+  settleRevision,
 } from "./chat-session";
+import { diffBriefs } from "./diff-brief";
 import { MAX_MESSAGES } from "./request-schema";
 
 /** Applies the actions in order, starting from a new chat. */
@@ -217,6 +221,67 @@ describe("remove-chip (TR-45)", () => {
   });
 });
 
+describe("the Results step's chat (TR-46)", () => {
+  const confirmed = BUSINESS_OWNER_BRIEF;
+  const opsManager = {
+    ...confirmed,
+    preferences: confirmed.preferences.map((c) =>
+      c.field === "title" ? { field: "title" as const, operator: "equals" as const, value: "Operations Manager" } : c,
+    ),
+  };
+
+  it("starts with its own opening line, which is sent, and keeps it on reset", () => {
+    const state = initialChatState(REVISE_TEXT.opening);
+    expect(state.items).toEqual([{ id: "greeting", role: "assistant", content: "Want to change something? Tell me." }]);
+    const sent = chatReducer(state, send("favor operations managers instead"));
+    expect(buildChatRequest(sent, EXAMPLE_SUMMARY, confirmed).messages[0]).toEqual({ role: "assistant", content: REVISE_TEXT.opening });
+    const reset = chatReducer(sent, { type: "reset" });
+    expect(reset.items[0].content).toBe(REVISE_TEXT.opening);
+    expect(chatReducer(initialChatState(), { type: "reset" }).items[0].content).toBe(GREETING);
+  });
+
+  it("always sends the confirmed brief as currentBrief, even after a proposal", () => {
+    let state = chatReducer(initialChatState(REVISE_TEXT.opening), send("favor operations managers instead"));
+    state = chatReducer(state, received(state.requestId, { proposal: opsManager }));
+    expect(currentBriefFor(state, confirmed, "revise")).toBe(confirmed);
+    // The Criteria step's chat follows the proposal instead.
+    expect(currentBriefFor(state, confirmed)).toBe(opsManager);
+    expect(currentBriefFor(state, null, "revise")).toBeUndefined();
+  });
+
+  it("dismiss-proposal closes the card and keeps the chat", () => {
+    let state = chatReducer(initialChatState(REVISE_TEXT.opening), send("favor operations managers instead"));
+    state = chatReducer(state, received(state.requestId, { proposal: opsManager }));
+    const dismissed = chatReducer(state, { type: "dismiss-proposal" });
+    expect(dismissed.proposal).toBeNull();
+    expect(dismissed.items).toBe(state.items);
+    expect(chatReducer(dismissed, { type: "dismiss-proposal" })).toBe(dismissed);
+  });
+
+  it("settleRevision turns a proposal that changes nothing into the note, with no proposal", () => {
+    const same = { type: "received", reply: "Here it is.", note: null, proposal: structuredClone(confirmed) } as const;
+    expect(settleRevision(same, confirmed)).toEqual({ ...same, proposal: null, note: "Your criteria are the same, so nothing to update." });
+    const changed = { ...same, proposal: opsManager };
+    expect(settleRevision(changed, confirmed)).toBe(changed);
+    expect(settleRevision(same, undefined)).toBe(same);
+    const failed = { type: "failed", error: "No." } as const;
+    expect(settleRevision(failed, confirmed)).toBe(failed);
+  });
+
+  it("changesAnnouncement reads the list, and the warning for more than one change", () => {
+    expect(changesAnnouncement(diffBriefs(confirmed, opsManager))).toBe("Changed: Title preference: Owner to Operations Manager.");
+    expect(changesAnnouncement(diffBriefs(confirmed, { ...opsManager, listSize: 30 }))).toBe(
+      "Changed: Title preference: Owner to Operations Manager; List size: 40 to 30. The AI changed more than one thing. Check each one before you confirm.",
+    );
+    expect(changesAnnouncement([])).toBe("");
+  });
+
+  it("names the new first row", () => {
+    expect(REVISE_TEXT.updated("Synthetic Company 0006", "SYN-0006")).toBe("Updated. Now first: Synthetic Company 0006 (SYN-0006).");
+    expect(REVISE_TEXT.updated(null, "SYN-0006")).toBe("Updated. Now first: SYN-0006.");
+  });
+});
+
 describe("currentBriefFor", () => {
   const pending = { ...BUSINESS_OWNER_BRIEF, listSize: 30 };
 
@@ -370,6 +435,24 @@ describe("PROPOSAL_TEXT", () => {
     expect(PROPOSAL_TEXT.remove("City: Phoenix")).toBe("Remove City: Phoenix");
     expect(PROPOSAL_TEXT.removed("City: Phoenix")).toBe("Removed City: Phoenix.");
     const texts = Object.values(PROPOSAL_TEXT).map((text) => (typeof text === "function" ? text("x") : text));
-    for (const text of texts) expect(text).not.toMatch(/[–—]/);
+    for (const text of texts) expect(text).not.toMatch(/[\u2013\u2014]/);
+  });
+});
+
+describe("REVISE_TEXT", () => {
+  it("has the wording and no em-dashes", () => {
+    expect(REVISE_TEXT.several).toBe("The AI changed more than one thing. Check each one before you confirm.");
+    const texts = [
+      REVISE_TEXT.opening,
+      REVISE_TEXT.changed,
+      REVISE_TEXT.several,
+      REVISE_TEXT.noChange,
+      REVISE_TEXT.cancel,
+      REVISE_TEXT.marks.new,
+      REVISE_TEXT.marks.changed,
+      REVISE_TEXT.updated("x", "y"),
+      REVISE_TEXT.updatedEmpty,
+    ];
+    for (const text of texts) expect(text).not.toMatch(/[\u2013\u2014]/);
   });
 });

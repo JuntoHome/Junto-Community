@@ -16,7 +16,7 @@ import { compareIssues, validateRows } from "../normalize/validate-rows";
 import { rank } from "../ranking";
 import { buildCounts } from "../ranking/counts";
 import { NO_OVERRIDES, type Overrides, pinContext } from "../ranking/overrides";
-import { type CriteriaMode, initialCriteriaMode } from "./criteria-mode";
+import { type CriteriaMode, initialCriteriaMode, MODE_ANNOUNCEMENT } from "./criteria-mode";
 import { CriteriaStep } from "./criteria-step";
 import { ExportStep } from "./export-step";
 import { FileUpload } from "./file-upload";
@@ -98,7 +98,8 @@ export function TranslatorWizard({
   const [pendingForm, setPendingForm] = useState<CriteriaForm | null>(null);
   // The brief the user confirmed with "Confirm and rank". Only this one is ranked.
   const [confirmedBrief, setConfirmedBrief] = useState<SearchBrief | null>(null);
-  // Where the brief came from: "ai" only after Confirm and rank on the AI's proposal card;
+  // Where the brief came from: "ai" only after Confirm and rank on an AI proposal card (the
+  // Criteria step's, TR-45, or the Results step's chat for changes, TR-46);
   // "form" by default and after Continue on the form (also when the form was filled by Edit in
   // form). Start over resets it with the remount. A Save in the criteria summary on Results
   // doesn't change it: TR-52 decides how to report an AI brief edited by hand.
@@ -224,6 +225,32 @@ export function TranslatorWizard({
     [workbook],
   );
 
+  /**
+   * Confirms a brief from the AI (TR-45 on the Criteria step, TR-46 on the Results step): the
+   * form's Continue and Confirm and rank in one go. The form becomes `briefToFormState(next)`, so
+   * the criteria summary's editors and the form show it; the pending and confirmed brief become
+   * `next` itself, and the results re-rank with the same `rank()`. Pins and omits are kept, as for
+   * any brief change, and pins that stop matching are reported (TR-21).
+   */
+  function confirmAiBrief(next: SearchBrief) {
+    const form = briefToFormState(next);
+    setCriteriaForm(form);
+    setPendingBrief(next);
+    setPendingForm(form);
+    setUnpinned([]);
+    setConfirmedBrief(next);
+    setBriefSource("ai");
+  }
+
+  /** Opens the Criteria step's form, filled in with `brief` when one is given (Edit in form on the Results step's card). */
+  function openCriteriaForm(brief?: SearchBrief) {
+    if (brief) setCriteriaForm(briefToFormState(brief));
+    setCriteriaMode("form");
+    focusHeading.current = true;
+    setCurrent("criteria");
+    onAnnounce(MODE_ANNOUNCEMENT.form);
+  }
+
   const step = STEPS.find((s) => s.id === current) ?? STEPS[0];
 
   return (
@@ -292,16 +319,8 @@ export function TranslatorWizard({
               setCurrent("results");
             }}
             onConfirmProposal={(next) => {
-              // The form's path in one go (TR-45): Continue (the form, so the criteria summary's
-              // editors and the form show the proposal, and the pending brief), then Confirm and
-              // rank. The brief ranked is the proposal as shown on the card, unchanged.
-              const form = briefToFormState(next);
-              setCriteriaForm(form);
-              setPendingBrief(next);
-              setPendingForm(form);
-              setUnpinned([]);
-              setConfirmedBrief(next);
-              setBriefSource("ai");
+              // The brief ranked is the proposal as shown on the card, unchanged.
+              confirmAiBrief(next);
               setDone(new Set<StepId>(["upload", "preview", "criteria"]));
               focusHeading.current = true;
               setCurrent("results");
@@ -309,6 +328,11 @@ export function TranslatorWizard({
           />
         ) : step.id === "results" && workbook && importSummary && pendingBrief && pendingForm ? (
           <ResultsStep
+            aiEnabled={aiEnabled}
+            layout={workbook.parsed.layout.id}
+            onConfirmRevision={confirmAiBrief}
+            onEditRevision={openCriteriaForm}
+            onUseForm={() => openCriteriaForm()}
             records={workbook.records}
             importSummary={importSummary}
             pendingBrief={pendingBrief}

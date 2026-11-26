@@ -7,13 +7,18 @@ import { cn } from "@/lib/cn";
 import type { SearchBrief } from "../../criteria/schema";
 import {
   canSend,
+  changesAnnouncement,
   CHAT_TEXT,
   type ChatItem,
+  type ChatMode,
   characterCount,
+  chipMarks,
+  diffBriefs,
   type FileSummary,
   latestAnnouncement,
   limitReached,
   MAX_USER_MESSAGE_CHARS,
+  REVISE_TEXT,
 } from "../../ai";
 import type { GroupedRecord } from "../../normalize/duplicates";
 import { ProposalCard } from "./proposal-card";
@@ -31,27 +36,53 @@ import { useChatSession } from "./use-chat-session";
  * When the AI has proposed a brief, the proposal card (TR-45) shows it under the conversation.
  * Its chips edit the proposal in the chat state; Confirm and rank and Edit in form hand the
  * current proposal to the Criteria step.
+ *
+ * `mode="revise"` is the compact chat on the Results step (TR-46). Its opening line is the
+ * panel's heading, so the conversation list shows only from the first message on (the line is
+ * still sent). The card compares the proposal with the confirmed brief (`diffBriefs()`), the
+ * live region reads the changes after the reply, Cancel closes the card, and Confirm and rank
+ * hands the proposal up and closes the card. Nothing is ranked before Confirm.
  */
 export function ChatPanel({
   records,
   layout,
-  pendingBrief,
+  getCurrentBrief,
+  mode = "criteria",
+  opening,
   onUseForm,
   onConfirmProposal,
   onEditProposal,
 }: {
   records: readonly GroupedRecord[];
   layout: FileSummary["layout"];
-  pendingBrief: SearchBrief | null;
-  /** Switches the Criteria step to the form. */
+  /** The wizard's brief, read at send time: the pending one (Criteria step) or the confirmed one (Results step). */
+  getCurrentBrief: () => SearchBrief | null;
+  mode?: ChatMode;
+  /** The chat's first assistant message (the greeting by default). */
+  opening?: string;
+  /** Switches to the form. */
   onUseForm: () => void;
   /** Confirm and rank on the proposal card, with the proposal as it is on screen. */
   onConfirmProposal: (brief: SearchBrief) => void;
   /** Edit in form on the proposal card, with the proposal as it is on screen. */
   onEditProposal: (brief: SearchBrief) => void;
 }) {
-  const { state, send, edit, resetChat, removeChip } = useChatSession({ records, layout, pendingBrief });
+  const { state, send, edit, resetChat, removeChip, dismissProposal } = useChatSession({
+    records,
+    layout,
+    getCurrentBrief,
+    opening,
+    mode,
+  });
   const { proposal } = state;
+  const revise = mode === "revise";
+  // On the Results step: what the proposal changes, compared with the confirmed brief now.
+  const base = revise ? getCurrentBrief() : null;
+  const changes = revise && proposal && base ? diffBriefs(base, proposal) : [];
+  const marks = revise && proposal && base ? chipMarks(base, proposal) : {};
+  // The opening line is the heading on the Results step, so the list starts at the first message.
+  const shownItems = revise ? state.items.slice(1) : state.items;
+  const latest = latestAnnouncement(state);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const listRef = useRef<HTMLOListElement>(null);
   const inputId = useId();
@@ -88,29 +119,55 @@ export function ChatPanel({
 
   return (
     <div className="flex w-full flex-col gap-4">
-      <ol
-        ref={listRef}
-        aria-label={CHAT_TEXT.conversation}
-        className="flex max-h-[28rem] min-h-48 flex-col gap-3 overflow-y-auto rounded-xl border border-sand bg-ivory p-4"
-      >
-        {state.items.map((item) => (
-          <ChatBubble key={item.id} item={item} />
-        ))}
-      </ol>
+      {shownItems.length > 0 && (
+        <ol
+          ref={listRef}
+          aria-label={CHAT_TEXT.conversation}
+          className={cn(
+            "flex flex-col gap-3 overflow-y-auto rounded-xl border border-sand bg-ivory p-4",
+            revise ? "max-h-72" : "max-h-[28rem] min-h-48",
+          )}
+        >
+          {shownItems.map((item) => (
+            <ChatBubble key={item.id} item={item} />
+          ))}
+        </ol>
+      )}
 
       <div aria-live="polite" className="sr-only">
-        {latestAnnouncement(state)}
+        {/* After the reply only, so the changes aren't read while waiting. */}
+        {latest && revise && proposal ? `${latest} ${changesAnnouncement(changes)}` : latest}
       </div>
 
-      {proposal && (
-        <ProposalCard
-          proposal={proposal}
-          onRemove={removeChip}
-          onConfirm={() => onConfirmProposal(proposal)}
-          onKeepChatting={() => inputRef.current?.focus()}
-          onEditInForm={() => onEditProposal(proposal)}
-        />
-      )}
+      {proposal &&
+        (revise && changes.length === 0 ? (
+          // A Save in the criteria summary can make an open proposal the same as the brief.
+          <p className="text-base text-ink">{REVISE_TEXT.noChange}</p>
+        ) : (
+          <ProposalCard
+            proposal={proposal}
+            onRemove={removeChip}
+            onConfirm={() => {
+              onConfirmProposal(proposal);
+              // On the Criteria step the wizard moves on; on Results the card closes.
+              if (revise) dismissProposal();
+            }}
+            onKeepChatting={revise ? undefined : () => inputRef.current?.focus()}
+            onEditInForm={() => onEditProposal(proposal)}
+            revise={
+              revise
+                ? {
+                    changes,
+                    marks,
+                    onCancel: () => {
+                      dismissProposal();
+                      inputRef.current?.focus();
+                    },
+                  }
+                : undefined
+            }
+          />
+        ))}
 
       {state.error && (
         <div role="alert" className="flex flex-col items-start gap-3 rounded-xl border border-red-700 bg-red-50 p-4 text-base">
@@ -141,7 +198,7 @@ export function ChatPanel({
           onChange={(event) => edit(event.target.value)}
           onKeyDown={onKeyDown}
           maxLength={MAX_USER_MESSAGE_CHARS}
-          rows={3}
+          rows={revise ? 2 : 3}
           aria-describedby={counter ? `${helpId} ${counterId}` : helpId}
           className={cn(textareaClasses, "w-full")}
         />

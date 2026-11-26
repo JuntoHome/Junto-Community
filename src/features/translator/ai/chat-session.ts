@@ -1,6 +1,8 @@
 /**
  * Capability: the chat's rules (TR-44). The chat panel and `use-chat-session.ts` only render
  * and wire these up. The proposal card (TR-45) uses `PROPOSAL_TEXT` and the `remove-chip` action.
+ * The chat on the Results step (TR-46) is the same chat in "revise" mode: its own opening line,
+ * the confirmed brief as `currentBrief`, `settleRevision()` and `REVISE_TEXT`.
  * Input: the chat state, the actions the hook dispatches, and the route's raw responses.
  * Output: the next chat state, the request body for `/api/translator/ai`, whether Send may run,
  * and what screen readers hear.
@@ -12,6 +14,7 @@
 import { z } from "zod";
 import { removeChip } from "../criteria/chips";
 import { type SearchBrief, searchBriefSchema } from "../criteria/schema";
+import { type BriefChange, diffBriefs } from "./diff-brief";
 import { MAX_MESSAGES, MAX_USER_MESSAGE_CHARS } from "./request-schema";
 import type { FileSummary } from "./summary";
 import type { AiRequest, ChatMessage } from "./types";
@@ -47,12 +50,42 @@ export const PROPOSAL_TEXT = {
   editInForm: "Edit in form",
 } as const;
 
+// The strings of the chat on the Results step (TR-46). Plain language, no em-dashes.
+export const REVISE_TEXT = {
+  /** The panel's heading, and the chat's first assistant message (sent, so the AI knows it was asked). */
+  opening: "Want to change something? Tell me.",
+  changed: "Changed:",
+  several: "The AI changed more than one thing. Check each one before you confirm.",
+  noChange: "Your criteria are the same, so nothing to update.",
+  cancel: "Cancel",
+  marks: { new: "(new)", changed: "(changed)" },
+  /**
+   * After Confirm and rank, the shortlist's first row: "Updated. Now first: Synthetic Company 0006
+   * (SYN-0006)." or, with no company name, "Updated. Now first: SYN-0006."; for an empty
+   * shortlist, the updatedEmpty line.
+   */
+  updated: (company: string | null, recordId: string) =>
+    company === null ? `Updated. Now first: ${recordId}.` : `Updated. Now first: ${company} (${recordId}).`,
+  updatedEmpty: "Updated. No records match these criteria now.",
+} as const;
+
+/**
+ * Which brief the chat sends as `currentBrief`:
+ * - `criteria` (the Criteria step, TR-44): the AI's last valid proposal, else the wizard's brief.
+ * - `revise` (the Results step, TR-46): always the confirmed brief, read when the message is
+ *   sent, so a Save in the criteria summary made in between is included. A proposal there is
+ *   compared with it (`diffBriefs()`) and never becomes the base until it is confirmed.
+ */
+export type ChatMode = "criteria" | "revise";
+
 /** The character counter shows from this many characters. */
 export const COUNTER_FROM = 800;
 
 export type ChatItem = { id: string; role: "user" | "assistant" | "note"; content: string };
 
 export type ChatState = {
+  /** The first assistant message: `GREETING`, or `REVISE_TEXT.opening` on the Results step. Reset keeps it. */
+  opening: string;
   items: ChatItem[];
   status: "idle" | "waiting" | "error";
   /** The last failure's text, shown under the list. */
@@ -80,6 +113,8 @@ export type ChatAction =
   | { type: "failed"; requestId: number; error: string }
   /** A chip removed on the proposal card: `chipId` is from `briefChips(state.proposal)`. No AI call. */
   | { type: "remove-chip"; chipId: string }
+  /** The proposal card closes (TR-46): Cancel, or a revision confirmed. The chat is kept. */
+  | { type: "dismiss-proposal" }
   | { type: "reset" };
 
 /** What `interpretResponse()` gives: a `received` or `failed` action, without the request it answers. */
@@ -91,10 +126,11 @@ type InterviewRequest = Extract<AiRequest, { kind: "interview" }>;
 
 const GREETING_ID = "greeting";
 
-/** A new chat: only the greeting, nothing typed, nothing proposed. */
-export function initialChatState(): ChatState {
+/** A new chat: only the opening line (the greeting by default), nothing typed, nothing proposed. */
+export function initialChatState(opening: string = GREETING): ChatState {
   return {
-    items: [{ id: GREETING_ID, role: "assistant", content: GREETING }],
+    opening,
+    items: [{ id: GREETING_ID, role: "assistant", content: opening }],
     status: "idle",
     error: null,
     proposal: null,
@@ -191,15 +227,42 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       return proposal === state.proposal ? state : { ...state, proposal, lastValidBrief: proposal };
     }
 
+    case "dismiss-proposal":
+      return state.proposal ? { ...state, proposal: null } : state;
+
     case "reset":
       // A fresh request number, so a reply to a request sent before the reset is ignored.
-      return { ...initialChatState(), requestId: state.requestId + 1 };
+      return { ...initialChatState(state.opening), requestId: state.requestId + 1 };
   }
 }
 
-/** The brief sent as `currentBrief`: the AI's last valid one, otherwise the wizard's pending one. */
-export function currentBriefFor(state: ChatState, pendingBrief: SearchBrief | null): SearchBrief | undefined {
-  return state.lastValidBrief ?? pendingBrief ?? undefined;
+/**
+ * The brief sent as `currentBrief` (see `ChatMode`). `base` is the wizard's brief: the pending
+ * one on the Criteria step, the confirmed one on the Results step.
+ */
+export function currentBriefFor(
+  state: ChatState,
+  base: SearchBrief | null,
+  mode: ChatMode = "criteria",
+): SearchBrief | undefined {
+  return (mode === "revise" ? base : (state.lastValidBrief ?? base)) ?? undefined;
+}
+
+/**
+ * For the Results step's chat (TR-46): a proposal that changes nothing compared with `base` (the
+ * brief the request carried) becomes the note `REVISE_TEXT.noChange`, so no card is shown.
+ * Anything else is passed on unchanged.
+ */
+export function settleRevision(outcome: ChatOutcome, base: SearchBrief | undefined): ChatOutcome {
+  if (outcome.type !== "received" || !outcome.proposal || !base) return outcome;
+  return diffBriefs(base, outcome.proposal).length === 0 ? { ...outcome, proposal: null, note: REVISE_TEXT.noChange } : outcome;
+}
+
+/** What screen readers hear about a revision: "Changed: List size: 40 to 30; ...", and the warning for several. */
+export function changesAnnouncement(changes: readonly BriefChange[]): string {
+  if (changes.length === 0) return "";
+  const list = `${REVISE_TEXT.changed} ${changes.map((change) => change.text).join("; ")}.`;
+  return changes.length > 1 ? `${list} ${REVISE_TEXT.several}` : list;
 }
 
 /**
