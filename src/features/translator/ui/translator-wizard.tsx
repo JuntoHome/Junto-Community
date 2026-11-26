@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FALLBACK_TEXT } from "../ai";
+import { canUseAi, FALLBACK_TEXT } from "../ai";
 import type { ExportSource } from "../export/criteria-rows";
 import { type CriteriaForm, EMPTY_CRITERIA_FORM } from "../criteria/from-form";
 import type { SearchBrief } from "../criteria/schema";
@@ -103,6 +103,10 @@ export function TranslatorWizard({
   const [aiAvailable, setAiAvailable] = useState(aiEnabled);
   // The note above the Criteria form (TR-50): why the form opened, or null.
   const [formNote, setFormNote] = useState<string | null>(null);
+  // AI requests this session has sent (TR-51), chat and intro together, for the session limit
+  // (`ai/session-limit.ts`). Here, so Start over and a new file reset it through the remount.
+  const [aiRequestCount, setAiRequestCount] = useState(0);
+  const aiBudget = { used: aiRequestCount, onSent: () => setAiRequestCount((n) => n + 1) };
   // The brief waiting to be ranked: set by Continue on Criteria and by a Save in the criteria
   // summary (TR-16), with the form that produced it, so the summary's editors start from that form.
   const [pendingBrief, setPendingBrief] = useState<SearchBrief | null>(null);
@@ -123,7 +127,7 @@ export function TranslatorWizard({
   const [unpinned, setUnpinned] = useState<string[]>([]);
   // The intro drafts (TR-49), by Record ID, as the user left them. Here, so Start over and a new
   // file clear them through the remount; TR-52 will export them. Never stored or logged.
-  const introDrafts = useIntroDrafts({ onUnavailable: turnAiOff });
+  const introDrafts = useIntroDrafts({ onUnavailable: turnAiOff, onSent: aiBudget.onSent, limitReached: !canUseAi(aiRequestCount) });
   // Counts workbook attempts, so a slow check can't override a newer choice.
   const attempt = useRef(0);
 
@@ -328,6 +332,7 @@ export function TranslatorWizard({
           <CriteriaStep
             aiEnabled={aiAvailable}
             simulateAiFailure={simulateAiFailure}
+            aiBudget={aiBudget}
             formNote={formNote}
             onFormNoteChange={setFormNote}
             onAiUnavailable={turnAiOff}
@@ -364,6 +369,7 @@ export function TranslatorWizard({
             aiEnabled={aiAvailable}
             aiOffNote={aiEnabled && !aiAvailable ? FALLBACK_TEXT.unavailable : null}
             simulateAiFailure={simulateAiFailure}
+            aiBudget={aiBudget}
             onAiUnavailable={turnAiOff}
             introDrafts={aiAvailable ? introDrafts : null}
             layout={workbook.parsed.layout.id}

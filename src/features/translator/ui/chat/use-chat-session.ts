@@ -41,6 +41,9 @@ import type { GroupedRecord } from "../../normalize/duplicates";
  * `interpretAiResult()` turns that into the action. With `simulateFailure` (`?aiFail=1` where the
  * simulation is allowed), `failingFetch` stands in for `fetch`: every message fails as a network
  * failure after 1.5 seconds, and the route is never called.
+ *
+ * The session limit (TR-51): `onSent` is called once for every request really sent to the route
+ * (never for a simulated failure), and `limitReached` stops `send()` altogether.
  */
 export function useChatSession({
   records,
@@ -49,6 +52,8 @@ export function useChatSession({
   opening = GREETING,
   mode = "criteria",
   simulateFailure = false,
+  onSent,
+  limitReached = false,
 }: {
   records: readonly GroupedRecord[];
   layout: FileSummary["layout"];
@@ -62,6 +67,10 @@ export function useChatSession({
   mode?: ChatMode;
   /** TR-50 test mode: every message fails after 1.5 seconds, without calling the route. */
   simulateFailure?: boolean;
+  /** Called once per request really sent to the route, for the session limit (TR-51). */
+  onSent?: () => void;
+  /** The session's AI limit is reached (TR-51): nothing more is sent. */
+  limitReached?: boolean;
 }) {
   const [state, dispatch] = useReducer(chatReducer, opening, initialChatState);
   // Built once per file: the same records always give the same summary.
@@ -72,7 +81,7 @@ export function useChatSession({
   useEffect(() => () => inFlight.current?.abort(), []);
 
   async function send() {
-    if (inFlight.current || !canSend(state, state.draft)) return;
+    if (inFlight.current || limitReached || !canSend(state, state.draft)) return;
     const action = { type: "send", text: state.draft } as const;
     // The state the reducer is about to make, so the request holds exactly what is on screen.
     const sending = chatReducer(state, action);
@@ -81,6 +90,8 @@ export function useChatSession({
 
     const controller = new AbortController();
     inFlight.current = controller;
+    // A simulated failure never reaches the route, so it doesn't count toward the limit.
+    if (!simulateFailure) onSent?.();
     // No content is logged, whatever happens.
     const result = await postAi(simulateFailure ? failingFetch : fetch, buildChatRequest(sending, summary, currentBrief), controller.signal);
     if (result.kind === "aborted" || controller.signal.aborted) return;

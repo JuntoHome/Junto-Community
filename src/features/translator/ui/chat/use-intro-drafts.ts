@@ -25,14 +25,24 @@ import {
  * The request goes through `postAi()` (TR-50). A `503` calls `onUnavailable`, so the wizard turns
  * the AI off for the session. The failure simulation (`?aiFail=1`) doesn't affect intro drafts.
  */
-export function useIntroDrafts({ onUnavailable }: { onUnavailable?: () => void } = {}) {
+export function useIntroDrafts({
+  onUnavailable,
+  onSent,
+  limitReached = false,
+}: {
+  onUnavailable?: () => void;
+  /** Called once per request sent to the route, for the session limit (TR-51). */
+  onSent?: () => void;
+  /** The session's AI limit is reached (TR-51): nothing more is sent. */
+  limitReached?: boolean;
+} = {}) {
   const [state, dispatch] = useReducer(introReducer, initialIntroState);
   const inFlight = useRef<AbortController | null>(null);
 
   useEffect(() => () => inFlight.current?.abort(), []);
 
   async function run(info: IntroRequestInfo) {
-    if (inFlight.current) return;
+    if (inFlight.current || limitReached) return;
     const action = { type: "request", ...info } as const;
     // The number the reducer is about to give this request.
     const { requestId } = introReducer(state, action);
@@ -40,6 +50,7 @@ export function useIntroDrafts({ onUnavailable }: { onUnavailable?: () => void }
 
     const controller = new AbortController();
     inFlight.current = controller;
+    onSent?.();
     // No content is logged, whatever happens.
     const result = await postAi(fetch, buildIntroRequest(info.intro, info.intent, info.goal), controller.signal);
     if (result.kind === "aborted" || controller.signal.aborted) return;

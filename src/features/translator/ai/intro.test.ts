@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { toArrayBuffer } from "../__fixtures__/build-workbook";
+import { createFakeAi, fail } from "../__fixtures__/fake-ai";
 import { importWorkbook } from "../__fixtures__/import-pipeline";
 import { SAMPLE_PATH, SYNTHETIC_HEADERS, syntheticRow } from "../__fixtures__/records";
 import { RS_FIXTURE_HEADERS, RS_FIXTURE_ROW } from "../__fixtures__/rs-row";
@@ -22,7 +23,6 @@ import {
   pickIntroFields,
   runIntroDraft,
 } from "./intro";
-import type { AiCall } from "./types";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -193,8 +193,8 @@ const INTRO: IntroFields = {
   contactTitle: "Owner",
 };
 
-/** A fake AI that always answers `value`, recording what it was given. */
-const answering = (value: string) => vi.fn<AiCall>(async () => ({ ok: true, value }));
+/** A fake AI that answers `value` once, recording what it was given (the shared fake AI, TR-51). */
+const answering = (value: string) => createFakeAi([value]);
 
 describe("runIntroDraft: what is sent", () => {
   it("sends the facts as a data block with the goal, and keeps them out of the instructions", async () => {
@@ -259,7 +259,7 @@ describe("runIntroDraft: the draft", () => {
   });
 
   it("passes a failed call's code on, with one attempt only", async () => {
-    const callAi = vi.fn<AiCall>(async () => ({ ok: false, code: "upstream" }));
+    const callAi = createFakeAi([fail("upstream")]);
     expect(await runIntroDraft({ intro: INTRO, intent: "business_owner" }, callAi)).toEqual({ ok: false, code: "upstream" });
     expect(callAi).toHaveBeenCalledTimes(1);
   });

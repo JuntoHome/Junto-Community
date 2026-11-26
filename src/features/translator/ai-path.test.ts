@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { beforeAll, describe, expect, it } from "vitest";
+import { createFakeAi } from "./__fixtures__/fake-ai";
 import { importWorkbook } from "./__fixtures__/import-pipeline";
 import { SAMPLE_PATH } from "./__fixtures__/records";
 import {
@@ -15,7 +16,6 @@ import {
   settleRevision,
 } from "./ai";
 import { runInterviewTurn } from "./ai/interview";
-import type { AiCall } from "./ai/types";
 import { parseInterviewReply } from "./ai/validate";
 import { briefChips, removeChip } from "./criteria/chips";
 import { BUSINESS_OWNER_BRIEF } from "./criteria/examples";
@@ -162,15 +162,11 @@ describe("AI path = form path", () => {
  * Confirm and rank ranks the proposal: the Phase 1 role change walkthrough.
  */
 describe("Change one thing through chat", () => {
-  /** A fake AI call that answers with `proposal`, and records what it was given. */
-  function fakeAi(proposal: SearchBrief) {
-    const calls: Parameters<AiCall>[0][] = [];
-    const call: AiCall = async (input) => {
-      calls.push(input);
-      return { ok: true, value: JSON.stringify({ message: "I changed the title preference.", proposal: { ...proposal, priorityOrder: null } }) };
-    };
-    return { call, calls };
-  }
+  /** The shared fake AI (TR-51), answering once with `proposal`. */
+  const fakeAi = (proposal: SearchBrief) => {
+    const call = createFakeAi([{ message: "I changed the title preference.", proposal: { ...proposal, priorityOrder: null } }]);
+    return { call, calls: call.calls };
+  };
 
   const opsManager: SearchBrief = {
     ...BUSINESS_OWNER_BRIEF,
