@@ -22,6 +22,7 @@ import { ExportStep } from "./export-step";
 import { FileUpload } from "./file-upload";
 import { logTranslatorError } from "./log-error";
 import { PreviewStep } from "./preview-step";
+import { useIntroDrafts } from "./chat/use-intro-drafts";
 import { ResultsStep } from "./results-step";
 import { SampleButtons } from "./sample-buttons";
 import { StartOver } from "./start-over";
@@ -110,6 +111,9 @@ export function TranslatorWizard({
   const [overrides, setOverrides] = useState<Overrides>(NO_OVERRIDES);
   // Pins the last brief change removed because those rows stopped matching, for a notice on Results.
   const [unpinned, setUnpinned] = useState<string[]>([]);
+  // The intro drafts (TR-49), by Record ID, as the user left them. Here, so Start over and a new
+  // file clear them through the remount; TR-52 will export them. Never stored or logged.
+  const introDrafts = useIntroDrafts();
   // Counts workbook attempts, so a slow check can't override a newer choice.
   const attempt = useRef(0);
 
@@ -329,6 +333,7 @@ export function TranslatorWizard({
         ) : step.id === "results" && workbook && importSummary && pendingBrief && pendingForm ? (
           <ResultsStep
             aiEnabled={aiEnabled}
+            introDrafts={aiEnabled ? introDrafts : null}
             layout={workbook.parsed.layout.id}
             onConfirmRevision={confirmAiBrief}
             onEditRevision={openCriteriaForm}

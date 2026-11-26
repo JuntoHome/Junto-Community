@@ -2,6 +2,7 @@
 
 import { type ReactNode, useId, useState } from "react";
 import { buttonClasses } from "@/components/ui/button";
+import { INTRO_PANEL_TEXT, pickIntroFields, type PickedIntro } from "../ai";
 import type { MappingRow } from "../import/describe-mapping";
 import type { ShortlistRow } from "../ranking";
 import { contactLines, MISSING_SEPARATOR, missingFields } from "../ranking/missing";
@@ -88,6 +89,8 @@ type RowView = {
   details: DetailItem[];
   /** "Row 2 in your file" and, for a row with duplicates, "Also in your file as ...". */
   source: string[];
+  /** `pickIntroFields()` (TR-48): the six intro fields, or why there are none (no company name). */
+  intro: PickedIntro;
 };
 
 function rowView(row: ShortlistRow, mapping: readonly MappingRow[]): RowView {
@@ -124,6 +127,7 @@ function rowView(row: ShortlistRow, mapping: readonly MappingRow[]): RowView {
     missing: missingFields(r, mapping),
     details,
     source,
+    intro: pickIntroFields(row),
   };
 }
 
@@ -133,6 +137,14 @@ export type RowControls = {
   buttonRef: (view: ResultsView, action: "pin" | "omit", recordId: string) => (element: HTMLButtonElement | null) => void;
   onPin: (view: ResultsView, row: ShortlistRow, index: number) => void;
   onOmit: (view: ResultsView, row: ShortlistRow, index: number) => void;
+};
+
+/**
+ * The Draft intro buttons' handler (TR-49), from the Results step. Given only when the AI is on,
+ * so with the AI off no button is shown. `opener` is the button pressed, for focus to return to.
+ */
+export type IntroControls = {
+  onDraft: (recordId: string, picked: Extract<PickedIntro, { ok: true }>, opener: HTMLButtonElement) => void;
 };
 
 /** The two renderings of the shortlist. Only one is visible at a time. */
@@ -178,7 +190,16 @@ function PinnedBadge({ wrap = false }: { wrap?: boolean }) {
  * table has no Contact or Missing column (TR-36), so its Details start with those two
  * (`withContactAndMissing`); a card shows them in its body instead.
  */
-function DetailsContent({ view, withContactAndMissing = false }: { view: RowView; withContactAndMissing?: boolean }) {
+function DetailsContent({
+  view,
+  withContactAndMissing = false,
+  intro,
+}: {
+  view: RowView;
+  withContactAndMissing?: boolean;
+  /** Shows Draft intro under the details (the table's Details, TR-49). */
+  intro?: IntroControls;
+}) {
   return (
     <div className="flex flex-col gap-3">
       {(withContactAndMissing || view.details.length > 0) && (
@@ -210,11 +231,46 @@ function DetailsContent({ view, withContactAndMissing = false }: { view: RowView
           <li key={line}>{line}</li>
         ))}
       </ul>
+      {intro && (
+        <div className="flex">
+          <DraftIntroButton view={view} intro={intro} />
+        </div>
+      )}
     </div>
   );
 }
 
 const action = buttonClasses("outline", "sm", "cursor-pointer px-4");
+
+/**
+ * Draft intro (TR-49) for one row. With no company name in the file there is nothing to
+ * introduce: the button is disabled, with the reason as visible text linked by `aria-describedby`.
+ * `compact` is the table's narrow Actions column: less padding, and the label may wrap.
+ */
+function DraftIntroButton({ view, intro, compact = false }: { view: RowView; intro: IntroControls; compact?: boolean }) {
+  const reasonId = useId();
+  const picked = view.intro;
+  const classes = buttonClasses("outline", "sm", compact ? "cursor-pointer px-2 leading-tight" : "cursor-pointer px-4");
+  if (!picked.ok) {
+    return (
+      <div className="flex flex-col gap-1">
+        <button type="button" disabled aria-describedby={reasonId} className={classes}>
+          {INTRO_PANEL_TEXT.draftIntro}
+          <span className="sr-only"> {view.id}</span>
+        </button>
+        <p id={reasonId} className="text-sm text-muted">
+          {INTRO_PANEL_TEXT.noCompany}
+        </p>
+      </div>
+    );
+  }
+  return (
+    <button type="button" onClick={(event) => intro.onDraft(view.id, picked, event.currentTarget)} className={classes}>
+      {INTRO_PANEL_TEXT.draftIntro}
+      <span className="sr-only"> {view.id}</span>
+    </button>
+  );
+}
 
 function PinOmitButtons({
   view,
@@ -286,18 +342,22 @@ const td = "px-2 py-3 align-top";
  * hidden one (`display: none`) is left out of the accessibility tree.
  *
  * Each row has Pin (or Unpin), Omit and Details. In the table Details opens a row under it; on
- * a card it is a `<details>`. Values are plain text: no `mailto:` or web links, so nothing from
+ * a card it is a `<details>`. With the AI on (`intro` given), each row also has Draft intro
+ * (TR-49): in the table's Actions column and its Details, and on each card. Values are plain text: no `mailto:` or web links, so nothing from
  * the spreadsheet becomes a link. Reasons are shown exactly as ranking wrote them.
  */
 export function ResultsTable({
   rows,
   mapping,
   controls,
+  intro,
 }: {
   rows: readonly ShortlistRow[];
   /** `describeMapping()` for the loaded file, for the Missing column. */
   mapping: readonly MappingRow[];
   controls: RowControls;
+  /** Draft intro (TR-49). Left out when the AI is off, so no button is shown. */
+  intro?: IntroControls;
 }) {
   const views = rows.map((row) => rowView(row, mapping));
   const idPrefix = useId();
@@ -389,6 +449,7 @@ export function ResultsTable({
                         {TEXT.details}
                         <span className="sr-only"> {view.id}</span>
                       </button>
+                      {intro && <DraftIntroButton view={view} intro={intro} compact />}
                     </div>
                   </td>
                 </tr>
@@ -396,7 +457,7 @@ export function ResultsTable({
                   <td colSpan={TABLE_COLUMNS.length} className="px-3 py-4">
                     {/* Sticky, so it shows at the box's left edge even when the table is scrolled sideways. */}
                     <div className="sticky left-3 max-w-xl">
-                      <DetailsContent view={view} withContactAndMissing />
+                      <DetailsContent view={view} withContactAndMissing intro={intro} />
                     </div>
                   </td>
                 </tr>
@@ -456,6 +517,7 @@ export function ResultsTable({
             </details>
             <div className="flex flex-wrap gap-3">
               <PinOmitButtons view={view} row={rows[index]} index={index} rendering="cards" controls={controls} />
+              {intro && <DraftIntroButton view={view} intro={intro} />}
             </div>
           </li>
         ))}
