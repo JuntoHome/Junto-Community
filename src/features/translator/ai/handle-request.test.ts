@@ -9,7 +9,16 @@ import type { AiCall, ChatMessage } from "./types";
 
 const ROUTE_URL = "http://localhost:3000/api/translator/ai";
 const INTERVIEW = { kind: "interview", summary: EXAMPLE_SUMMARY, messages: [{ role: "user", content: "Hello" }] };
-const INTRO = { kind: "intro", intro: { companyName: "Example Fabrication Co" }, goal: "I sell welding supplies." };
+/** SYN-0001's six intro fields (TR-48). */
+const INTRO_FIELDS = {
+  company: "Synthetic Company 0001",
+  industry: "Fabrication",
+  city: "Phoenix",
+  state: "AZ",
+  contactName: "Demo Contact 0001",
+  contactTitle: "Owner",
+};
+const INTRO = { kind: "intro", intro: INTRO_FIELDS, intent: "business_owner", goal: "I sell welding supplies." };
 
 const replyWith =
   (value: string): AiCall =>
@@ -125,7 +134,13 @@ describe("handleAiRequest: what it accepts", () => {
     ["an unknown key", post({ ...INTERVIEW, rows: [] })],
     ["an empty chat", post({ ...INTERVIEW, messages: [] })],
     ["an invalid currentBrief", post({ ...INTERVIEW, currentBrief: { intent: "everything" } })],
-    ["an intro without a goal", post({ kind: "intro", intro: {} })],
+    ["an intro without an intent", post({ kind: "intro", intro: INTRO_FIELDS })],
+    ["an intro with an unknown intent", post({ ...INTRO, intent: "everything" })],
+    ["intro fields with an extra key", post({ ...INTRO, intro: { ...INTRO_FIELDS, phone: "602 555 0100" } })],
+    ["intro fields without a company", post({ ...INTRO, intro: { ...INTRO_FIELDS, company: "" } })],
+    ["intro fields missing a field", post({ ...INTRO, intro: { company: "Synthetic Company 0001" } })],
+    ["an intro field that looks like an email", post({ ...INTRO, intro: { ...INTRO_FIELDS, contactTitle: "jane@example.invalid" } })],
+    ["an intro with a goal that isn't text", post({ ...INTRO, goal: 42 })],
     ["a summary with an extra key", post({ ...INTERVIEW, summary: { ...EXAMPLE_SUMMARY, rows: [] } })],
     ["a summary missing a list", post({ ...INTERVIEW, summary: Object.fromEntries(Object.entries(EXAMPLE_SUMMARY).filter(([key]) => key !== "titles")) })],
     ["an empty summary", post({ ...INTERVIEW, summary: {} })],
@@ -205,7 +220,7 @@ describe("handleAiRequest: what it accepts", () => {
     expect((await handleAiRequest(post({ ...INTERVIEW, messages: atLimit }), deps)).status).toBe(200);
   });
 
-  it("returns 413 for an assistant turn over 4,000 characters, and for a 1,001-character goal", async () => {
+  it("returns 413 for an assistant turn over 4,000 characters, and for an intro note over 300 characters", async () => {
     const deps = fakeDeps();
     const messages = [
       { role: "user", content: "Hi" },
@@ -213,8 +228,10 @@ describe("handleAiRequest: what it accepts", () => {
       { role: "user", content: "And?" },
     ];
     await expectFailure(await handleAiRequest(post({ ...INTERVIEW, messages }), deps), 413, "This conversation is too long. Start a new chat to keep going.");
-    await expectFailure(await handleAiRequest(post({ ...INTRO, goal: "a".repeat(1001) }), deps), 413, "Your message is too long. Keep it under 1,000 characters.");
+    await expectFailure(await handleAiRequest(post({ ...INTRO, goal: "a".repeat(301) }), deps), 413, "Keep your note under 300 characters.");
     expect(deps.callAi).not.toHaveBeenCalled();
+    // 300 is allowed.
+    expect((await handleAiRequest(post({ ...INTRO, goal: "a".repeat(300) }), deps)).status).toBe(200);
   });
 
   it("returns 429 when the admin is over the rate limit, and counts only valid requests", async () => {
@@ -362,6 +379,34 @@ describe("handleAiRequest: calling the AI", () => {
     const response = await handleAiRequest(post(INTRO), deps);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, kind: "intro", draft: "Hello from a local supplier." });
+    // Only the six fields, the goal line and the note reach the AI, in the message, never the instructions.
+    const [{ instructions, messages }] = vi.mocked(deps.callAi).mock.calls[0];
+    expect(messages).toHaveLength(1);
+    expect(messages[0].content).toContain(JSON.stringify(INTRO_FIELDS));
+    expect(messages[0].content).toContain("Goal: customers or partners");
+    expect(messages[0].content).toContain("I sell welding supplies.");
+    expect(instructions).not.toContain("Synthetic Company 0001");
+    expect(logged()).toEqual([]);
+  });
+
+  it("returns 200 for an intro with no note", async () => {
+    const { goal, ...withoutNote } = INTRO;
+    expect(goal).toBeTruthy();
+    const response = await handleAiRequest(post({ ...withoutNote, intent: "job_seeker" }), fakeDeps());
+    expect(response.status).toBe(200);
+    expect((await response.json()).kind).toBe("intro");
+  });
+
+  it("returns 502 with the too-long message for an intro draft over 200 words, and logs only the code", async () => {
+    const deps = fakeDeps({ callAi: replyWith(Array.from({ length: 210 }, () => "word").join(" ")) });
+    await expectFailure(await handleAiRequest(post(INTRO), deps), 502, "The draft came back too long. Try again.");
+    expect(logged()).toEqual([["translator_ai_intro_too_long"]]);
+  });
+
+  it("replaces contact details the AI invented in an intro draft", async () => {
+    const deps = fakeDeps({ callAi: replyWith("Call (602) 555-0100 or email jane@example.invalid.") });
+    const body = await (await handleAiRequest(post(INTRO), deps)).json();
+    expect(body).toEqual({ ok: true, kind: "intro", draft: "Call [contact details] or email [contact details]." });
   });
 
   it("accepts a valid currentBrief", async () => {

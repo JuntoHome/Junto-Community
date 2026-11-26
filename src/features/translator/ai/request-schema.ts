@@ -6,7 +6,8 @@
  * This module is pure (zod only, no React, no I/O).
  */
 import { z } from "zod";
-import { searchBriefSchema } from "../criteria/schema";
+import { BRIEF_INTENTS, searchBriefSchema } from "../criteria/schema";
+import { introFieldsSchema, MAX_INTRO_NOTE_CHARS } from "./intro";
 import { fileSummarySchema } from "./summary";
 import type { AiRequest, ChatMessage } from "./types";
 
@@ -28,9 +29,6 @@ const chatMessageSchema = z.strictObject({
   content: text,
 });
 
-// Loose until TR-48 defines the intro fields.
-const introFieldsSchema = z.looseObject({});
-
 const interviewRequestSchema = z.strictObject({
   kind: z.literal("interview"),
   // Strict (summary.ts): any key that isn't in FileSummary, such as `rows`, is refused.
@@ -41,8 +39,11 @@ const interviewRequestSchema = z.strictObject({
 
 const introRequestSchema = z.strictObject({
   kind: z.literal("intro"),
+  // Strict (intro.ts): only the six intro fields. Any other key, such as `phone`, is refused.
   intro: introFieldsSchema,
-  goal: text,
+  intent: z.enum(BRIEF_INTENTS),
+  // The user's optional note. Its length is checked in parseAiRequest, so it gets its own message.
+  goal: z.string().trim().optional(),
 });
 
 /**
@@ -55,7 +56,7 @@ export const aiRequestSchema: z.ZodType<AiRequest, unknown> = z.discriminatedUni
 ]);
 
 /** Why a request was refused. */
-export type AiRequestProblem = "bad-request" | "conversation-too-long" | "message-too-long";
+export type AiRequestProblem = "bad-request" | "conversation-too-long" | "message-too-long" | "note-too-long";
 
 export type ParsedAiRequest = { ok: true; request: AiRequest } | { ok: false; problem: AiRequestProblem };
 
@@ -69,9 +70,9 @@ export function parseAiRequest(body: unknown): ParsedAiRequest {
   const request = parsed.data;
 
   if (request.kind === "intro") {
-    // The goal is typed by the user, like a chat message.
-    return request.goal.length > MAX_USER_MESSAGE_CHARS
-      ? { ok: false, problem: "message-too-long" }
+    // The note is typed by the user (TR-48): at most MAX_INTRO_NOTE_CHARS.
+    return (request.goal?.length ?? 0) > MAX_INTRO_NOTE_CHARS
+      ? { ok: false, problem: "note-too-long" }
       : { ok: true, request };
   }
 
