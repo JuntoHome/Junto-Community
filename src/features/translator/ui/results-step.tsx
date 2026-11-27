@@ -137,7 +137,7 @@ export function ResultsStep({
   /** The workbook's layout id, for the file summary the chat sends. */
   layout: FileSummary["layout"];
   /** Confirm and rank on the chat's card: confirms `brief` and re-ranks (TR-46). */
-  onConfirmRevision: (brief: SearchBrief) => void;
+  onConfirmRevision: (brief: SearchBrief, firstRequest: string | null) => void;
   /** Edit in form on the chat's card: opens the Criteria step's form filled in with `brief`. */
   onEditRevision: (brief: SearchBrief) => void;
   /** Use the form, after a chat failure: opens the Criteria step's form filled in with `brief` (the confirmed brief). */
@@ -331,9 +331,9 @@ export function ResultsStep({
             aiBudget={aiBudget}
             onUseForm={onUseForm}
             onAiUnavailable={onAiUnavailable}
-            onConfirmProposal={(brief) => {
+            onConfirmProposal={(brief, firstRequest) => {
               pendingRevision.current = { before: results, brief };
-              onConfirmRevision(brief);
+              onConfirmRevision(brief, firstRequest);
             }}
             onEditProposal={onEditRevision}
           />

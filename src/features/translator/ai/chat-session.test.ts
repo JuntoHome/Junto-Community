@@ -16,6 +16,7 @@ import {
   initialChatState,
   aiTurnedOff,
   fallbackBrief,
+  firstUserMessage,
   interpretAiResult,
   shouldSwitchToForm,
   isAddedNote,
@@ -327,6 +328,28 @@ describe("add-note (TR-47)", () => {
     // A note the AI route sent is not an added note.
     const routeNote = run(send("Owners"), received(1, { note: "A note." })).items.at(-1);
     expect(routeNote && isAddedNote(routeNote)).toBe(false);
+  });
+});
+
+describe("firstUserMessage (TR-52)", () => {
+  const sendAndReply = (state: ChatState, text: string): ChatState => {
+    const sent = chatReducer(state, { type: "send", text });
+    return chatReducer(sent, { type: "received", requestId: sent.requestId, reply: "OK", note: null, proposal: null });
+  };
+
+  it("is null before anything is sent", () => {
+    expect(firstUserMessage(initialChatState())).toBeNull();
+  });
+
+  it("is the first message typed, trimmed, not a later one or the greeting", () => {
+    const state = sendAndReply(sendAndReply(initialChatState(), "  owners in Phoenix \n"), "only Owners");
+    expect(firstUserMessage(state)).toBe("owners in Phoenix");
+  });
+
+  it("starts again after Start over chat", () => {
+    const reset = chatReducer(sendAndReply(initialChatState(), "owners in Phoenix"), { type: "reset" });
+    expect(firstUserMessage(reset)).toBeNull();
+    expect(firstUserMessage(sendAndReply(reset, "Tempe logistics"))).toBe("Tempe logistics");
   });
 });
 

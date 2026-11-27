@@ -18,6 +18,7 @@ import {
   diffBriefs,
   failureActions,
   fallbackBrief,
+  firstUserMessage,
   FALLBACK_TEXT,
   type FileSummary,
   isAddedNote,
@@ -103,8 +104,11 @@ export function ChatPanel({
   simulateFailure?: boolean;
   /** The session's AI requests so far and how to count one (TR-51). */
   aiBudget: AiBudget;
-  /** Confirm and rank on the proposal card, with the proposal as it is on screen. */
-  onConfirmProposal: (brief: SearchBrief) => void;
+  /**
+   * Confirm and rank on the proposal card, with the proposal as it is on screen and the chat's
+   * first user message (`firstUserMessage()`), for the export's "What you asked for" (TR-52).
+   */
+  onConfirmProposal: (brief: SearchBrief, firstRequest: string | null) => void;
   /** Edit in form on the proposal card, with the proposal as it is on screen. */
   onEditProposal: (brief: SearchBrief) => void;
 }) {
@@ -226,7 +230,7 @@ export function ChatPanel({
             proposal={proposal}
             onRemove={removeChip}
             onConfirm={() => {
-              onConfirmProposal(proposal);
+              onConfirmProposal(proposal, firstUserMessage(state));
               // On the Criteria step the wizard moves on; on Results the card closes.
               if (revise) dismissProposal();
             }}

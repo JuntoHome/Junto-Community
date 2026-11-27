@@ -17,6 +17,7 @@ import { compareIssues, validateRows } from "../normalize/validate-rows";
 import { rank } from "../ranking";
 import { buildCounts } from "../ranking/counts";
 import { NO_OVERRIDES, type Overrides, pinContext } from "../ranking/overrides";
+import { type BriefOrigin, confirmedFromAi, confirmedFromForm, INITIAL_BRIEF_ORIGIN, savedInSummary } from "./brief-origin";
 import { type CriteriaMode, initialCriteriaMode, MODE_ANNOUNCEMENT } from "./criteria-mode";
 import { CriteriaStep } from "./criteria-step";
 import { ExportStep } from "./export-step";
@@ -39,12 +40,6 @@ import { isStepAvailable, STEPS, type StepId } from "./steps";
  * issue from both steps, sorted by row then code.
  */
 type LoadedWorkbook = GatedWorkbook & ImportState;
-
-/**
- * Where the confirmed criteria came from (TR-45), for the export (TR-52). Session state only:
- * never part of `SearchBrief`.
- */
-export type BriefSource = "ai" | "form";
 
 /** What a workbook input holds, as a list: one File, a FileList or an array. */
 function toFiles(input: WorkbookFileInput): readonly File[] {
@@ -113,20 +108,19 @@ export function TranslatorWizard({
   const [pendingForm, setPendingForm] = useState<CriteriaForm | null>(null);
   // The brief the user confirmed with "Confirm and rank". Only this one is ranked.
   const [confirmedBrief, setConfirmedBrief] = useState<SearchBrief | null>(null);
-  // Where the brief came from: "ai" only after Confirm and rank on an AI proposal card (the
-  // Criteria step's, TR-45, or the Results step's chat for changes, TR-46);
-  // "form" by default and after Continue on the form (also when the form was filled by Edit in
-  // form). Start over resets it with the remount. A Save in the criteria summary on Results
-  // doesn't change it: TR-52 decides how to report an AI brief edited by hand.
-  // Nothing reads it yet: the export's "Criteria set by" line (TR-52) will.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [briefSource, setBriefSource] = useState<BriefSource>("form");
+  // How the brief was made, for the export's Criteria sheet (TR-52): `briefSource` ("ai" only
+  // after Confirm and rank on an AI proposal card, TR-45 and TR-46; "form" after Continue on the
+  // form, also when Edit in form filled it), `editedAfterAi` (a summary Save then changed an AI
+  // brief) and `firstAiRequest` (the first confirmed chat's first message, set once). Changed only
+  // through `ui/brief-origin.ts`. Start over resets it with the remount. Never in `SearchBrief`.
+  const [briefOrigin, setBriefOrigin] = useState<BriefOrigin>(INITIAL_BRIEF_ORIGIN);
   // The user's pins and omits (TR-21), two lists of Record IDs. They survive brief edits.
   const [overrides, setOverrides] = useState<Overrides>(NO_OVERRIDES);
   // Pins the last brief change removed because those rows stopped matching, for a notice on Results.
   const [unpinned, setUnpinned] = useState<string[]>([]);
   // The intro drafts (TR-49), by Record ID, as the user left them. Here, so Start over and a new
-  // file clear them through the remount; TR-52 will export them. Never stored or logged.
+  // file clear them through the remount; the export has them on its Intro drafts sheet (TR-52).
+  // Never stored or logged.
   const introDrafts = useIntroDrafts({ onUnavailable: turnAiOff, onSent: aiBudget.onSent, limitReached: !canUseAi(aiRequestCount) });
   // Counts workbook attempts, so a slow check can't override a newer choice.
   const attempt = useRef(0);
@@ -248,16 +242,17 @@ export function TranslatorWizard({
    * form's Continue and Confirm and rank in one go. The form becomes `briefToFormState(next)`, so
    * the criteria summary's editors and the form show it; the pending and confirmed brief become
    * `next` itself, and the results re-rank with the same `rank()`. Pins and omits are kept, as for
-   * any brief change, and pins that stop matching are reported (TR-21).
+   * any brief change, and pins that stop matching are reported (TR-21). `firstRequest` is that
+   * chat's first user message; only the session's first confirm records it (TR-52).
    */
-  function confirmAiBrief(next: SearchBrief) {
+  function confirmAiBrief(next: SearchBrief, firstRequest: string | null) {
     const form = briefToFormState(next);
     setCriteriaForm(form);
     setPendingBrief(next);
     setPendingForm(form);
     setUnpinned([]);
     setConfirmedBrief(next);
-    setBriefSource("ai");
+    setBriefOrigin((origin) => confirmedFromAi(origin, firstRequest));
   }
 
   /**
@@ -351,14 +346,14 @@ export function TranslatorWizard({
               setPendingBrief(next);
               setPendingForm(form);
               setConfirmedBrief(null);
-              setBriefSource("form");
+              setBriefOrigin(confirmedFromForm);
               setDone(new Set<StepId>(["upload", "preview", "criteria"]));
               focusHeading.current = true;
               setCurrent("results");
             }}
-            onConfirmProposal={(next) => {
+            onConfirmProposal={(next, firstRequest) => {
               // The brief ranked is the proposal as shown on the card, unchanged.
-              confirmAiBrief(next);
+              confirmAiBrief(next, firstRequest);
               setDone(new Set<StepId>(["upload", "preview", "criteria"]));
               focusHeading.current = true;
               setCurrent("results");
@@ -389,6 +384,8 @@ export function TranslatorWizard({
               setCriteriaForm(form);
               setPendingForm(form);
               setPendingBrief(next);
+              // An AI brief changed by hand is reported as "AI chat, then edited" (TR-52).
+              setBriefOrigin((origin) => savedInSummary(origin, confirmedBrief ?? pendingBrief, next));
               // With results showing, the edit re-ranks straight away. The overrides are kept.
               if (confirmedBrief) {
                 setUnpinned([]);
@@ -410,7 +407,14 @@ export function TranslatorWizard({
             }}
           />
         ) : step.id === "export" && results && importSummary && source ? (
-          <ExportStep results={results} mapping={mapping} counts={buildCounts(importSummary, results)} source={source} />
+          <ExportStep
+            results={results}
+            mapping={mapping}
+            counts={buildCounts(importSummary, results)}
+            source={source}
+            briefOrigin={briefOrigin}
+            introDrafts={introDrafts.drafts}
+          />
         ) : (
           <p className="mt-3 text-base text-muted">This step isn’t built yet.</p>
         )}

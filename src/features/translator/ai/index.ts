@@ -21,6 +21,7 @@ export {
   interpretAiResult,
   aiTurnedOff,
   fallbackBrief,
+  firstUserMessage,
   isAddedNote,
   shouldSwitchToForm,
   latestAnnouncement,
@@ -44,6 +45,7 @@ export {
   introReducer,
   placeholderCount,
 } from "./intro-session";
+export { PROMPT_VERSION } from "./instructions";
 export { MAX_MESSAGES, MAX_USER_MESSAGE_CHARS } from "./request-schema";
 export { buildFileSummary } from "./summary";
 export type { AiRequest, AiResponse, ChatMessage, FileSummary } from "./types";

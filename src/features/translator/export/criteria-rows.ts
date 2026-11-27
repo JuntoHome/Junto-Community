@@ -29,6 +29,27 @@ export type ExportSource = {
   sha256: AllowedWorkbook["sha256"];
 };
 
+/**
+ * How the brief was made (TR-52), as the wizard holds it (`ui/brief-origin.ts`), passed in as
+ * plain values so this file stays pure.
+ */
+export type ExportBriefOrigin = {
+  /** "ai": confirmed on an AI proposal card; "form": the form. */
+  briefSource: "ai" | "form";
+  /** An AI brief was then changed by a Save in the criteria summary. */
+  editedAfterAi: boolean;
+  /** The user's first chat message of the first confirmed conversation, as typed. */
+  firstAiRequest: string | null;
+  /** `PROMPT_VERSION` (TR-41): which AI rules produced the brief. */
+  aiRulesVersion: string;
+};
+
+/** "What you asked for" is cut to this many characters, then an ellipsis is added. */
+export const MAX_ASKED_FOR_CHARS = 300;
+
+/** Added after "What you asked for" when it was cut: the single ellipsis character (U+2026). */
+export const CUT_MARK = "…";
+
 /** One row: what it is, and the details. Either can be "". */
 export type CriteriaRow = readonly [label: string, value: string];
 
@@ -47,6 +68,12 @@ export const CRITERIA_TEXT = {
   sheet: "Sheet",
   sha256: "SHA-256",
   criteria: "Criteria",
+  setBy: "Criteria set by",
+  setByForm: "Form",
+  setByAi: "AI chat",
+  setByAiEdited: "AI chat, then edited",
+  askedFor: "What you asked for",
+  aiRulesVersion: "AI rules version",
   scoring: "Scoring",
   scoringVersion: "Scoring version",
   weightsMode: "Weights mode",
@@ -95,6 +122,36 @@ function percent(part: number, total: number): string {
   return String(Math.round((part / total) * 1000) / 10);
 }
 
+/** Line breaks, with any spaces or tabs around them. */
+const LINE_BREAKS = /[ \t]*(?:\r\n|\r|\n)+[ \t]*/g;
+
+/**
+ * The user's first chat message on one line: trimmed, each run of line breaks (and the spaces
+ * around it) turned into one space, then cut to `MAX_ASKED_FOR_CHARS` characters with
+ * `CUT_MARK` added when it was longer. Code points are counted, so an emoji is never cut in
+ * half. Nothing else changes: text such as `=SUM(1,1)` stays as typed (the cell is literal text).
+ */
+export function askedForText(message: string): string {
+  const oneLine = message.trim().replace(LINE_BREAKS, " ");
+  const chars = Array.from(oneLine);
+  return chars.length > MAX_ASKED_FOR_CHARS ? `${chars.slice(0, MAX_ASKED_FOR_CHARS).join("")}${CUT_MARK}` : oneLine;
+}
+
+/**
+ * How the criteria were set (TR-52), placed after the brief's lines: always "Criteria set by";
+ * for an AI brief also "What you asked for" (when there is a first request) and "AI rules version".
+ */
+function originRows(origin: ExportBriefOrigin): CriteriaRow[] {
+  if (origin.briefSource === "form") return [[CRITERIA_TEXT.setBy, CRITERIA_TEXT.setByForm]];
+  const rows: CriteriaRow[] = [
+    [CRITERIA_TEXT.setBy, origin.editedAfterAi ? CRITERIA_TEXT.setByAiEdited : CRITERIA_TEXT.setByAi],
+  ];
+  const askedFor = origin.firstAiRequest === null ? "" : askedForText(origin.firstAiRequest);
+  if (askedFor !== "") rows.push([CRITERIA_TEXT.askedFor, askedFor]);
+  rows.push([CRITERIA_TEXT.aiRulesVersion, origin.aiRulesVersion]);
+  return rows;
+}
+
 function scoringRows(rankResult: RankResult): CriteriaRow[] {
   const ordered = (rankResult.brief.priorityOrder ?? []).length > 0;
   const rows: CriteriaRow[] = [
@@ -132,13 +189,15 @@ function overrideRows(rankResult: RankResult): CriteriaRow[] {
 
 /**
  * The Criteria sheet's sections for one ranking run, in order: title and synthetic note, Created,
- * Source file, Criteria, Scoring, Counts, Overrides, Technical.
+ * Source file, Criteria (ending with how they were set), Scoring, Counts, Overrides, Technical.
  *
  * - `counts`: `buildCounts()` for the same `rankResult`.
  * - `source`: the file the rows came from.
  * - `now`: when the file is made, shown in local time with its offset.
+ * - `origin`: how the brief was made (TR-52), see `originRows()`.
  *
- * Criteria are the brief's summary lines (`describeLines()`, as on screen). Weights show each
+ * Criteria are the brief's summary lines (`describeLines()`, as on screen), then how they were
+ * set: "Criteria set by", and for an AI brief "What you asked for" and "AI rules version". Weights show each
  * active dimension's points and its share of the total. The brief is also written out as JSON,
  * so the run can be repeated exactly.
  */
@@ -147,11 +206,13 @@ export function criteriaTable({
   counts,
   source,
   now,
+  origin,
 }: {
   rankResult: RankResult;
   counts: Counts;
   source: ExportSource;
   now: Date;
+  origin: ExportBriefOrigin;
 }): CriteriaSection[] {
   return [
     {
@@ -173,7 +234,10 @@ export function criteriaTable({
     },
     {
       heading: CRITERIA_TEXT.criteria,
-      rows: describeLines(rankResult.brief).map((line): CriteriaRow => [SECTION_NAMES[line.section], line.text]),
+      rows: [
+        ...describeLines(rankResult.brief).map((line): CriteriaRow => [SECTION_NAMES[line.section], line.text]),
+        ...originRows(origin),
+      ],
     },
     { heading: CRITERIA_TEXT.scoring, rows: scoringRows(rankResult) },
     { heading: CRITERIA_TEXT.counts, rows: describeCounts(counts).map((line): CriteriaRow => ["", line.text]) },
