@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { beforeAll, describe, expect, it } from "vitest";
+import { AI_CONVERSATIONS } from "../__fixtures__/ai-conversations";
 import { toArrayBuffer } from "../__fixtures__/build-workbook";
 import { createScriptedAi, type FakeAi, loadAiScript } from "../__fixtures__/fake-ai";
 import { confirmAiProposal, goldenRows, type LoadedFile, loadFile } from "../__fixtures__/pipeline";
@@ -88,15 +89,11 @@ async function converse(
   return { turns, state };
 }
 
-const BUSINESS_OWNER_MESSAGES = [
-  "I sell welding supplies, looking for customers in Phoenix",
-  "Owners, please",
-  "10 to 99 employees, and 40 businesses",
-] as const;
+const BUSINESS_OWNER_MESSAGES = AI_CONVERSATIONS.businessOwner.messages;
 
 /** The business owner conversation with a fresh fake, its proposal confirmed and ranked. */
 async function businessOwnerConfirmed() {
-  const ai = createScriptedAi(loadAiScript("business-owner"));
+  const ai = createScriptedAi(loadAiScript(AI_CONVERSATIONS.businessOwner.script));
   const conversation = await converse(ai, BUSINESS_OWNER_MESSAGES);
   const proposal = proposalOf(conversation, "business owner conversation");
   return { ai, ...conversation, proposal, ...confirmAiProposal(proposal, file) };
@@ -152,8 +149,8 @@ describe("role change: prefer operations managers instead", () => {
   let proposal: SearchBrief;
   beforeAll(async () => {
     before = await businessOwnerConfirmed();
-    ai = createScriptedAi(loadAiScript("role-change"));
-    const conversation = await converse(ai, ["prefer operations managers instead"], { mode: "revise", base: before.confirmedBrief });
+    ai = createScriptedAi(loadAiScript(AI_CONVERSATIONS.roleChange.script));
+    const conversation = await converse(ai, AI_CONVERSATIONS.roleChange.messages, { mode: "revise", base: before.confirmedBrief });
     proposal = proposalOf(conversation, "role change");
   });
 
@@ -197,8 +194,8 @@ describe("job seeker: logistics employers in Tempe", () => {
   let turns: InterviewTurn[];
   let proposal: SearchBrief;
   beforeAll(async () => {
-    ai = createScriptedAi(loadAiScript("job-seeker"));
-    const conversation = await converse(ai, ["looking for logistics employers in Tempe", "operations managers, 10 to 99 employees, 30 of them"]);
+    ai = createScriptedAi(loadAiScript(AI_CONVERSATIONS.jobSeeker.script));
+    const conversation = await converse(ai, AI_CONVERSATIONS.jobSeeker.messages);
     turns = conversation.turns;
     proposal = proposalOf(conversation, "job seeker conversation");
   });
@@ -219,8 +216,8 @@ describe("job seeker: logistics employers in Tempe", () => {
 
 describe("ambiguous answer: Phoenix area", () => {
   it("gets a choice question naming 2 to 4 cities from the summary, no proposal and nothing to rank", async () => {
-    const ai = createScriptedAi(loadAiScript("ambiguous"));
-    const { turns, state } = await converse(ai, ["Phoenix area"]);
+    const ai = createScriptedAi(loadAiScript(AI_CONVERSATIONS.ambiguous.script));
+    const { turns, state } = await converse(ai, AI_CONVERSATIONS.ambiguous.messages);
     const [turn] = turns;
 
     expect(turn.proposal).toBeNull();
@@ -240,8 +237,8 @@ describe("ambiguous answer: Phoenix area", () => {
 
 describe("values checked against the file", () => {
   it("drops a proposal for Flagstaff, which isn't in the file, with the note", async () => {
-    const ai = createScriptedAi(loadAiScript("not-in-file"));
-    const { turns, state } = await converse(ai, ["customers in Flagstaff"]);
+    const ai = createScriptedAi(loadAiScript(AI_CONVERSATIONS.notInFile.script));
+    const { turns, state } = await converse(ai, AI_CONVERSATIONS.notInFile.messages);
 
     expect(turns[0].proposal).toBeNull();
     expect(turns[0].note).toBe(`I couldn't use "Flagstaff" because it's not in this file.`);
@@ -250,8 +247,8 @@ describe("values checked against the file", () => {
   });
 
   it("accepts Scottsdale (99 rows in the sample), written as the summary spells it (control)", async () => {
-    const ai = createScriptedAi(loadAiScript("not-in-file"));
-    const { turns } = await converse(ai, ["customers in Scottsdale"]);
+    const ai = createScriptedAi(loadAiScript(AI_CONVERSATIONS.inFile.script));
+    const { turns } = await converse(ai, AI_CONVERSATIONS.inFile.messages);
 
     expect(summary.cities).toContainEqual({ value: "Scottsdale", count: 99 });
     expect(turns[0].note).toBeNull();

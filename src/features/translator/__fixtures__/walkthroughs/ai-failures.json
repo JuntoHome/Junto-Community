@@ -1,0 +1,8 @@
+{
+  "description": "Failures (TR-54): the AI times out on \"show 30 businesses\", and answers in the wrong format to \"show something odd\" and to the app's one retry after it.",
+  "steps": [
+    { "whenUserSays": { "pattern": "^show 30 businesses$", "flags": "i" }, "reply": "timeout" },
+    { "whenUserSays": { "pattern": "^show something odd$", "flags": "i" }, "reply": "invalid" },
+    { "whenUserSays": { "pattern": "^Your last reply didn't match the required format" }, "reply": "invalid" }
+  ]
+}
