@@ -4,6 +4,7 @@
  */
 export {
   buildChatRequest,
+  withheldNote,
   canSend,
   changesAnnouncement,
   CHAT_TEXT,

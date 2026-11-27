@@ -8,6 +8,7 @@ import {
   interpretAiResult,
   REVISE_TEXT,
   settleRevision,
+  withheldNote,
 } from "../ai/chat-session";
 import { handleAiRequest, type AiRouteDeps } from "../ai/handle-request";
 import type { IntroFields } from "../ai/intro";
@@ -117,21 +118,28 @@ export type ChatDriver = {
 
 /**
  * A chat panel on the Criteria step (`criteria`, `base` the pending brief) or the Results step
- * (`revise`, `base` the confirmed brief), sending through `harness`.
+ * (`revise`, `base` the confirmed brief), sending through `harness`. `summary` is a fixed summary,
+ * or, as the hook does it, a function that builds one for the brief being sent
+ * (`(brief) => buildFileSummary(records, layout, brief)`, fix B).
  */
 export function createChatDriver(
   harness: RouteHarness,
-  summary: FileSummary,
+  summary: FileSummary | ((currentBrief: SearchBrief | undefined) => FileSummary),
   { mode = "criteria", base = null }: { mode?: ChatMode; base?: SearchBrief | null } = {},
 ): ChatDriver {
   let state = initialChatState(mode === "revise" ? REVISE_TEXT.opening : undefined);
+  let lastNote: string | null = null;
 
   async function sendDraft(): Promise<ChatState> {
     const sending = chatReducer(state, { type: "send", text: state.draft });
     if (sending === state) throw new Error("The chat can't send this message (canSend is false).");
     state = sending;
     const currentBrief = currentBriefFor(sending, base, mode);
-    const result = await postAi(harness.fetch, buildChatRequest(sending, summary, currentBrief), new AbortController().signal);
+    const summaryNow = typeof summary === "function" ? summary(currentBrief) : summary;
+    const note = withheldNote(currentBrief, summaryNow);
+    if (note !== null && note !== lastNote) state = chatReducer(state, { type: "add-note", content: note });
+    lastNote = note;
+    const result = await postAi(harness.fetch, buildChatRequest(sending, summaryNow, currentBrief), new AbortController().signal);
     throwAiErrors(harness);
     if (result.kind === "aborted") throw new Error("The request was aborted.");
     const outcome = interpretAiResult(result);

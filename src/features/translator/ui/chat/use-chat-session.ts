@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useReducer, useRef } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import type { SearchBrief } from "../../criteria/schema";
 import {
   buildChatRequest,
@@ -16,13 +16,16 @@ import {
   interpretAiResult,
   postAi,
   settleRevision,
+  withheldNote,
 } from "../../ai";
 import type { GroupedRecord } from "../../normalize/duplicates";
 
 /**
  * The chat's state and its one network call (TR-44). A thin wrapper: every rule is in
  * `ai/chat-session.ts`. State lives in React only: nothing is stored, logged or put in the URL.
- * The request carries only the file summary, the chat and the current brief (`buildChatRequest`).
+ * The request carries only the file summary, the chat and the current brief (`buildChatRequest`),
+ * the brief cut to the values the summary holds; the summary is built per message with that brief
+ * (fix B), and a note says once which of the user's values the AI can't see.
  *
  * The request is aborted on Start over chat and when the panel unmounts (switching to the form,
  * or leaving the step), so a late reply never shows up. The reducer also drops any reply whose
@@ -73,10 +76,10 @@ export function useChatSession({
   limitReached?: boolean;
 }) {
   const [state, dispatch] = useReducer(chatReducer, opening, initialChatState);
-  // Built once per file: the same records always give the same summary.
-  const summary = useMemo(() => buildFileSummary(records, layout), [records, layout]);
   // The request in flight, if any. Set at once, so a double click can't send twice.
   const inFlight = useRef<AbortController | null>(null);
+  // The withheld-values note last added to this chat (fix B), so it is added once, not per message.
+  const lastNote = useRef<string | null>(null);
 
   useEffect(() => () => inFlight.current?.abort(), []);
 
@@ -87,6 +90,12 @@ export function useChatSession({
     const sending = chatReducer(state, action);
     dispatch(action);
     const currentBrief = currentBriefFor(sending, getCurrentBrief(), mode);
+    // Built with the brief it goes with, so the summary holds every value the brief uses that the
+    // file really has (fix B). The same records and brief always give the same summary.
+    const summary = buildFileSummary(records, layout, currentBrief);
+    const note = withheldNote(currentBrief, summary);
+    if (note !== null && note !== lastNote.current) dispatch({ type: "add-note", content: note });
+    lastNote.current = note;
 
     const controller = new AbortController();
     inFlight.current = controller;
@@ -104,6 +113,7 @@ export function useChatSession({
   function resetChat() {
     inFlight.current?.abort();
     inFlight.current = null;
+    lastNote.current = null;
     dispatch({ type: "reset" });
   }
 

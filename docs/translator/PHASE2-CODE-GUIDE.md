@@ -27,6 +27,7 @@ src/
       instructions.ts     # Capability: interview + intro instructions (system prompts), PROMPT_VERSION (TR-41)
       schema.ts           # Capability: the AI's reply shape (reuses searchBriefSchema) + the transport schema for OpenAI. The request is in request-schema.ts (TR-42)
       validate.ts         # Capability: check AI output, "value must exist in the file" (TR-42)
+      brief-for-ai.ts     # Capability: the current brief as the AI may see it. briefForAi (browser), briefFitsSummary (route) (fix B)
       interview.ts        # Capability: run one interview turn (instructions + call + validate)
       intro.ts            # Capability: pick the six intro fields (pickIntroFields, introFieldsSchema) + run the intro draft (TR-48)
       diff-brief.ts       # Capability: what changed between two briefs. diffBriefs, chipMarks, DIFF_TEXT (TR-46; TR-47 reuses it)
@@ -35,7 +36,7 @@ src/
       session-limit.ts    # Capability: the browser's 40 requests per session. canUseAi, remaining, limitNotice (TR-51)
       post-ai.ts          # Capability: one request to the route, classified (postAi), and the failure simulation's failingFetch (TR-50)
       fallback.ts         # Capability: the message and buttons for each failure kind. failureMessage, failureActions, FALLBACK_TEXT (TR-50)
-      chat-session.ts     # Capability: the chat's rules. chatReducer, buildChatRequest, canSend, interpretAiResult, fallbackBrief, shouldSwitchToForm, aiTurnedOff, firstUserMessage, CHAT_TEXT (TR-44, TR-50, TR-52)
+      chat-session.ts     # Capability: the chat's rules. chatReducer, buildChatRequest, withheldNote, canSend, interpretAiResult, fallbackBrief, shouldSwitchToForm, aiTurnedOff, firstUserMessage, CHAT_TEXT (TR-44, TR-50, TR-52, fix B)
       guardrails.ts       # Capability: limits (withTimeout, AI_ATTEMPT_TIMEOUT_MS, AI_REQUEST_TIMEOUT_MS), sanitising values (sanitizeSummaryValue), cleaning AI text (cleanAiText, cutText), stripping invented contacts
       index.ts            # Public exports for the UI (types + pure helpers only, never client.ts). Built in TR-44
     criteria/
@@ -112,6 +113,8 @@ Rules:
 - **`truncated` has a `states` flag** as well as `cities`, `industries` and `titles`. Issue #83's type had no `states` flag, but states are capped at 100 too, and without a flag a bad file could lose values silently. Later tickets use the schema, not the issue's type.
 - **No `Infinity`.** `employees.min` and `max` use finite bounds only, because `JSON.stringify(Infinity)` is `null`.
 - **It reuses `fieldOptions()`** for the four lists and never recounts. What the summary holds, its caps, sorting and dropped values: [README.md](README.md#the-file-summary).
+- **Only what the summary can carry exactly** (fix B). A value is listed only when its cleaned text still has its own match key, so one that would be cut or changed is left out, never shortened. `buildFileSummary(records, layout, currentBrief)` always lists the current brief's values (in place of the least common), and the chat builds the summary per message with the brief it sends.
+- **The current brief obeys the same wall** (fix B, `ai/brief-for-ai.ts`). `buildChatRequest()` sends `briefForAi(currentBrief, summary).brief`: only values the summary holds, assumptions within the limits. `withheldNote()` gives the chat's note naming what was left out. The route refuses any other `currentBrief` with `briefFitsSummary()`. Never send a brief value to the AI any other way.
 - **Adding a field to the summary** changes what leaves the browser: update the README's [What is sent to the AI](README.md#what-is-sent-to-the-ai) table, and never add a row-level field.
 
 ### The intro fields (`ai/intro.ts`)

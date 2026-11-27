@@ -194,7 +194,8 @@ describe("Change one thing through chat", () => {
     const { state, request, calls } = await reviseTurn(confirmed, opsManager);
 
     expect(Object.keys(request).sort()).toEqual(["currentBrief", "kind", "messages", "summary"]);
-    expect(request.currentBrief).toBe(confirmed);
+    // A checked copy (fix B): every value is in the summary, so nothing is taken out.
+    expect(request.currentBrief).toStrictEqual(confirmed);
     expect(request.messages[0]).toEqual({ role: "assistant", content: "Want to change something? Tell me." });
     expect(calls[0].instructions).toContain('"value":"Owner"');
 

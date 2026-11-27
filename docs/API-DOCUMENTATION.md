@@ -64,7 +64,7 @@ type SummaryValue = { value: string; count: number };   // value 1 to 80 charact
 - `intro` holds exactly the six intro fields, picked in the browser by `pickIntroFields()` ([translator/README.md](translator/README.md#the-intro-draft)). The schema is **strict**: any other key (for example `phone`), a missing field, an empty or missing `company`, a value over 120 characters, or a value that looks like contact data (the summary's rule) gives `400`.
 - `intent`: `business_owner` (a business introduction) or `job_seeker` (an informational-interview request). Required.
 - `messages`: 1 to 30. Each `content` has text in it (it is trimmed).
-- `currentBrief`, when given, must be a valid `SearchBrief` ([translator/README.md](translator/README.md#criteria-schema)).
+- `currentBrief`, when given, must be a valid `SearchBrief` ([translator/README.md](translator/README.md#criteria-schema)) whose every city, state, industry and title value is in that request's `summary` (compared by match key), with at most 5 assumptions of at most 200 characters, none looking like contact data (`briefFitsSummary()` in `ai/brief-for-ai.ts`, fix B). The browser sends only such a brief; anything else gives `400`.
 - `goal` (intro, optional): the user's own note, at most 300 characters (trimmed; a blank note is left out). It is sent to the AI as data, after the facts.
 
 **Limits:**
@@ -109,7 +109,7 @@ The checks run in this order; the first that fails answers.
 | 3 | 503 | The AI assistant is not available right now. Use the form instead. | `OPENAI_API_KEY` not set, or `TRANSLATOR_AI` is `off` | |
 | 4 | 400 | The request couldn't be read. Refresh the page and try again. | `Content-Type` isn't `application/json` | `translator_ai_bad_request` |
 | 5 | 413 | This request is too large. Start a new chat and try again. | Body over 100 KB | |
-| 6 | 400 | The request couldn't be read. Refresh the page and try again. | Not JSON, or not the shape above (unknown `kind`, a `system` message, an unknown key, an invalid `currentBrief`, a `summary` that isn't a valid `FileSummary`, an `intro` that isn't valid `IntroFields`, a missing or unknown `intent`) | `translator_ai_bad_request` |
+| 6 | 400 | The request couldn't be read. Refresh the page and try again. | Not JSON, or not the shape above (unknown `kind`, a `system` message, an unknown key, an invalid `currentBrief`, a `currentBrief` with a value the `summary` doesn't hold or an assumption that breaks the limits, a `summary` that isn't a valid `FileSummary`, an `intro` that isn't valid `IntroFields`, a missing or unknown `intent`) | `translator_ai_bad_request` |
 | 7 | 413 | This conversation is too long. Start a new chat to keep going. | More than 30 messages, or an assistant message over 4,000 characters | |
 | 8 | 413 | Your message is too long. Keep it under 1,000 characters. | A user message over 1,000 characters | |
 | 8 | 413 | Keep your note under 300 characters. | The intro `goal` over 300 characters | |

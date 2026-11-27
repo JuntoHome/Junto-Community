@@ -131,6 +131,55 @@ it("privacy: interview requests never contain row data", async () => {
   expect(requests).toBe(3 * Object.values(AI_CONVERSATIONS).reduce((n, c) => n + c.messages.length, 0));
 });
 
+it("privacy: the current criteria never carry a value the summary doesn't hold", async () => {
+  // Invented rows: a title column that holds an email on one row and an 85-character title on
+  // another. The form's pickers offer both, uncleaned; the summary holds neither.
+  const longTitle = `Director of ${"Regional ".repeat(8)}Operations`.slice(0, 85);
+  const { workbook, grouping } = await importRows(
+    syntheticSheet([syntheticRow(1), syntheticRow(2, { Title: "jane@example.invalid" }), syntheticRow(3, { Title: longTitle })]),
+  );
+  const records = grouping.records;
+  const summaryFor = (brief?: Parameters<typeof buildFileSummary>[2]) => buildFileSummary(records, workbook.layout.id, brief);
+  // A form brief (the pending brief) that leaves out both titles.
+  const formBrief = {
+    ...BUSINESS_OWNER_BRIEF,
+    exclusions: [{ field: "title" as const, operator: "in" as const, value: ["jane@example.invalid", longTitle] }],
+  };
+
+  const ai = createScriptedAi(loadAiScript(AI_CONVERSATIONS.ambiguous.script));
+  const harness = createRouteHarness(ai);
+  const chat = createChatDriver(harness, summaryFor, { base: formBrief });
+  const state = await chat.send(AI_CONVERSATIONS.ambiguous.messages[0]);
+
+  // Neither value left the browser, in the brief or anywhere else, and the route accepted it.
+  expect(harness.responses.map((response) => response.status)).toEqual([200]);
+  expect(JSON.parse(harness.bodies[0]).currentBrief.exclusions).toEqual([]);
+  for (const text of everythingSent(harness, [ai])) {
+    expect(text).not.toContain("jane@");
+    expect(text).not.toContain(longTitle);
+  }
+  // The chat says once which values the AI can't see.
+  const notes = state.items.filter((item) => item.role === "note").map((item) => item.content);
+  expect(notes).toHaveLength(1);
+  expect(notes[0]).toContain('"jane@example.invalid"');
+
+  // A request made by hand with the email in the brief is refused before the AI is called.
+  const crafted = await harness.fetch("/api/translator/ai", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      kind: "interview",
+      summary: summaryFor(),
+      messages: [{ role: "user", content: "Phoenix area" }],
+      currentBrief: formBrief,
+    }),
+  });
+  expect(crafted.status).toBe(400);
+  expect(ai.calls).toHaveLength(1);
+  expect(consoleError).toHaveBeenCalledWith("translator_ai_bad_request");
+  consoleError.mockClear();
+});
+
 it("privacy: interview requests hold only kind, summary and messages, plus currentBrief", async () => {
   const [synthetic] = files;
   for (const conversation of [AI_CONVERSATIONS.businessOwner, AI_CONVERSATIONS.roleChange]) {

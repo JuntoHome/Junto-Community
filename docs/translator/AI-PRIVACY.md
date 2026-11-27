@@ -10,7 +10,7 @@ Your file is read, ranked and exported in your web browser, by ordinary code wit
 
 We send a short summary: the number of businesses, the cities, states, industries and job titles with a count for each, the range of company sizes and how many have one, the file's layout, and whether a list was cut short. **No business names, people's names, phone numbers, emails, websites, addresses, ZIP codes or record IDs from your file are sent.** Values that look like emails, phone numbers or websites are left out.
 
-We also send what you type, as typed, the AI's replies and your criteria once there are some: don't type personal details you don't want sent.
+We also send what you type, as typed, the AI's replies and your criteria once there are some (only values that are in the summary): don't type personal details you don't want sent.
 
 ## When you draft an intro
 
