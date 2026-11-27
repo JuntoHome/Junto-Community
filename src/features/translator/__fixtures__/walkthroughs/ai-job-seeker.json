@@ -1,0 +1,33 @@
+{
+  "description": "Job seeker walkthrough (TR-53): looking for logistics employers in Tempe. One follow-up question, then the job seeker brief from criteria/examples.ts.",
+  "steps": [
+    {
+      "whenUserSays": { "pattern": "^looking for logistics employers in Tempe$", "flags": "i" },
+      "reply": {
+        "message": "Who would you like to reach at those employers, what size of company suits you, and how many employers should the list have?",
+        "proposal": null
+      }
+    },
+    {
+      "whenUserSays": { "pattern": "^operations managers, 10 to 99 employees, 30 of them$", "flags": "i" },
+      "reply": {
+        "message": "Here's what I understood: logistics employers in Tempe, AZ, preferring operations managers and 10 to 99 employees, with 30 in the list.",
+        "proposal": {
+          "intent": "job_seeker",
+          "mustHaves": [
+            { "field": "city", "operator": "equals", "value": "Tempe" },
+            { "field": "state", "operator": "equals", "value": "AZ" }
+          ],
+          "preferences": [
+            { "field": "industry", "operator": "equals", "value": "Logistics" },
+            { "field": "title", "operator": "equals", "value": "Operations Manager" },
+            { "field": "employees", "operator": "range", "value": { "min": 10, "max": 99 } }
+          ],
+          "exclusions": [],
+          "listSize": 30,
+          "assumptions": []
+        }
+      }
+    }
+  ]
+}

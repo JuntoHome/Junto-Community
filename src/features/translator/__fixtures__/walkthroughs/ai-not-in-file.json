@@ -1,0 +1,47 @@
+{
+  "description": "Values checked against the file (TR-53): Flagstaff is not in the sample, so the proposal is dropped with the note; Scottsdale is (99 rows), so it is accepted, written as the summary spells it.",
+  "steps": [
+    {
+      "whenUserSays": { "pattern": "^customers in Flagstaff$", "flags": "i" },
+      "reply": {
+        "message": "Here's what I understood: businesses in Flagstaff, AZ, preferring fabrication, owners and 10 to 99 employees, with 40 in the list.",
+        "proposal": {
+          "intent": "business_owner",
+          "mustHaves": [
+            { "field": "city", "operator": "equals", "value": "Flagstaff" },
+            { "field": "state", "operator": "equals", "value": "AZ" }
+          ],
+          "preferences": [
+            { "field": "industry", "operator": "equals", "value": "Fabrication" },
+            { "field": "title", "operator": "equals", "value": "Owner" },
+            { "field": "employees", "operator": "range", "value": { "min": 10, "max": 99 } }
+          ],
+          "exclusions": [],
+          "listSize": 40,
+          "assumptions": []
+        }
+      }
+    },
+    {
+      "whenUserSays": { "pattern": "^customers in Scottsdale$", "flags": "i" },
+      "reply": {
+        "message": "Here's what I understood: businesses in Scottsdale, AZ, preferring fabrication, owners and 10 to 99 employees, with 40 in the list.",
+        "proposal": {
+          "intent": "business_owner",
+          "mustHaves": [
+            { "field": "city", "operator": "equals", "value": "scottsdale" },
+            { "field": "state", "operator": "equals", "value": "AZ" }
+          ],
+          "preferences": [
+            { "field": "industry", "operator": "equals", "value": "Fabrication" },
+            { "field": "title", "operator": "equals", "value": "Owner" },
+            { "field": "employees", "operator": "range", "value": { "min": 10, "max": 99 } }
+          ],
+          "exclusions": [],
+          "listSize": 40,
+          "assumptions": []
+        }
+      }
+    }
+  ]
+}
