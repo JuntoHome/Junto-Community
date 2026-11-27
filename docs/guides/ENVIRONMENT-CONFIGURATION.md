@@ -20,9 +20,9 @@ Every setting the app depends on: environment variables, and the settings that e
 
 `BUILT_AT` is set by `next.config.ts` at build time; don't set it yourself.
 
-The Translator's Phase 1 uses no environment variables. The three Phase 2 variables were added in TR-38. Since TR-39 they are read only in `src/features/translator/ai/client.ts`, used by the AI route `/api/translator/ai` and, since TR-43, by the `/admin/translator` page, which passes `aiEnabled()` to the UI as a boolean ([translator/PHASE2-CODE-GUIDE.md](../translator/PHASE2-CODE-GUIDE.md)). Chat with AI shows only when `OPENAI_API_KEY` is set and `TRANSLATOR_AI` is not `"off"`.
+The Translator's Phase 1 uses no environment variables. The three Phase 2 variables were added in TR-38. Since TR-39 they are read only in `src/features/translator/ai/client.ts`, used by the AI route `/api/translator/ai` and, since TR-43, by the `/admin/translator` page, which passes `aiEnabled()` to the UI as a boolean ([translator/PHASE2-CODE-GUIDE.md](../translator/PHASE2-CODE-GUIDE.md)). Chat with AI shows only when `OPENAI_API_KEY` is set and `TRANSLATOR_AI` is not `"off"`. How to run it locally: [translator/README.md](../translator/README.md#run-locally).
 
-The Translator's failure simulation (TR-50, `?aiFail=1`) reads `VERCEL_ENV`, which Vercel sets on every deployment (`production`, `preview` or `development`): there is nothing to configure. It works on previews and locally (where `VERCEL_ENV` is unset and `NODE_ENV` isn't `production`) and never in production. Also read only in `ai/client.ts` (`aiFailureSimulationAllowed()`); see [translator/README.md](../translator/README.md#when-the-ai-fails).
+The Translator's failure simulation (TR-50, `?aiFail=1`) reads `VERCEL_ENV`, which Vercel sets on every deployment (`production`, `preview` or `development`): there is nothing to configure. It works on previews and locally (where `VERCEL_ENV` is unset and `NODE_ENV` isn't `production`) and never in production. Also read only in `ai/client.ts` (`aiFailureSimulationAllowed()`); see [translator/README.md](../translator/README.md#simulate-a-failure).
 
 ### What happens when one is missing
 

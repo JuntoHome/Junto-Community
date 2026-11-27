@@ -2,7 +2,7 @@
 
 How to write the Translator's Phase 2 code (Chat with AI). Every Phase 2 ticket follows this guide.
 
-- **Status:** in progress. TR-38 set the rules, this guide, the environment variables and the `openai` dependency. TR-39 built the route and the files it needs: `types.ts`, `request-schema.ts`, `client.ts`, `guardrails.ts`, `handle-request.ts`, and placeholder `interview.ts` and `intro.ts`. TR-40 added `summary.ts` and `sanitizeSummaryValue()` in `guardrails.ts`. TR-41 added `instructions.ts`. TR-42 added `schema.ts` and `validate.ts`, made `interview.ts` real, and added `cleanAiText()` and `cutText()` to `guardrails.ts`. TR-43 made the admin page pass `aiEnabled` to the Criteria step (the chooser is in `ui/`, no new `ai/` files). TR-44 added `chat-session.ts`, `index.ts`, `ui/chat/chat-panel.tsx` and `ui/chat/use-chat-session.ts`. TR-46 added `diff-brief.ts` and the chat's revise mode (Results step). TR-47 added `explain-change.ts` and the `add-note` action in `chat-session.ts`. TR-48 made `intro.ts` real (`pickIntroFields()`, `introFieldsSchema`, `runIntroDraft()`) and added `stripInventedContacts()` to `guardrails.ts`. TR-49 added `intro-session.ts`, `ui/chat/intro-panel.tsx` and `ui/chat/use-intro-drafts.ts`. TR-50 added `post-ai.ts`, `fallback.ts`, `aiFailureSimulationAllowed()` in `client.ts` and `ui/simulation-banner.tsx`. TR-51 added `session-limit.ts`, `__fixtures__/fake-ai.ts` and the static safety tests in `__tests__/`. TR-53 added `createScriptedAi()` and `loadAiScript()` to `fake-ai.ts`, the `walkthroughs/ai-*.json` scripts, `loadFile()`, `confirmAiProposal()` and `goldenRows()` in `__fixtures__/pipeline.ts`, `ai/walkthroughs.test.ts` and the root `vitest.setup.ts`. TR-54 added `__fixtures__/ai-harness.ts`, `__fixtures__/ai-conversations.ts` and the safety evidence suite `__tests__/phase2-safety/`, and moved the TR-51 static tests into it. TR-52 added `firstUserMessage()` in `chat-session.ts`, the pure `ui/brief-origin.ts` and the export's AI rows and Intro drafts sheet (`export/intro-drafts-rows.ts`). TR-45 added `ui/chat/proposal-card.tsx`, the pure `criteria/to-form.ts` (`briefToFormState()`, `inFormShape()`) and `criteria/chips.ts`, and the `remove-chip` action and `PROPOSAL_TEXT` in `chat-session.ts`. The other files below are created by later tickets.
+- **Status:** built. Every Phase 2 ticket, TR-38 to TR-54, is merged into `translator`; TR-55 brought this guide in line with the code. Who built which file: TR-38 the rules, this guide, the environment variables and the `openai` dependency; TR-39 `types.ts`, `request-schema.ts`, `client.ts`, `guardrails.ts`, `handle-request.ts` and the route; TR-40 `summary.ts` and `sanitizeSummaryValue()`; TR-41 `instructions.ts`; TR-42 `schema.ts`, `validate.ts`, the real `interview.ts`, `cleanAiText()` and `cutText()`; TR-43 the `aiEnabled` prop and the chooser in `ui/`; TR-44 `chat-session.ts`, `index.ts`, `ui/chat/chat-panel.tsx` and `ui/chat/use-chat-session.ts`; TR-45 `ui/chat/proposal-card.tsx`, `criteria/to-form.ts`, `criteria/chips.ts`, the `remove-chip` action and `PROPOSAL_TEXT`; TR-46 `diff-brief.ts` and the chat's revise mode; TR-47 `explain-change.ts` and the `add-note` action; TR-48 the real `intro.ts` and `stripInventedContacts()`; TR-49 `intro-session.ts`, `ui/chat/intro-panel.tsx` and `ui/chat/use-intro-drafts.ts`; TR-50 `post-ai.ts`, `fallback.ts`, `aiFailureSimulationAllowed()` and `ui/simulation-banner.tsx`; TR-51 `session-limit.ts` and `__fixtures__/fake-ai.ts`; TR-52 `firstUserMessage()`, `ui/brief-origin.ts` and `export/intro-drafts-rows.ts`; TR-53 `createScriptedAi()`, `loadAiScript()`, the `walkthroughs/ai-*.json` scripts, `confirmAiProposal()` and `vitest.setup.ts`; TR-54 `__fixtures__/ai-harness.ts`, `__fixtures__/ai-conversations.ts` and the safety evidence suite `__tests__/phase2-safety/`, which now holds the TR-51 static checks.
 - **Rules:** the hard rules are in [../../CLAUDE.md](../../CLAUDE.md). What Phase 2 is, its flow and what is sent to the AI: [README.md](README.md#phase-2).
 - **Source:** the code guide in issue #81 (TR-38), with the corrections listed in [Changes from the issue's guide](#changes-from-the-issues-guide).
 
@@ -19,7 +19,8 @@ src/
     ai/                   # NEW. Pure logic, no React. One file per capability.
       types.ts            # Shared types: ChatMessage, AiRequest, AiResponse, IntroFields, AiCall. Re-exports FileSummary from summary.ts
       client.ts           # Server only. First line: import "server-only". The ONLY file that imports
-                          # "openai" and reads process.env. Exports aiEnabled(), aiModel(), createOpenAiCall().
+                          # "openai" and reads process.env. Exports aiEnabled(), aiFailureSimulationAllowed(),
+                          # aiModel(), createOpenAiCall().
       handle-request.ts   # The route's work: every check in order, run the capability, JSON reply (TR-39)
       request-schema.ts   # The request shape (aiRequestSchema) and its size limits (TR-39)
       summary.ts          # Capability: build the file summary (what the AI may see). fileSummarySchema, FileSummary (TR-40)
@@ -33,10 +34,18 @@ src/
       intro-session.ts    # Capability: the intro panel's rules. introReducer, buildIntroRequest, interpretIntroResult, placeholderCount, INTRO_PANEL_TEXT (TR-49)
       session-limit.ts    # Capability: the browser's 40 requests per session. canUseAi, remaining, limitNotice (TR-51)
       post-ai.ts          # Capability: one request to the route, classified (postAi), and the failure simulation's failingFetch (TR-50)
-      fallback.ts         # Capability: the message and buttons for each failure kind. FALLBACK_TEXT (TR-50)
-      chat-session.ts     # Capability: the chat's rules. chatReducer, buildChatRequest, canSend, interpretAiResult, fallbackBrief, CHAT_TEXT (TR-44, TR-50)
+      fallback.ts         # Capability: the message and buttons for each failure kind. failureMessage, failureActions, FALLBACK_TEXT (TR-50)
+      chat-session.ts     # Capability: the chat's rules. chatReducer, buildChatRequest, canSend, interpretAiResult, fallbackBrief, shouldSwitchToForm, aiTurnedOff, firstUserMessage, CHAT_TEXT (TR-44, TR-50, TR-52)
       guardrails.ts       # Capability: limits (withTimeout, AI_ATTEMPT_TIMEOUT_MS, AI_REQUEST_TIMEOUT_MS), sanitising values (sanitizeSummaryValue), cleaning AI text (cleanAiText, cutText), stripping invented contacts
       index.ts            # Public exports for the UI (types + pure helpers only, never client.ts). Built in TR-44
+    criteria/
+      to-form.ts          # briefToFormState(), inFormShape(): a brief back to form state (TR-45). Pure
+      chips.ts            # briefChips(), removeChip(): the proposal card's chips (TR-45). Pure
+    export/
+      intro-drafts-rows.ts  # The Intro drafts sheet (TR-52); the AI rows of the Criteria sheet are in criteria-rows.ts
+    ui/
+      brief-origin.ts     # How the confirmed brief was made, for the export (TR-52). Pure, no React
+      simulation-banner.tsx # The ?aiFail=1 banner (TR-50)
     ui/chat/              # NEW. React only. No business rules here.
       chat-panel.tsx      # Render and forward only (TR-44)
       proposal-card.tsx   # "Here's what I understood": chips, Confirm and rank, Keep chatting, Edit in form. Render only (TR-45)
@@ -52,6 +61,10 @@ src/
       walkthroughs/ai-*.json  # The AI scripts (TR-53), next to the TR-30 golden files
       ai-conversations.ts # The user's side of the TR-53 conversations (TR-54)
       ai-harness.ts       # The browser and the route together: createRouteHarness(), createChatDriver(), requestIntro() (TR-54)
+    __tests__/
+      source-files.ts     # Reads the Translator's source for the static checks
+      phase2-safety/      # The safety evidence suite (TR-54): failure, privacy, injection, determinism, guardrails
+vitest.setup.ts           # At the repo root: importing the openai SDK fails any test (TR-53)
 ```
 
 ## 2. Layers and who may call whom
@@ -89,7 +102,7 @@ Rules:
 - **12 seconds per attempt, 25 per request (TR-42).** The SDK client gets `timeout: AI_ATTEMPT_TIMEOUT_MS` (12 s) and `maxRetries: 0`. The SDK retries twice by default, which would blow the budget. Each capability wraps every attempt in `withTimeout(..., AI_ATTEMPT_TIMEOUT_MS)`, and `handle-request.ts` wraps the whole capability, the interview's one retry included, in `withTimeout(..., AI_REQUEST_TIMEOUT_MS)` (25 s), so the limits hold even if the SDK misbehaves, and tests can check them with fake timers. The route exports `maxDuration = 30` for Vercel.
 - **Structured output (TR-42).** `AiCall`'s `format` is `"text"` or `{ name: "interview_reply"; schema }`. For the second, `client.ts` sends `text: { format: { type: "json_schema", name, schema, strict: true } }` in the Responses API it already uses. A refusal (a `refusal` part instead of text) or an empty reply gives `{ ok: false, code: "empty" }`.
 - **Nothing stored at OpenAI either.** Calls use the Responses API with `store: false`.
-- **Errors.** `client.ts` catches every OpenAI error and returns `{ ok: false, code }` to the capability, with `code` one of `timeout`, `upstream` or `empty` (`AiErrorCode`). It never throws, never logs and never returns the error's message: an error message can quote what was sent. `handle-request.ts` is the one place that logs, and only `console.error("translator_ai_<code>")` with a fixed code: `timeout`, `upstream`, `empty`, `unusable` (TR-42), `rate_limited` or `bad_request`. This is the same idea as `logTranslatorError()` in Phase 1 ([README.md](README.md#session-and-start-over)).
+- **Errors.** `client.ts` catches every OpenAI error and returns `{ ok: false, code }` to the capability, with `code` one of `timeout`, `upstream` or `empty` (`AiErrorCode`). It never throws, never logs and never returns the error's message: an error message can quote what was sent. `handle-request.ts` is the one place in `ai/` that logs, and only `console.error("translator_ai_<code>")` with a fixed code: `timeout`, `upstream`, `empty`, `unusable` (TR-42), `intro_too_long` (TR-48), `rate_limited` or `bad_request`. This is the same idea as `logTranslatorError()` in Phase 1 ([README.md](README.md#session-and-start-over)).
 - **Tests and `server-only`.** Importing `server-only` throws outside a React Server environment, so `vitest.config.ts` aliases it to the empty `__fixtures__/empty.ts`. Tests can import `client.ts` (with `openai` mocked); the Next.js build still uses the real package. Never remove the import from `client.ts`.
 
 ### The file summary (`ai/summary.ts`)
@@ -129,38 +142,41 @@ Rules:
 ## 3. Shape of a capability file (follow this pattern)
 
 ```ts
-// src/features/translator/ai/interview.ts
+// src/features/translator/ai/interview.ts (shortened; the real file is the reference)
 /**
  * Capability: run one interview turn.
  * Input: the file summary, the chat so far, the current brief (if any).
- * Output: the message to show + a validated SearchBrief proposal or null.
- * Privacy: receives only FileSummary and chat text. Never rows.
+ * Output: the message to show + a validated SearchBrief proposal or null + a note when a proposal
+ * was dropped; or the code of what failed (a failed call, or "unusable").
+ * Privacy: receives only FileSummary and chat text. Never rows. Never logs: the route logs the code.
  */
-import { buildInterviewInstructions } from "./instructions";
-import { parseInterviewReply } from "./validate";
-import type { AiCall, ChatMessage, FileSummary, InterviewResult } from "./types";
-import type { SearchBrief } from "../criteria/schema";
-
-const INTERVIEW_TEXT = {
-  noResponse: "The AI didn't answer. Try again, or use the form.",
-  unusableAnswer: "The AI gave an answer I couldn't use. Try again, or use the form.",
+export const INTERVIEW_TEXT = {
+  retry: "Your last reply didn't match the required format. Reply again using the format.",
 } as const;
+
+const FORMAT: AiFormat = { name: INTERVIEW_REPLY_FORMAT_NAME, schema: interviewReplyJsonSchema };
 
 export async function runInterviewTurn(
   input: { summary: FileSummary; messages: ChatMessage[]; currentBrief?: SearchBrief },
-  callAi: AiCall,                       // real client in the route, fake in tests
+  callAi: AiCall, // real client in the route, fake in tests
 ): Promise<InterviewResult> {
   const instructions = buildInterviewInstructions(input.summary, input.currentBrief);
-  const raw = await callAi({ instructions, messages: input.messages, format: "interview_reply" });
-  if (!raw.ok) return { ok: false, error: INTERVIEW_TEXT.noResponse };
-  const parsed = parseInterviewReply(raw.value, input.summary);
-  return parsed.ok
-    ? { ok: true, reply: parsed.reply.message, proposal: parsed.reply.proposal }
-    : { ok: false, error: INTERVIEW_TEXT.unusableAnswer };
+  const attempt = (messages: ChatMessage[]) =>
+    withTimeout(callAi({ instructions, messages, format: FORMAT }), AI_ATTEMPT_TIMEOUT_MS, () => TIMED_OUT);
+
+  let raw = await attempt(input.messages);
+  if (!raw.ok) return { ok: false, code: raw.code };
+  let parsed = parseInterviewReply(raw.value, input.summary);
+  if (!parsed.ok) {
+    // One retry, only for a reply in the wrong format.
+    raw = await attempt([...input.messages, { role: "user", content: INTERVIEW_TEXT.retry }]);
+    if (!raw.ok) return { ok: false, code: raw.code };
+    parsed = parseInterviewReply(raw.value, input.summary);
+    if (!parsed.ok) return { ok: false, code: "unusable" };
+  }
+  return { ok: true, kind: "interview", reply: parsed.reply.message, proposal: parsed.reply.proposal, note: parsed.note };
 }
 ```
-
-The message wording above is an example. The ticket that builds each file sets its final text.
 
 Every capability file has:
 
@@ -183,6 +199,8 @@ import { isRateLimited } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Two 12-second attempts inside a 25-second request budget (ai/guardrails.ts), plus room to reply.
+export const maxDuration = 30;
 
 export function POST(request: Request) {
   return handleAiRequest(request, {
@@ -201,9 +219,10 @@ export async function handleAiRequest(request: Request, deps: AiRouteDeps): Prom
   if (!admin) return fail(ROUTE_TEXT.signedOut, 401);
   if (isCrossOrigin(request)) return fail(ROUTE_TEXT.forbidden, 403);
   if (!deps.aiEnabled()) return fail(ROUTE_TEXT.unavailable, 503);
-  // JSON only (400), body size (413), aiRequestSchema (400), message limits (413), rate limit (429)
-  const result = await withTimeout(runCapability(...), AI_TIMEOUT_MS, () => ({ ok: false, code: "timeout" }));
-  // timeout: 504; upstream or empty: 502; success: 200 with the AiResponse
+  // JSON only (400), body size (413), aiRequestSchema (400), message and note limits (413), rate limit (429)
+  const run = input.kind === "interview" ? runInterviewTurn(input, deps.callAi) : runIntroDraft(input, deps.callAi);
+  const result = await withTimeout(run, AI_REQUEST_TIMEOUT_MS, () => ({ ok: false, code: "timeout" }) as const);
+  // timeout: 504; upstream, empty, unusable or intro_too_long: 502; success: 200 with the AiResponse
 }
 ```
 
@@ -213,7 +232,7 @@ Notes on the pattern:
 - **The route is in the `proxy.ts` matcher** (TR-39). `src/proxy.ts` refreshes the admin session on `/admin`, `/preview` and `/api/translator/ai`, so a call with an expired access token still works while the admin is logged in, and the redirects in `proxy.ts` never apply to it (repo checklist in [WAY-OF-WORKING.md](../WAY-OF-WORKING.md#checklist-for-a-change): "New gated or redirected URL: add it to the `proxy.ts` matcher").
 - **Same origin, JSON only.** A request whose `Origin` header names another site gets `403`, and only `Content-Type: application/json` is read (`400` otherwise). Together they stop a form on another site from posting with the admin's cookie.
 - **The on/off check is `aiEnabled()` from `client.ts`,** never `process.env` in the route or the handler.
-- **Limits** are named constants: `MAX_BODY_BYTES` (100 KB), `MAX_MESSAGES` (30), `MAX_USER_MESSAGE_CHARS` (1,000, also the intro goal), `MAX_ASSISTANT_MESSAGE_CHARS` (4,000) in `request-schema.ts`, and `AI_REQUESTS_PER_WINDOW` (30 per 10 minutes per admin) in `handle-request.ts`. The body is read with a byte limit before it is parsed. `parseAiRequest()` checks the shape first (`400`), then the limits, so a long chat gets its own `413` message.
+- **Limits** are named constants: `MAX_BODY_BYTES` (100 KB), `MAX_MESSAGES` (30), `MAX_USER_MESSAGE_CHARS` (1,000) and `MAX_ASSISTANT_MESSAGE_CHARS` (4,000) in `request-schema.ts`, `MAX_INTRO_NOTE_CHARS` (300, the intro note) in `intro.ts`, and `AI_REQUESTS_PER_WINDOW` (30 per 10 minutes per admin) in `handle-request.ts`. Every limit in one table: [README.md](README.md#limits-and-failures). The body is read with a byte limit before it is parsed. `parseAiRequest()` checks the shape first (`400`), then the limits, so a long chat gets its own `413` message.
 - **No `system` role.** `ChatMessage.role` is only `"user"` or `"assistant"`. The browser sends the history, so an admin could forge assistant turns; that is accepted (admins only, nothing secret in the instructions).
 - **The handler has its own `ROUTE_TEXT`**, like every other file (section 3, point 4). Every reply is JSON with `Cache-Control: no-store`. Every status and message: [API-DOCUMENTATION.md](../API-DOCUMENTATION.md#post-apitranslatorai).
 - **Never log** the request body, the result or an error message. Only `translator_ai_<code>` (section 2, "Errors").
@@ -221,10 +240,10 @@ Notes on the pattern:
 ## 5. UI pattern
 
 - Components only render and forward events. No validation, no prompt text, no fetch logic inside components.
-- `use-chat-session.ts` owns state and the `fetch("/api/translator/ai")` call.
+- `use-chat-session.ts` owns the chat's state and its one request, made through `postAi()` (`ai/post-ai.ts`).
 - State lives in React only. No localStorage, sessionStorage, cookies, URL params with content.
 - The UI learns whether the AI is on from a boolean prop (`aiEnabled`) passed down from the admin page (section 2, TR-43). It never reads an environment variable.
-- Show the route's `error` text as it is. The status only matters for `401` (the session ended: offer a way to log in again).
+- **Failure messages come from `ai/fallback.ts`** (TR-50): `failureMessage(kind, error)` gives the fixed AI-failure text for `ai-failure` and `network`, the login text for `session-expired`, the unavailable text for `unavailable`, and the route's own text for `too-long`, `rate-limited` and `bad-request`; `failureActions(kind)` says which buttons show. The intro panel shows the route's text, with the login text for a `401` (`interpretIntroResult()`).
 - **Import from `ai/index.ts`** (TR-44), never from a single `ai/` file, so the UI can only reach what is meant for it.
 
 ### Rules pure, hook thin: the chat session (TR-44)
@@ -233,11 +252,11 @@ The chat is the pattern for any stateful AI feature. The rules are a pure reduce
 
 | Piece | File | Holds |
 |---|---|---|
-| Rules | `ai/chat-session.ts` (pure) | `ChatState`, `chatReducer` (`edit`, `send`, `received`, `failed`, `remove-chip`, `dismiss-proposal`, `add-note`, `reset`), `isAddedNote()`, `buildChatRequest()`, `canSend()`, `limitReached()`, `currentBriefFor()`, `settleRevision()`, `changesAnnouncement()`, `interpretAiResult()`, `latestAnnouncement()`, `characterCount()`, `GREETING`, `CHAT_TEXT`, `PROPOSAL_TEXT`, `REVISE_TEXT` |
-| Wiring | `ui/chat/use-chat-session.ts` | `useReducer(chatReducer)`, the memoised `buildFileSummary()`, the one `fetch`, the `AbortController`. Options: `getCurrentBrief`, `opening`, `mode` (TR-46) |
+| Rules | `ai/chat-session.ts` (pure) | `ChatState`, `chatReducer` (`edit`, `send`, `received`, `failed`, `remove-chip`, `dismiss-proposal`, `add-note`, `reset`), `isAddedNote()`, `buildChatRequest()`, `canSend()`, `limitReached()`, `currentBriefFor()`, `settleRevision()`, `changesAnnouncement()`, `interpretAiResult()`, `shouldSwitchToForm()`, `aiTurnedOff()`, `fallbackBrief()`, `firstUserMessage()`, `latestAnnouncement()`, `characterCount()`, `GREETING`, `CHAT_TEXT`, `PROPOSAL_TEXT`, `REVISE_TEXT` |
+| Wiring | `ui/chat/use-chat-session.ts` | `useReducer(chatReducer)`, the memoised `buildFileSummary()`, the one request through `postAi()`, the `AbortController`, the session limit (`onSent`, `limitReached`). Options: `getCurrentBrief`, `opening`, `mode` (TR-46) |
 | View | `ui/chat/chat-panel.tsx`, `ui/chat/proposal-card.tsx` | Markup, focus, scrolling, key handling. Every decision comes from the rules (the chips' from `criteria/chips.ts`) |
 
-- **The request.** `fetch("/api/translator/ai", { method: "POST", headers: { "Content-Type": "application/json" }, body, signal })`. The header is required: the route reads JSON only and answers anything else with `400`. The body is `buildChatRequest(state, summary, currentBrief)` and nothing else; build it from the state the reducer makes for the `send` (the hook runs `chatReducer` on the current state to get it), so the request holds exactly what is on screen.
+- **The request.** `postAi(fetch, body, signal)` sends `POST /api/translator/ai` with `Content-Type: application/json` (required: the route reads JSON only and answers anything else with `400`). The body is `buildChatRequest(state, summary, currentBrief)` and nothing else; build it from the state the reducer makes for the `send` (the hook runs `chatReducer` on the current state to get it), so the request holds exactly what is on screen.
 - **Stale replies.** Each `send` sets a new `requestId`; `received` and `failed` carry it and are ignored unless it matches and the chat is waiting. `reset` starts a new number. The hook also aborts the request on `resetChat()` and on unmount, and dispatches nothing after an abort.
 - **One response path (TR-50).** The hooks call `postAi(fetchFn, body, signal)` (`ai/post-ai.ts`), which classifies every outcome: `ok`, `ai-failure` (`200` with `ok: false`, `502`, `504`), `network` (a rejected `fetch` or a body that isn't JSON), `session-expired` (`401`), `unavailable` (`503`), `too-long` (`413`), `rate-limited` (`429`), `bad-request` (`400`, `403`), or `aborted` (ignored). `interpretAiResult()` (chat) and `interpretIntroResult()` (intro) turn it into a `received` or `failed` action; the messages and buttons come from `ai/fallback.ts`. Only `ai-failure` and `network` count toward two in a row (`countsAsAiFailure()`). Tests pass a fake `fetchFn`; the failure simulation passes `failingFetch`, which never calls the route. No parsing or status logic in the hook.
 - **Limits come from `request-schema.ts`.** `MAX_MESSAGES` and `MAX_USER_MESSAGE_CHARS` are imported, never copied, so the UI's limits can't drift from the route's.
@@ -253,8 +272,9 @@ The chat is the pattern for any stateful AI feature. The rules are a pure reduce
 
 ## 6. When the AI is off or fails
 
-- **AI off** (`aiEnabled()` is false): the Chat with AI button is not shown, and the Phase 1 form works exactly as before.
-- **Any AI error** (no answer, an unusable answer, a timeout, a `401`, `503` or a network failure): the Phase 1 form stays available and works exactly as before. Nothing the user already has (file, criteria, results) is lost.
+- **AI off** (`aiEnabled()` is false: no key, or `TRANSLATOR_AI=off`): no Chat with AI choice, no change chat and no Draft intro; the Phase 1 form works exactly as before.
+- **Any AI error**: the Phase 1 form stays available and nothing the user already has (file, criteria, results) is lost. The chat shows the message and buttons for the failure kind; two AI failures in a row (`ai-failure` or `network`) switch the Criteria step to the form, filled in with `fallbackBrief()`, while the Results step stays put; a `503` turns the AI off for the session (`aiTurnedOff()`, `aiAvailable` in the wizard). The rules and tables: [README.md](README.md#when-the-ai-fails); the tests: `__tests__/phase2-safety/failure.test.ts`.
+- **The demo's failure simulation** (`?aiFail=1`) never calls the route: [README.md](README.md#simulate-a-failure).
 - The AI is an extra way to fill the `SearchBrief`. Nothing in Phase 1 may depend on it.
 
 ## 7. Naming
@@ -263,7 +283,10 @@ The chat is the pattern for any stateful AI feature. The rules are a pure reduce
 - Types: nouns (`FileSummary`, `IntroFields`, `InterviewResult`).
 - Branches: `tr-<number>-<short-name>`, off `translator`, PR back into `translator`, `Closes #<issue>` in the PR.
 
-### Safety checks that run as tests (TR-51)
+## 8. Tests and safety checks
+
+Every test runs with `npm run test` and needs no key. How to run one file: [README.md](README.md#tests-for-the-ai-path).
+
 
 - **The fake AI.** `__fixtures__/fake-ai.ts` has two modes. Both return an `AiCall` (a `vi.fn`) that keeps every call's `instructions`, `messages` and `format` in `calls`, and both throw on a call they have no answer for. Use one for every AI test; never call OpenAI from a committed test, and never create a second fake.
   - `createFakeAi(steps)` (TR-51) plays back one result per call, in order: a string is a text answer, an object is answered as JSON, `fail(code)` is a failed call. Running past the end throws. Good for one-call unit tests.
@@ -286,13 +309,13 @@ The chat is the pattern for any stateful AI feature. The rules are a pure reduce
 - **`confirmAiProposal(proposal, file)`** (`__fixtures__/pipeline.ts`) is Confirm and rank on the proposal card, as `confirmAiBrief()` in the wizard does it: `briefToFormState()`, then `toBrief()`, which must deep-equal the proposal (the test fails otherwise), then pending, confirmed, `rank()` and `buildCounts()`. Never rank an AI proposal in a test with `rank()` directly: that skips the form round trip the app relies on. `file` comes from `loadFile(buffer)`.
 - **A new AI scenario that ranks must compare its whole shortlist against a reviewed golden file** in `__fixtures__/walkthroughs/` (`goldenRows(rankResult)`), not only its first row. Reuse a TR-30 file when the brief is the same; a new file is generated once, checked by hand against the expected results and committed with a reason in the PR ([WAY-OF-WORKING.md](../WAY-OF-WORKING.md#testing)). Write at the top of the test what scripted replies can't prove (how a real model maps words to values).
 - **Testing the browser and the route together** (TR-54): `__fixtures__/ai-harness.ts`. `createRouteHarness(ai, deps?)` gives a `fetch` for `postAi()` that hands each request to the real `handleAiRequest()` (with `Origin` set, as a browser does) and records every body and response; `setAi()` and the `getAdmin`, `aiEnabled` and `rateLimit` overrides change the route between requests. `createChatDriver(harness, summary, { mode, base })` does what `send()` in `use-chat-session.ts` does, and `tryAgain()` is Try again; `requestIntro()` is Write draft. The route turns an exception from the AI call into a `502`, so the harness rethrows the strict fake's errors in the test. Use it for any test about what is sent or what the user sees after a reply. **If the chat hook's `send()` changes, change `createChatDriver()` to match.** Replay the TR-53 conversations from `__fixtures__/ai-conversations.ts` rather than retyping the messages.
-- **Every new Phase 2 feature adds a test to the matching `__tests__/phase2-safety/` file** (TR-54): something new sent to the route or the AI to `privacy.test.ts` (and the README's "What is sent to the AI"), a new way the AI can fail to `failure.test.ts`, a new place file text reaches the AI or a new reply field to `injection.test.ts`, anything new that is ranked or explained to `determinism.test.ts`, a new limit or cap to `guardrails.test.ts`. Name it with the file's prefix (`privacy: ...`) and add a row to the README's Promise to test table ([README.md](README.md#phase-2-safety-evidence)). Don't move a promise test back next to its code, and don't skip or loosen one without the project lead's OK.
+- **Every new Phase 2 feature adds a test to the matching `__tests__/phase2-safety/` file** (TR-54): something new sent to the route or the AI to `privacy.test.ts` (and the README's "What is sent to the AI"), a new way the AI can fail to `failure.test.ts`, a new place file text reaches the AI or a new reply field to `injection.test.ts`, anything new that is ranked or explained to `determinism.test.ts`, a new limit or cap to `guardrails.test.ts`. Name it with the file's prefix (`privacy: ...`) and add a row to the README's Promise to test table ([README.md](README.md#promise-to-test)). Don't move a promise test back next to its code, and don't skip or loosen one without the project lead's OK.
 - **No test imports the OpenAI SDK.** `vitest.setup.ts` mocks `openai` with a factory that throws `Tests must not import the OpenAI SDK. Use the fake AI.`, so importing it, directly or through `ai/client.ts`, fails the test file. Only `ai/client.test.ts` mocks `openai` itself (a stand-in SDK, never a network call).
-- **The only allowed `console.error` calls** in `src/features/translator/` and `src/app/api/translator/` have exactly one string literal: `console.error("translator_ai_<code>")` (the route, `handle-request.ts`) or `console.error("[translator] <code>")` (the UI, `log-error.ts`). Both helpers write one literal per code in a `switch`, on purpose: a template string such as `` `translator_ai_${code}` `` would make the static test unable to prove nothing else is logged. Any other `console` method is an ESLint error (`no-console`, only `error` allowed, for those two folders).
+- **The only allowed `console.error` calls** in `src/features/translator/` and `src/app/api/translator/` have exactly one string literal: `console.error("translator_ai_<code>")` (the route's handler, `handle-request.ts`) or `console.error("[translator] <code>")` (the UI, `ui/log-error.ts`). Both helpers write one literal per code in a `switch`, on purpose: a template string such as `` `translator_ai_${code}` `` would make the static test unable to prove nothing else is logged. Any other `console` method is an ESLint error (`no-console`, only `error` allowed, for those two folders).
 - **The static tests** in `src/features/translator/__tests__/phase2-safety/guardrails.test.ts` read the source with `fs` (through `__tests__/source-files.ts`): `guardrail: no content logging` (the console rule above), `guardrail: no storage` (no `localStorage`, `sessionStorage`, `indexedDB`, `document.cookie`, `caches.` or Supabase import) and `guardrail: key stays on the server` (no client module or `ui/` file touches the key, `process.env`, `openai` or `ai/client`; no public OpenAI variable in the repo; `process.env` only in `ai/client.ts`). `injection.test.ts` and the `guardrail: value length caps` tests check data blocks and value caps. When one fails, fix the code, never the test: don't loosen a pattern, add an exception or skip a file without the project lead's OK ([WAY-OF-WORKING.md](../WAY-OF-WORKING.md#testing)).
 - **The session limit** (`ai/session-limit.ts`) is counted in `TranslatorWizard`; the hooks call `onSent` once per request really sent (not for a simulated failure) and refuse to send at the limit.
 
-## 8. Never do
+## 9. Never do
 
 - Never import `openai` or read `process.env` outside `ai/client.ts`.
 - Never put the OpenAI key in client code or in a variable that starts with `NEXT_PUBLIC_`.
@@ -313,7 +336,7 @@ Where this guide differs from the code guide in issue #81, and why.
 |---|---|---|
 | 1 | The route pattern called `await requireAdmin()`. That redirects to `/admin/login`, so a `fetch` gets the login HTML back, not JSON | The route calls `getAdmin()` and returns `401` JSON (section 4) |
 | 2 | `src/proxy.ts` refreshes the session only on `/admin` and `/preview`, so a call to the route with an expired access token would fail | The route ticket must add `/api/translator/ai` to the `proxy.ts` matcher (section 4) |
-| 3 | `aiEnabled()` was used in the route, and the page needs it to show the button, but only `client.ts` may read `process.env` | `client.ts` exports `aiEnabled()` and `aiModel()`. The admin page may import `aiEnabled` and pass a boolean prop. The page is in the layer table, and the route's row lists `ai/client.ts` and `ai/schema.ts` (section 2) |
+| 3 | `aiEnabled()` was used in the route, and the page needs it to show the button, but only `client.ts` may read `process.env` | `client.ts` exports `aiEnabled()` and `aiModel()`. The admin page may import `aiEnabled` and pass a boolean prop. The page is in the layer table, and the route's row lists `ai/client.ts` (section 2) |
 | 4 | `client.ts` was "server-only" in a comment only | Its first line is `import "server-only";` (section 2) |
 | 5 | The sample used `AI_TEXT` without defining it, while each file is meant to have its own `_TEXT` object | `INTERVIEW_TEXT` is defined at the top of `interview.ts`; the route uses its own `ROUTE_TEXT` (sections 3 and 4) |
 | 6 | `json()` and `readJsonWithLimit()` weren't defined anywhere | TR-39 put them in `ai/handle-request.ts` (the route stays thin), with a 100 KB body limit as a named constant (section 4) |
