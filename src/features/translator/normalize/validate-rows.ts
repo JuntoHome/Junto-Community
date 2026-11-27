@@ -76,6 +76,24 @@ function employeesIssue(row: NormalizedRow): RowIssue | null {
   };
 }
 
+/**
+ * The rows, with each generated ID that the file itself also uses moved to the first free
+ * suffix: `ROW-0001-2`, then `-3`, and so on, never one any row already has. IDs are compared
+ * with `matchKey()`, as for duplicates. Rows whose ID came from the file are never changed, and
+ * neither are generated IDs nothing collides with (every row of the two samples).
+ */
+export function withFreeGeneratedIds(rows: readonly NormalizedRow[]): NormalizedRow[] {
+  const taken = new Set(rows.filter((row) => !row.record.idGenerated).map((row) => matchKey(row.normalized.recordId)));
+  return rows.map((row) => {
+    if (!row.record.idGenerated) return row;
+    const base = row.normalized.recordId;
+    let recordId = base;
+    for (let n = 2; taken.has(matchKey(recordId)); n += 1) recordId = `${base}-${n}`;
+    taken.add(matchKey(recordId));
+    return recordId === base ? row : { ...row, record: { ...row.record, recordId }, normalized: { ...row.normalized, recordId } };
+  });
+}
+
 /** Whole-file issues (sourceRow null) first, then by row number, then by code. */
 export function compareIssues(a: RowIssue, b: RowIssue): number {
   const rowA = a.sourceRow ?? 0;
@@ -95,7 +113,10 @@ export function compareIssues(a: RowIssue, b: RowIssue): number {
  * - **Generated ID** (warning): the ID cell was blank, so the parser gave the row a `ROW-0001`
  *   style ID. Read from the parser's `record.idGenerated` flag, never guessed from the ID's text,
  *   so a file's own ID that happens to look like `ROW-0016` isn't flagged. For the Reference Solutions layout, when no row has an IUSA Number (expected: the
- *   column is optional), this is one whole-file issue instead of one per row.
+ *   column is optional), this is one whole-file issue instead of one per row. When the file itself
+ *   uses a generated ID on another row, the generated one gets the first free suffix
+ *   (`ROW-0001-2`, `withFreeGeneratedIds()`), so a real business is never left out because of a
+ *   blank ID cell elsewhere.
  *
  * Invariant: every row in `kept` has a unique Record ID, compared with `matchKey()`. Later steps
  * (duplicate grouping, ranking, pin and omit, export) may rely on it.
@@ -103,7 +124,7 @@ export function compareIssues(a: RowIssue, b: RowIssue): number {
  * `kept` and `excluded` are in `sourceRow` order. A row can have more than one issue.
  */
 export function validateRows(rows: readonly NormalizedRow[], layout: LayoutMapping): RowValidation {
-  const ordered = [...rows].sort((a, b) => a.sourceRow - b.sourceRow);
+  const ordered = withFreeGeneratedIds([...rows].sort((a, b) => a.sourceRow - b.sourceRow));
   const idColumn = layout.fields.recordId.header;
   const kept: NormalizedRow[] = [];
   const excluded: NormalizedRow[] = [];
