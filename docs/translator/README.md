@@ -180,7 +180,7 @@ Right after a workbook is parsed, every row's record is normalized in the browse
 
 **Employees** (`normalizeEmployees()`):
 
-1. The `employees` value with commas and spaces removed must be digits only. `"25"`, `"1,200"` and `" 40 "` give 25, 1200 and 40 (`source: "actual"`). `"25.5"`, `"-3"`, `"about 20"` and `"N/A"` are unknown (`invalid`); blank is unknown (`blank`).
+1. The `employees` value, with spaces only at its ends, must be digits, optionally with thousands commas in the right places (the size range's rule). `"25"`, `"1,200"` and `" 40 "` give 25, 1200 and 40 (`source: "actual"`); `"1,2,3"`, `"1,5"` and `"12 34"` are `invalid`, never read as a different number. `"25.5"`, `"-3"`, `"about 20"` and `"N/A"` are unknown (`invalid`); blank is unknown (`blank`).
 2. Only when that is unknown and `employeeRange` has a value, the range is read instead (`source: "range"`, with `min` and `max`). Accepted: `"10 to 19"`, `"10-19"`, `"10 - 19"`, `"1,000 to 4,999"`, and open ranges `"10,000+"` and `"10,000 or more"` (`max` is infinity). Anything else (for example `"Unknown"`, or a min above the max) leaves the count unknown with the reason from step 1. **Unverified:** these formats are a guess. The Reference Solutions headers workbook has no data rows, so the exact range wording in real exports hasn't been seen. The [Reference Solutions sample](#the-reference-solutions-sample) uses the `10 to 19` form, which is the same guess.
 3. A range that is read replaces an `invalid` actual count, and the `invalid` reason is not kept.
 
@@ -198,6 +198,7 @@ Each issue is `{ sourceRow, recordId, code, severity, reason }`. `severity` is `
 
 | Code | When | Severity | Reason shown |
 |---|---|---|---|
+| `unreadable-range` | The size range was needed (the employees cell is blank or not a whole number) and has text, but isn't a format the Translator reads (`10 to 19`, `10-19`, `10,000+`). The formats are guessed (**Unverified**), so this is the only sign a guess is wrong | `warning` | Employee size range "Unknown" isn't a format the Translator can read, so company size is treated as unknown. |
 | `invalid-employees` | The employees cell has text that isn't a whole number (`25.5`, `-3`, `N/A`). Blank cells are not flagged | `warning` | Employees value "25.5" isn't a whole number, so company size is treated as unknown. When a size range was read instead, it ends: Using the size range 10 to 19 instead. |
 | `duplicate-id` | The Record ID was already used on an earlier row. IDs are compared with `matchKey()`, so `SYN-0007` and ` syn-0007 ` are the same | `excluded` | Record ID SYN-0007 is also used on row 5. Row 5 is used and this row is left out. |
 | `generated-id` | The ID cell was blank (or the ID column is missing), so the row was given a `ROW-0001` style ID. When the file itself uses that ID on another row, the generated one gets the first free suffix (`ROW-0001-2`, `withFreeGeneratedIds()`), so a real business is never left out as a duplicate of a blank cell (fix C) | `warning` | Record ID is blank, so this row was given the ID ROW-0016. (The Reference Solutions layout names its column: IUSA Number is blank, ...) |
@@ -952,7 +953,7 @@ npm run test -- edge-cases -t "file gate"        # tests in edge-cases.test.ts w
 | `normalize/normalize.test.ts` | Match keys, unknown values, employee counts and the range fallback |
 | `normalize/validate-rows.test.ts` | Invalid employee counts, duplicate Record IDs, generated IDs |
 | `normalize/duplicates.test.ts` | Grouping in the sample (SYN-0500 under SYN-0001), exact and possible duplicates |
-| `normalize/review-edge-cases.test.ts` | Three edge cases from the review after TR-55 (fix C): a generated ID the file also uses gets a free suffix and both businesses are kept; invisible characters don't split a value or a must-have; a blank and an `N/A` employee count with the same range don't group (and two blanks still do) |
+| `normalize/review-edge-cases.test.ts` | Three edge cases from the review after TR-55 (fix C): a generated ID the file also uses gets a free suffix and both businesses are kept; invisible characters don't split a value or a must-have; a blank and an `N/A` employee count with the same range don't group (and two blanks still do); an unreadable size range gets a warning; an employee count with misplaced commas or inner spaces is invalid |
 | `ranking/walkthroughs.test.ts` | The three spec walkthroughs (TR-30) from the sample's bytes through `runPipeline()`: counts, first 8 rows, last row, score spread, the role change's export builders, repeat runs, 3 seeded shuffles, and the golden files |
 | `rs-sample.test.ts` | The [Reference Solutions sample](#the-reference-solutions-sample) (TR-35): its 396 headers, that only mapped columns are filled and every value is invented, the import figures, every documented row, the Phoenix fabrication shortlist and the export's Phone, Website and empty Email |
 | `edge-cases.test.ts` | The spec edge cases (TR-31), each from a real file (below) |
@@ -1184,7 +1185,7 @@ The conversation itself (TR-44). The user types what they need, the AI asks shor
 - **Timeout:** 12 seconds per attempt and 25 seconds per request, retry included (`AI_ATTEMPT_TIMEOUT_MS` and `AI_REQUEST_TIMEOUT_MS` in `ai/guardrails.ts`, TR-42). The OpenAI client has the 12-second timeout and `maxRetries: 0`, and `withTimeout()` holds both limits even if the SDK doesn't. `maxDuration = 30` in `route.ts` ([Checking the AI's reply](#checking-the-ais-reply)).
 - **No memory.** Each request is answered on its own. The chat history comes from the browser with every interview request, so an admin could send made-up assistant turns; that is accepted (admins only, nothing secret in the instructions). The schema refuses a `system` message, so the browser can't replace the instructions.
 - **Nothing stored.** Not in Supabase, files or a cache, and the route asks OpenAI not to store the response (`store: false`). Replies are `Cache-Control: no-store`.
-- **No logs except a code.** The only output is `console.error("translator_ai_<code>")` with `timeout`, `upstream`, `empty`, `unusable` (TR-42), `intro_too_long` (TR-48), `rate_limited` or `bad_request`. Never the body, the chat, the summary, the intro fields, the reply, a note or an error's message.
+- **No logs except a code.** The only output is `console.error("translator_ai_<code>")` with `timeout`, `upstream`, `empty`, `unusable` (TR-42), `intro_too_long` (TR-48), `rate_limited`, `bad_request` or `server_error` (a dependency such as the admin check threw before the AI was called: the route still answers `500` JSON, "Something went wrong on our side. Try again, or use the form."). Never the body, the chat, the summary, the intro fields, the reply, a note or an error's message.
 - **The admin session.** The route is in the `proxy.ts` matcher, so an expired access token is refreshed before the route checks the admin, as on `/admin` pages.
 
 #### The AI instructions
@@ -1385,7 +1386,7 @@ Every limit in one place. The route's limits are also in [API-DOCUMENTATION.md](
 | An assistant message sent back | 4,000 characters | Route (`413`) | `MAX_ASSISTANT_MESSAGE_CHARS` |
 | Request body | 100 KB | Route (`413`) | `MAX_BODY_BYTES` |
 | AI requests per session | 40, chat and intro together | Browser only: a courtesy, reset by a reload or Start over | `AI_SESSION_LIMIT` (`ai/session-limit.ts`) |
-| AI requests per admin | 30 per 10 minutes | Route (`429`): the cost guard, per server instance, best effort ([KNOWN-ISSUES.md](../KNOWN-ISSUES.md#security)) | `AI_REQUESTS_PER_WINDOW` (`ai/handle-request.ts`) |
+| AI requests per admin | 30 per 10 minutes | Route (`429`): the cost guard, per server instance, best effort ([KNOWN-ISSUES.md](../KNOWN-ISSUES.md#security)). Only requests that went through count, so the limit lifts as the 10 minutes move on | `AI_REQUESTS_PER_WINDOW` (`ai/handle-request.ts`) |
 | One AI attempt | 12 seconds | The OpenAI client and `withTimeout()` in each capability | `AI_ATTEMPT_TIMEOUT_MS` (`ai/guardrails.ts`) |
 | One request, retry included | 25 seconds | `withTimeout()` in `handle-request.ts` | `AI_REQUEST_TIMEOUT_MS` |
 | Vercel function | 30 seconds | `route.ts` | `maxDuration` |

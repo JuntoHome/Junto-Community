@@ -5,9 +5,11 @@ import { BUSINESS_OWNER_BRIEF } from "../criteria/examples";
 import { rank } from "../ranking";
 import { fieldOptions } from "./field-options";
 import { matchKey } from "./match-key";
+import { normalizeEmployees } from "./normalize";
 
 /**
- * Three Phase 1 edge cases found in the review after TR-55 (fix C). None can happen with the two
+ * Phase 1 edge cases found in the review after TR-55: three in fix C, the size range warning
+ * and the strict employee count in the follow-up. None can happen with the two
  * synthetic samples; all could with a real export. Every row here is invented.
  */
 
@@ -93,5 +95,41 @@ describe("a blank employee count and an invalid one, with the same size range", 
       rsSheet([rsBusiness(1, same), rsBusiness(1, { ...same, "IUSA Number": "900000002" })]),
     );
     expect(grouping.duplicateCount).toBe(1);
+  });
+});
+
+describe("an unreadable size range", () => {
+  it("gets a warning when it was needed: a blank or invalid count and range text no format reads", async () => {
+    const { validation, grouping } = await importRows(
+      rsSheet([
+        rsBusiness(1, { "Location Employee Size Actual": null, "Location Employee Size Range": "Unknown" }),
+        rsBusiness(2, { "Location Employee Size Actual": null, "Location Employee Size Range": "10 to 19" }),
+        rsBusiness(3, { "Location Employee Size Actual": 25, "Location Employee Size Range": "Unknown" }),
+      ]),
+    );
+    expect(validation.issues.filter((issue) => issue.code === "unreadable-range")).toEqual([
+      expect.objectContaining({
+        sourceRow: 2,
+        severity: "warning",
+        reason: `Employee size range "Unknown" isn't a format the Translator can read, so company size is treated as unknown.`,
+      }),
+    ]);
+    // Every row is kept; the first one has an unknown size.
+    expect(grouping.records).toHaveLength(3);
+    expect(grouping.records[0].normalized.employees.known).toBe(false);
+  });
+});
+
+describe("the employee count", () => {
+  it("reads digits, correct thousands commas and spaces at the ends", () => {
+    for (const [cell, count] of [["25", 25], ["1,200", 1200], [" 40 ", 40], ["12,345,678", 12345678]] as const) {
+      expect(normalizeEmployees(cell, null)).toMatchObject({ known: true, count, source: "actual" });
+    }
+  });
+
+  it("treats misplaced commas or inner spaces as invalid, never as a different number", () => {
+    for (const cell of ["1,2,3", "12 34", "1,5", "1,20", ",120"]) {
+      expect(normalizeEmployees(cell, null)).toMatchObject({ known: false, reason: "invalid" });
+    }
   });
 });

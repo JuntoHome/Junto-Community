@@ -80,7 +80,7 @@ type SummaryValue = { value: string; count: number };   // value 1 to 80 charact
 | An intro field | 120 characters | `MAX_INTRO_VALUE_CHARS` (`ai/intro.ts`) |
 | An intro draft | 200 words | `MAX_INTRO_WORDS` (`ai/intro.ts`) |
 | An assistant message | 4,000 characters | `MAX_ASSISTANT_MESSAGE_CHARS` |
-| Requests per admin | 30 per 10 minutes, per server instance (best effort, [KNOWN-ISSUES.md](KNOWN-ISSUES.md#security)) | `AI_REQUESTS_PER_WINDOW` |
+| Requests per admin | 30 per 10 minutes, per server instance (best effort, [KNOWN-ISSUES.md](KNOWN-ISSUES.md#security)); only requests that went through count, so a refused one doesn't extend the wait | `AI_REQUESTS_PER_WINDOW` |
 | Time for one AI attempt | 12 seconds (the SDK makes no retries of its own) | `AI_ATTEMPT_TIMEOUT_MS` (`ai/guardrails.ts`) |
 | Time for the whole request | 25 seconds, the interview's one retry included | `AI_REQUEST_TIMEOUT_MS` (`ai/guardrails.ts`) |
 | Vercel function duration | 30 seconds | `export const maxDuration = 30` in `route.ts` |
@@ -119,6 +119,7 @@ The checks run in this order; the first that fails answers.
 | 10 | 502 | The AI gave an answer I couldn't use. Your last criteria are kept. Try again or use the form. | Interview only: the reply wasn't in the format twice in a row (TR-42) | `translator_ai_unusable` |
 | 10 | 502 | The draft came back too long. Try again. | Intro only: the draft was over 200 words (TR-48) | `translator_ai_intro_too_long` |
 | 11 | 200 | | The `AiResponse` above | |
+| any | 500 | Something went wrong on our side. Try again, or use the form. | A dependency threw before the AI was called (the admin check, the on/off switch or the rate limit; for example missing Supabase settings). Still JSON with `no-store`, never the framework's error page | `translator_ai_server_error` |
 
 **Logging:** only `console.error("translator_ai_<code>")` with one of the fixed codes in the table. Never the body, the chat, the summary, the intro fields, the AI's reply (including a reply in the wrong format), a note or an error's message. The route asks OpenAI not to store the response (`store: false`).
 

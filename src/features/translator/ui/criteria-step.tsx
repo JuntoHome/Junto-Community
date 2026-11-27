@@ -130,6 +130,14 @@ export function CriteriaStep({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [switches]);
 
+  // The AI turned off (a 503): the chat is gone, and with it whatever had focus. Put focus on the
+  // step heading, above the form and its note, but only when focus was lost, never by moving it.
+  useEffect(() => {
+    if (!aiEnabled && document.activeElement === document.body) focusStepHeading();
+    // Only when the AI turns off.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiEnabled]);
+
   // Once the chat has been opened it stays mounted, hidden behind the form, so its history is kept.
   const [chatOpened, setChatOpened] = useState(mode === "chat");
 

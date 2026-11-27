@@ -66,14 +66,18 @@ function toCount(digits: string): number | null {
   return Number.isSafeInteger(count) ? count : null;
 }
 
+/** The whole employees cell: digits, optionally with correct thousands commas, spaces only at the ends. */
+const ACTUAL = new RegExp(String.raw`^${NUMBER}$`);
+
 /**
- * The employees column as a whole number. Commas and spaces are removed first, so "1,200" and
- * " 40 " are fine. Anything else that isn't blank ("25.5", "-3", "about 20", "N/A") is "invalid".
+ * The employees column as a whole number: "25", "1,200" or " 40 ". Thousands commas must be in
+ * the right places, the same rule as the size range, so "1,2,3" or "12 34" isn't read as a
+ * different number. Anything else that isn't blank ("25.5", "-3", "about 20", "N/A") is "invalid".
  */
 function parseActual(original: string | null): Employees {
   if (original === null || original.trim() === "") return unknown(original, "blank");
-  const digits = original.replace(/[,\s]/g, "");
-  const count = /^\d+$/.test(digits) ? toCount(digits) : null;
+  const text = original.trim();
+  const count = ACTUAL.test(text) ? toCount(text) : null;
   return count === null ? unknown(original, "invalid") : { known: true, original, count, source: "actual" };
 }
 

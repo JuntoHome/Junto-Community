@@ -200,13 +200,19 @@ export function ResultsStep({
     const opener = introOpen?.opener;
     introDrafts?.cancel();
     setIntroOpen(null);
-    if (opener?.isConnected) opener.focus();
+    // A disabled button can't take focus (the request just made was the session's last).
+    if (opener?.isConnected && !opener.disabled) opener.focus();
     else resultsRef.current?.focus();
   }
 
   // The AI turned off while the panel was open (a 503): the panel and the Draft intro buttons are
   // gone, so forget which one was open. Done while rendering, like the wizard's dropped pins.
   if (!introDrafts && introOpen) setIntroOpen(null);
+  // ...and the dialog took focus with it: put it on the results, but only when it was lost.
+  const aiOn = Boolean(introDrafts);
+  useEffect(() => {
+    if (!aiOn && document.activeElement === document.body) resultsRef.current?.focus();
+  }, [aiOn]);
 
   const [pinId, setPinId] = useState("");
   // The Pin by Record ID message; `count` makes the same message be announced again.
