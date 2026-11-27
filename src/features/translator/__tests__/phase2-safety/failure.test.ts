@@ -188,6 +188,20 @@ it("failure: on Results, two failures don't leave the page", async () => {
   expect(step("results-step.tsx")).not.toContain("onTwoFailures");
 });
 
+it("failure: a hidden Criteria chat never switches to the form", async () => {
+  // The state still asks for the switch after two failures, wherever the chat is...
+  const harness = createRouteHarness(createScriptedAi(loadAiScript("failures")));
+  const chat = createChatDriver(harness, summary);
+  await chat.send(TIMED_OUT);
+  expect(shouldSwitchToForm(await chat.tryAgain())).toBe(true);
+
+  // ...so the Criteria step gives the panel onTwoFailures only while the chat is on screen. A
+  // request still in flight after the user chose the form must not refill it, show the note or
+  // move focus. Checked in the source, since screens aren't rendered.
+  const source = stripComments(readSource(`${REPO_ROOT}src/features/translator/ui/criteria-step.tsx`));
+  expect(source).toContain("onTwoFailures={hidden ? undefined : onTwoFailures}");
+});
+
 it("failure: invalid output twice gives the plain error", async () => {
   // The capability: one attempt, one retry with only the retry line added, then "unusable".
   const others = (["log", "info", "warn", "debug"] as const).map((name) => vi.spyOn(console, name).mockImplementation(() => {}));

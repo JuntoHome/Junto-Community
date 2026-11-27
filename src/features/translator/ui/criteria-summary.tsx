@@ -38,6 +38,8 @@ const TEXT = {
   otherErrors: "This change can't be saved, because it clashes with another criterion:",
   updated: "Updated.",
   updatedAndRefreshed: "Updated. Results refreshed.",
+  // When the criteria change under an open editor (a change confirmed in the Results chat).
+  editorClosed: "Your criteria changed, so the editor was closed without saving.",
 } as const;
 
 /** The "Your criteria" heading's id. The results' Edit criteria button (TR-22) moves focus to it. */
@@ -136,7 +138,8 @@ export type CriteriaSummaryHandle = {
 };
 
 /** The open inline editor: which item, the draft copy of the form it edits, and its errors. */
-type Editing = { id: BriefItemId; editor: Editor; draft: CriteriaForm; errors: CriteriaFormErrors };
+/** An open editor. `base` is the form it was opened from: a Save builds on the draft, which copied it. */
+type Editing = { id: BriefItemId; editor: Editor; base: CriteriaForm; draft: CriteriaForm; errors: CriteriaFormErrors };
 
 /** The first control in an editor that can take focus. */
 const FIRST_CONTROL = "input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])";
@@ -150,7 +153,9 @@ const FIRST_CONTROL = "input:not([disabled]), select:not([disabled]), textarea:n
  *
  * `brief` must be the brief the current results were ranked against (or the pending one before
  * confirming), never one rebuilt from form state, so the summary always matches the results.
- * `form` is the form that produced it, so a Save changes only the item being edited.
+ * `form` is the form that produced it, so a Save changes only the item being edited. When `form`
+ * changes while an editor is open (a change confirmed in the Results chat), the editor closes
+ * without saving and says so, because its draft holds the old form.
  *
  * `ref` gives `openItem()` (TR-24), so the no-results helper's Edit buttons can open an item.
  */
@@ -179,6 +184,14 @@ export function CriteriaSummary({
   const lines = describeLines(brief);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [announcement, setAnnouncement] = useState({ text: "", count: 0 });
+
+  // The criteria changed under an open editor (a change confirmed in the Results chat). Its draft
+  // copied the old form, so a Save would quietly undo that change: close it without saving and
+  // say so. State adjusted while rendering, as React recommends for state that follows a prop.
+  if (editing && editing.base !== form) {
+    setEditing(null);
+    setAnnouncement((a) => ({ text: TEXT.editorClosed, count: a.count + 1 }));
+  }
 
   const headingRef = useRef<HTMLHeadingElement>(null);
   const editorHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -213,7 +226,7 @@ export function CriteriaSummary({
 
   function open(id: BriefItemId, editor: Editor, focus: "editor" | "control" = "editor") {
     // A fresh draft every time, so whatever an earlier editor held is dropped.
-    setEditing({ id, editor, draft: form, errors: {} });
+    setEditing({ id, editor, base: form, draft: form, errors: {} });
     focusNext.current = { to: focus };
   }
 
