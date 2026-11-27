@@ -4,6 +4,7 @@
  * The chat on the Results step (TR-46) is the same chat in "revise" mode: its own opening line,
  * the confirmed brief as `currentBrief`, `settleRevision()` and `REVISE_TEXT`. After a revision
  * is confirmed, the `add-note` action puts TR-47's explanation (`explainChange()`) in the chat.
+ * `firstUserMessage()` gives the wizard the conversation's first request for the export (TR-52).
  * When the AI fails (TR-50): `interpretAiResult()` turns `postAi()`'s result into an action, the
  * state counts AI failures in a row, `shouldSwitchToForm()` and `aiTurnedOff()` say what the UI
  * should do, and `fallbackBrief()` is the brief the form is filled in with.
@@ -280,6 +281,16 @@ export function currentBriefFor(
   mode: ChatMode = "criteria",
 ): SearchBrief | undefined {
   return (mode === "revise" ? base : (state.lastValidBrief ?? base)) ?? undefined;
+}
+
+/**
+ * The first message the user typed in this conversation, as it was sent (trimmed), or null when
+ * nothing has been sent since the chat started or was reset. The wizard records it when the
+ * first proposal is confirmed, for the export's "What you asked for" line (TR-52). It never
+ * leaves the browser from here.
+ */
+export function firstUserMessage(state: ChatState): string | null {
+  return state.items.find((item) => item.role === "user")?.content ?? null;
 }
 
 /**

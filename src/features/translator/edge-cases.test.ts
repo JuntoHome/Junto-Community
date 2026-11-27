@@ -340,6 +340,8 @@ describe("formula-like text in the export", () => {
       counts: result.counts,
       source: { fileName: "formula-text.xlsx", layout: "Synthetic", sheetName: "Contacts", sha256: "0".repeat(64) },
       now: NOW,
+      origin: { briefSource: "form", editedAfterAi: false, firstAiRequest: null, aiRulesVersion: "1.0" },
+      introDrafts: {},
     });
   });
 

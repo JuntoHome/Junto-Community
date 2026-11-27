@@ -171,6 +171,24 @@ Runs on staging or a branch preview, never on the live site, where `?aiFail=1` d
 | 12.8 | On the live site, open `/admin/translator?aiFail=1` | No banner; nothing is simulated |
 | 12.9 | Log out in another tab, then send a chat message | "Your login has expired. Log in again to keep using the AI." Log in again opens the login page in a new tab. Log in there, come back, press Try again: it works, and nothing on the page was lost |
 
+## 13. Phase 2: export with AI criteria and intro drafts
+
+Runs on staging or a branch preview with the AI on (`OPENAI_API_KEY` set). Background: [README.md](README.md#sheet-criteria) and [Sheet `Intro drafts`](README.md#sheet-intro-drafts).
+
+| # | Do | Expected |
+|---|---|---|
+| 13.1 | Run section 3 with the form, Continue to export | No line about intro drafts under Download Excel |
+| 13.2 | Download and open the file | Two sheets, Shortlist and Criteria. In Criteria, after the criteria lines: `Criteria set by` `Form`; no `What you asked for`, no `AI rules version` |
+| 13.3 | Start over, load the sample, Chat with AI, send "owners in Phoenix", chat until "Here's what I understood" shows, Confirm and rank | The shortlist shows |
+| 13.4 | Draft intro on two rows (for example ranks 1 and 2); change a few words in one draft; close the dialog | Both drafts are kept when you reopen them |
+| 13.5 | Continue to export | Under Download Excel: "Your intro drafts are included on a separate sheet." |
+| 13.6 | Download and open the file in Excel | No repair message. Three sheets: Shortlist, Criteria, Intro drafts. Criteria: `Criteria set by` `AI chat`, `What you asked for` `owners in Phoenix`, `AI rules version` `1.0` |
+| 13.7 | In Intro drafts | Row 1 the synthetic note in bold, header on row 3, frozen and with a filter. Columns Rank, Record ID, Company, Draft. Rows in rank order; the edited draft shows your edited text; long drafts wrap |
+| 13.8 | Open the same file in Google Sheets (upload to your Drive; it's fictional data; delete it afterwards) | Same three sheets; the frozen header and filter work on Intro drafts |
+| 13.9 | Back on Results, change a criterion with Change in "Your criteria" and Save, then export again | `Criteria set by` `AI chat, then edited`; `What you asked for` is still `owners in Phoenix` |
+| 13.10 | On Results, ask the "Want to change something?" chat for a change that takes a drafted row out of the list (for example "only 1 row"), Confirm and rank, export again | `Criteria set by` `AI chat`, `What you asked for` still `owners in Phoenix`. The draft for the row that left is still on Intro drafts, with Rank `Not in shortlist`, after the ranked ones |
+| 13.11 | Start over and export again (form) | The drafts are gone: two sheets only |
+
 ## Reporting bugs
 
 Open one GitHub issue per bug, in milestone "Data Axle Translator Phase 1", with:

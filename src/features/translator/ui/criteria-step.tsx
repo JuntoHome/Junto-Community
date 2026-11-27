@@ -117,7 +117,7 @@ export function CriteriaStep({
   /** Moves focus to the step's "Criteria" heading, the heading above the form. */
   focusStepHeading: () => void;
   /** Confirm and rank on the AI's proposal card (TR-45). */
-  onConfirmProposal: (brief: SearchBrief) => void;
+  onConfirmProposal: (brief: SearchBrief, firstRequest: string | null) => void;
 }) {
   const chatHeadingRef = useRef<HTMLHeadingElement>(null);
   // Counts choices and switches, so focus moves after one but not when the step first shows.
@@ -222,7 +222,7 @@ function ChatSection({
   onUseForm: (brief: SearchBrief | null) => void;
   onTwoFailures: (brief: SearchBrief | null) => void;
   onAiUnavailable: () => void;
-  onConfirmProposal: (brief: SearchBrief) => void;
+  onConfirmProposal: (brief: SearchBrief, firstRequest: string | null) => void;
   onEditProposal: (brief: SearchBrief) => void;
   onSwitchToForm: () => void;
 }) {

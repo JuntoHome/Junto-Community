@@ -231,6 +231,7 @@ describe("role change walkthrough (business owner brief, title Operations Manage
           sha256: ALLOWED_WORKBOOKS[0].sha256,
         },
         now: new Date(Date.UTC(2026, 10, 18)),
+        origin: { briefSource: "form", editedAfterAi: false, firstAiRequest: null, aiRulesVersion: "1.0" },
       });
       const section = (heading: string) => sections.find((s) => s.heading === heading)?.rows ?? [];
 

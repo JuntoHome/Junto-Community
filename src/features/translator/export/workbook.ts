@@ -3,7 +3,8 @@ import type { MappingRow } from "../import/describe-mapping";
 import type { RankResult } from "../ranking";
 import type { Counts } from "../ranking/counts";
 import { setTextCell } from "./cells";
-import { type CriteriaSection, criteriaTable, type ExportSource } from "./criteria-rows";
+import { type CriteriaSection, criteriaTable, type ExportBriefOrigin, type ExportSource } from "./criteria-rows";
+import { type ExportIntroDraft, type IntroDraftColumnKey, type IntroDraftsTable, introDraftsTable } from "./intro-drafts-rows";
 import { SYNTHETIC_NOTE, WORKBOOK_SUBJECT, WORKBOOK_TITLE } from "./labels";
 import { type ShortlistColumnKey, shortlistTable } from "./shortlist-rows";
 
@@ -27,6 +28,7 @@ export const WORKBOOK_CREATOR = "JCA Data Axle Translator";
 
 export const SHORTLIST_SHEET_NAME = "Shortlist";
 export const CRITERIA_SHEET_NAME = "Criteria";
+export const INTRO_DRAFTS_SHEET_NAME = "Intro drafts";
 
 /**
  * The Shortlist sheet's layout (TR-28): row 1 is the synthetic note, row 2 is blank, the table
@@ -34,6 +36,16 @@ export const CRITERIA_SHEET_NAME = "Criteria";
  */
 export const SHORTLIST_NOTE_ROW = 1;
 export const SHORTLIST_HEADER_ROW = 3;
+
+/**
+ * The Intro drafts sheet (TR-52) has the Shortlist sheet's layout: the note in row 1, row 2
+ * blank, the header in row 3, the first draft in row 4.
+ */
+export const INTRO_DRAFTS_NOTE_ROW = SHORTLIST_NOTE_ROW;
+export const INTRO_DRAFTS_HEADER_ROW = SHORTLIST_HEADER_ROW;
+
+/** Intro drafts column widths in characters. Only Draft wraps. */
+const INTRO_DRAFT_WIDTHS: Record<IntroDraftColumnKey, number> = { rank: 8, recordId: 14, company: 30, draft: 90 };
 
 /** The Criteria sheet's two columns. */
 const CRITERIA_COLUMNS = [
@@ -142,7 +154,52 @@ function addCriteriaSheet(workbook: ExcelJS.Workbook, sections: readonly Criteri
   });
 }
 
-/** What the Criteria sheet needs besides the ranking result. */
+/**
+ * Adds the Intro drafts sheet (TR-52), laid out like Shortlist: the synthetic note in bold in row
+ * 1, row 2 blank, a bold header in row 3 with a filter, frozen with everything above it, then one
+ * row per draft (`introDraftsTable()`). Rank is a number for a shortlisted record; every other
+ * value is text through `setTextCell()`, so a draft that starts with `=` or `@` stays text.
+ */
+function addIntroDraftsSheet(workbook: ExcelJS.Workbook, { columns, rows }: IntroDraftsTable) {
+  const sheet = workbook.addWorksheet(INTRO_DRAFTS_SHEET_NAME, {
+    views: [{ state: "frozen", ySplit: INTRO_DRAFTS_HEADER_ROW }],
+  });
+  sheet.columns = columns.map(({ key }) => ({ key, width: INTRO_DRAFT_WIDTHS[key] }));
+
+  const note = sheet.getRow(INTRO_DRAFTS_NOTE_ROW).getCell(1);
+  setTextCell(note, SYNTHETIC_NOTE);
+  note.font = { bold: true };
+
+  const header = sheet.getRow(INTRO_DRAFTS_HEADER_ROW);
+  columns.forEach((column, index) => {
+    const cell = header.getCell(index + 1);
+    setTextCell(cell, column.header);
+    cell.font = { bold: true };
+    cell.alignment = { vertical: "top", wrapText: true };
+  });
+
+  rows.forEach((values, rowIndex) => {
+    const row = sheet.getRow(INTRO_DRAFTS_HEADER_ROW + 1 + rowIndex);
+    columns.forEach((column, index) => {
+      const value = values[index];
+      const cell = row.getCell(index + 1);
+      // Only Rank can be a number. Every string goes through setTextCell().
+      if (typeof value === "number") {
+        cell.value = value;
+      } else {
+        setTextCell(cell, value);
+      }
+      cell.alignment = column.key === "draft" ? { vertical: "top", wrapText: true } : { vertical: "top" };
+    });
+  });
+
+  sheet.autoFilter = {
+    from: { row: INTRO_DRAFTS_HEADER_ROW, column: 1 },
+    to: { row: INTRO_DRAFTS_HEADER_ROW + rows.length, column: columns.length },
+  };
+}
+
+/** What the Criteria and Intro drafts sheets need besides the ranking result. */
 export type CriteriaInput = {
   /** `buildCounts()` for the same ranking result. */
   counts: Counts;
@@ -150,6 +207,10 @@ export type CriteriaInput = {
   source: ExportSource;
   /** When the file is made. */
   now: Date;
+  /** How the brief was made (TR-52), for the Criteria sheet. */
+  origin: ExportBriefOrigin;
+  /** The intro drafts by Record ID (TR-49), for the Intro drafts sheet. `{}` when there are none. */
+  introDrafts: Readonly<Record<string, ExportIntroDraft>>;
 };
 
 /**
@@ -164,6 +225,9 @@ export type CriteriaInput = {
  *
  * Sheet `Criteria`, after it: how the list was made (`criteriaTable()`), see `addCriteriaSheet()`.
  *
+ * Sheet `Intro drafts`, last, only when the user kept at least one non-empty draft
+ * (`introDraftsTable()`), see `addIntroDraftsSheet()`.
+ *
  * Every text cell is a literal string with the Text format (`setTextCell()`), so a value such as
  * `=SUM(1,1)` shows as that text, never as 2. Throws `FORMULA_BLOCKED_MESSAGE` if a cell would
  * hold a formula (`assertNoFormulas()`).
@@ -171,7 +235,7 @@ export type CriteriaInput = {
 export async function buildWorkbook(
   rankResult: RankResult,
   mapping: readonly MappingRow[],
-  { counts, source, now }: CriteriaInput,
+  { counts, source, now, origin, introDrafts }: CriteriaInput,
 ): Promise<ArrayBuffer> {
   const { columns, rows } = shortlistTable(rankResult, mapping);
 
@@ -221,7 +285,10 @@ export async function buildWorkbook(
     to: { row: SHORTLIST_HEADER_ROW + rows.length, column: columns.length },
   };
 
-  addCriteriaSheet(workbook, criteriaTable({ rankResult, counts, source, now }));
+  addCriteriaSheet(workbook, criteriaTable({ rankResult, counts, source, now, origin }));
+
+  const drafts = introDraftsTable(introDrafts, rankResult);
+  if (drafts) addIntroDraftsSheet(workbook, drafts);
 
   // The backstop: no formula ever leaves this function.
   assertNoFormulas(workbook);
