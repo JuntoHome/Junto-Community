@@ -45,7 +45,7 @@ type LogCode = InterviewErrorCode | IntroErrorCode | "rate_limited" | "bad_reque
 
 /**
  * Writes `translator_ai_<code>`. One string literal per code, never built from a value, so the
- * static test (`__tests__/no-content-logging.test.ts`, TR-51) can prove nothing else is logged.
+ * static test (`__tests__/phase2-safety/guardrails.test.ts`, TR-51, TR-54) can prove nothing else is logged.
  */
 function logCode(code: LogCode): void {
   switch (code) {

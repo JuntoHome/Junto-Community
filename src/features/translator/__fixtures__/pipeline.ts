@@ -3,6 +3,7 @@ import { type MustHaveField, type PickerOption, toBrief } from "../criteria/from
 import type { SearchBrief } from "../criteria/schema";
 import { briefToFormState } from "../criteria/to-form";
 import { describeMapping } from "../import/describe-mapping";
+import type { GroupedRecord } from "../normalize/duplicates";
 import { fieldOptions } from "../normalize/field-options";
 import { summarizeImport, type ImportState } from "../normalize/summary";
 import { compareIssues } from "../normalize/validate-rows";
@@ -29,22 +30,31 @@ export async function loadFile(buffer: ArrayBuffer) {
     issues: [...validation.issues, ...grouping.issues].sort(compareIssues),
   };
   const records = importState.records;
-  const options: Record<MustHaveField, PickerOption[]> = {
-    city: fieldOptions(records, "city"),
-    state: fieldOptions(records, "state"),
-    industry: fieldOptions(records, "industry"),
-    title: fieldOptions(records, "title"),
-  };
   return {
     importState,
     records,
     importSummary: summarizeImport(importState),
     mapping: describeMapping(workbook.layout, workbook.headers),
-    options,
+    options: pickerOptions(records),
   };
 }
 
 export type LoadedFile = Awaited<ReturnType<typeof loadFile>>;
+
+/** The values each criteria picker offers for these records (`fieldOptions()`), as `toBrief()` needs them. */
+export function pickerOptions(records: readonly GroupedRecord[]): Record<MustHaveField, PickerOption[]> {
+  return {
+    city: fieldOptions(records, "city"),
+    state: fieldOptions(records, "state"),
+    industry: fieldOptions(records, "industry"),
+    title: fieldOptions(records, "title"),
+  };
+}
+
+/** The same file with its grouped records in another order (a shuffle), and the pickers built from them. */
+export function withRecords(file: LoadedFile, records: GroupedRecord[]): LoadedFile {
+  return { ...file, records, options: pickerOptions(records) };
+}
 
 /**
  * Runs a workbook through the whole chain the wizard runs (`ui/translator-wizard.tsx`), from the

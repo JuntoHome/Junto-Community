@@ -14,11 +14,8 @@ import {
   currentBriefFor,
   GREETING,
   initialChatState,
-  aiTurnedOff,
-  fallbackBrief,
   firstUserMessage,
   interpretAiResult,
-  shouldSwitchToForm,
   isAddedNote,
   latestAnnouncement,
   limitReached,
@@ -446,65 +443,6 @@ describe("interpretAiResult", () => {
       error: "This conversation is too long. Start a new chat to keep going.",
     });
     expect(interpretAiResult({ kind: "bad-request", error: null })).toMatchObject({ error: FALLBACK_TEXT.somethingWrong });
-  });
-});
-
-describe("when the AI fails (TR-50)", () => {
-  const failed = (requestId: number, kind: Extract<ChatAction, { type: "failed" }>["kind"]): ChatAction => ({
-    ...(interpretAiResult({ kind, error: null }) as Extract<ChatAction, { type: "failed" }>),
-    requestId,
-  });
-
-  it("counts two AI failures after a proposal, keeps that proposal, and asks for the switch to the form", () => {
-    const state = run(send("Owners"), received(1, { proposal: BUSINESS_OWNER_BRIEF }), send("Mesa"), failed(2, "ai-failure"), send("Mesa"), failed(3, "network"));
-    expect(state.failures).toBe(2);
-    expect(state.lastValidBrief).toBe(BUSINESS_OWNER_BRIEF);
-    expect(fallbackBrief(state, null)).toBe(BUSINESS_OWNER_BRIEF);
-    expect(shouldSwitchToForm(state)).toBe(true);
-  });
-
-  it("asks for nothing after one failure", () => {
-    const state = run(send("Owners"), failed(1, "ai-failure"));
-    expect(state.failures).toBe(1);
-    expect(shouldSwitchToForm(state)).toBe(false);
-  });
-
-  it("resets the count on a reply: failure, success, failure gives 1", () => {
-    const state = run(send("A"), failed(1, "network"), send("A"), received(2), send("B"), failed(3, "ai-failure"));
-    expect(state.failures).toBe(1);
-    expect(shouldSwitchToForm(state)).toBe(false);
-  });
-
-  it("doesn't count a login expiry, a rate limit or a refusal", () => {
-    const expired = run(send("A"), failed(1, "session-expired"), send("A"), failed(2, "session-expired"));
-    expect(expired.failures).toBe(0);
-    expect(shouldSwitchToForm(expired)).toBe(false);
-    const others = run(send("A"), failed(1, "rate-limited"), send("A"), failed(2, "too-long"), send("A"), failed(3, "bad-request"));
-    expect(others.failures).toBe(0);
-  });
-
-  it("uses the confirmed brief on the Results step, and the pending brief on Criteria with no proposal", () => {
-    const state = run(send("Owners"), failed(1, "ai-failure"));
-    expect(fallbackBrief(state, BUSINESS_OWNER_BRIEF, "revise")).toBe(BUSINESS_OWNER_BRIEF);
-    expect(fallbackBrief(state, BUSINESS_OWNER_BRIEF, "criteria")).toBe(BUSINESS_OWNER_BRIEF);
-    expect(fallbackBrief(state, null)).toBeNull();
-    // On Results a proposal that was never confirmed doesn't replace the confirmed brief.
-    const proposal = { ...BUSINESS_OWNER_BRIEF, listSize: 30 };
-    const withProposal = run(send("30 rows"), received(1, { proposal }), send("Hm"), failed(2, "network"));
-    expect(fallbackBrief(withProposal, BUSINESS_OWNER_BRIEF, "revise")).toBe(BUSINESS_OWNER_BRIEF);
-    expect(fallbackBrief(withProposal, BUSINESS_OWNER_BRIEF, "criteria")).toBe(proposal);
-  });
-
-  it("turns the AI off on unavailable, without counting it", () => {
-    const state = run(send("A"), failed(1, "unavailable"));
-    expect(aiTurnedOff(state)).toBe(true);
-    expect(state.failures).toBe(0);
-    expect(aiTurnedOff(run(send("A"), failed(1, "network")))).toBe(false);
-  });
-
-  it("starts a fresh count after Start over chat", () => {
-    const state = run(send("A"), failed(1, "network"), { type: "reset" });
-    expect(state).toMatchObject({ failures: 0, failureKind: null, aiOff: false });
   });
 });
 

@@ -1,5 +1,7 @@
 import type { TranslatorRecord } from "../import/fields";
-import type { SourceCell } from "../import/map-row";
+import { mapRow, type SourceCell } from "../import/map-row";
+import { REFERENCE_SOLUTIONS_MAPPING } from "../import/mappings/reference-solutions";
+import { normalizeRecord } from "../normalize/normalize";
 
 /**
  * One invented row in the Reference Solutions layout, and the record mapRow should give for it.
@@ -81,3 +83,27 @@ export const RS_FIXTURE_EXPECTED: TranslatorRecord = {
     { name: "Demo Person 002", title: null },
   ],
 };
+
+/**
+ * The fixture row with an IUSA Number and three other executives filled in, normalized, as
+ * `pickIntroFields()` sees a ranked row. It holds a phone, a website, an address, a ZIP code,
+ * NAICS text, a size range and executives, so an intro test can check none of them is sent.
+ */
+export function fullRsRecord() {
+  const values = new Map<SourceCell, SourceCell>(RS_FIXTURE_HEADERS.map((header, index) => [header, RS_FIXTURE_ROW[index]]));
+  const changes: [string, SourceCell][] = [
+    ["IUSA Number", "900012345"],
+    ["Executive First Name 1", "Other"],
+    ["Executive Last Name 1", "Exec 01"],
+    ["Executive Title 1", "Vice President"],
+    ["Executive First Name 2", "Other"],
+    ["Executive Last Name 2", "Exec 02"],
+    ["Executive Title 2", "Treasurer"],
+    ["Executive First Name 3", "Other"],
+    ["Executive Last Name 3", "Exec 03"],
+    ["Executive Title 3", "Secretary"],
+  ];
+  for (const [header, value] of changes) values.set(header, value);
+  const row = RS_FIXTURE_HEADERS.map((header) => values.get(header) ?? null);
+  return { normalized: normalizeRecord(mapRow(REFERENCE_SOLUTIONS_MAPPING, RS_FIXTURE_HEADERS, row, 7)) };
+}

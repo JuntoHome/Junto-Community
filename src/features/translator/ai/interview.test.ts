@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createFakeAi } from "../__fixtures__/fake-ai";
 import { EXAMPLE_SUMMARY } from "../__fixtures__/summary";
 import { BUSINESS_OWNER_BRIEF } from "../criteria/examples";
@@ -18,20 +18,10 @@ const BAD_SHAPE = ok("Where are your customers?"); // plain text, not the format
 /** A fake AiCall that gives these results in order (the shared fake AI, TR-51). */
 const scripted = (...results: AiCallResult[]) => createFakeAi(results);
 
-let consoleSpies: MockInstance[];
-
-beforeEach(() => {
-  consoleSpies = (["log", "info", "warn", "error", "debug"] as const).map((name) =>
-    vi.spyOn(console, name).mockImplementation(() => {}),
-  );
-});
-
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
-
-const logged = () => consoleSpies.flatMap((spy) => spy.mock.calls);
 
 describe("runInterviewTurn", () => {
   it("sends the chat with the instructions and the structured format, and returns the checked reply", async () => {
@@ -72,13 +62,6 @@ describe("runInterviewTurn", () => {
     expect(retry.instructions).toBe(callAi.mock.calls[0][0].instructions);
     expect(retry.format).toEqual(callAi.mock.calls[0][0].format);
     expect(MESSAGES).toHaveLength(1); // the caller's chat is not changed
-  });
-
-  it('gives "unusable" after two replies in the wrong format, and logs nothing itself', async () => {
-    const callAi = scripted(BAD_SHAPE, ok({ message: "Hi", proposal: null, extra: 1 }));
-    expect(await runInterviewTurn(INPUT, callAi)).toEqual({ ok: false, code: "unusable" });
-    expect(callAi).toHaveBeenCalledTimes(2);
-    expect(logged()).toEqual([]);
   });
 
   it("doesn't retry when a valid reply's proposal was dropped: the note is shown instead", async () => {

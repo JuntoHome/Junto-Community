@@ -15,7 +15,7 @@ export type TranslatorErrorCode = "file-unreadable" | "parser-unavailable" | "sa
  */
 export function logTranslatorError(code: TranslatorErrorCode): void {
   // One string literal per code, never built from a value, so the static test
-  // (`__tests__/no-content-logging.test.ts`, TR-51) can prove nothing else is logged.
+  // (`__tests__/phase2-safety/guardrails.test.ts`, TR-51, TR-54) can prove nothing else is logged.
   switch (code) {
     case "file-unreadable":
       console.error("[translator] file-unreadable");
