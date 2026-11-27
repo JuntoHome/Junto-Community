@@ -163,6 +163,23 @@ describe("handleAiRequest: what it accepts", () => {
       "a summary value of 81 characters",
       post({ ...INTERVIEW, summary: { ...EXAMPLE_SUMMARY, titles: [{ value: "a".repeat(81), count: 1 }] } }),
     ],
+    // Fix B: the brief's values must be ones the summary holds, and its assumptions within limits.
+    [
+      "a currentBrief value that isn't in the summary",
+      post({ ...INTERVIEW, currentBrief: { ...BUSINESS_OWNER_BRIEF, exclusions: [{ field: "title", operator: "equals", value: "jane@example.invalid" }] } }),
+    ],
+    [
+      "a currentBrief city outside the summary",
+      post({ ...INTERVIEW, currentBrief: { ...BUSINESS_OWNER_BRIEF, mustHaves: [{ field: "city", operator: "equals", value: "Zuni" }] } }),
+    ],
+    [
+      "a currentBrief assumption that looks like contact data",
+      post({ ...INTERVIEW, currentBrief: { ...BUSINESS_OWNER_BRIEF, assumptions: ["Acme Fabrication, call 602-555-0100"] } }),
+    ],
+    [
+      "a currentBrief assumption over 200 characters",
+      post({ ...INTERVIEW, currentBrief: { ...BUSINESS_OWNER_BRIEF, assumptions: ["x".repeat(201)] } }),
+    ],
   ])("returns 400 for %s and logs only translator_ai_bad_request", async (_, request) => {
     const deps = fakeDeps();
     await expectFailure(await handleAiRequest(request, deps), 400, BAD_REQUEST);

@@ -19,6 +19,7 @@
 import { z } from "zod";
 import { removeChip } from "../criteria/chips";
 import { type SearchBrief, searchBriefSchema } from "../criteria/schema";
+import { briefForAi } from "./brief-for-ai";
 import { type BriefChange, diffBriefs } from "./diff-brief";
 import { failureMessage } from "./fallback";
 import { type AiFailureKind, countsAsAiFailure, type PostAiResult } from "./post-ai";
@@ -42,6 +43,9 @@ export const CHAT_TEXT = {
   startOver: "Start over chat",
   useForm: "Use the form",
   limitReached: "This chat is getting long. Start over chat to keep going, or use the form.",
+  /** A note when the current criteria hold values the AI may not see (fix B): not in the file summary. */
+  withheld: (values: readonly string[]) =>
+    `The AI can't see ${values.map((value) => `"${value}"`).join(", ")} from your criteria, so its suggestion leaves ${values.length === 1 ? "it" : "them"} out. Check it before you confirm, or use the form.`,
 } as const;
 
 // The proposal card's strings (TR-45). Plain language, no em-dashes.
@@ -312,19 +316,33 @@ export function changesAnnouncement(changes: readonly BriefChange[]): string {
 
 /**
  * The body for `/api/translator/ai`: `kind`, `summary`, `messages` and, when there is one,
- * `currentBrief` (the route refuses `null`, so the key is left out). Nothing else.
+ * `currentBrief` (the route refuses `null`, so the key is left out). Nothing else. The brief is
+ * `briefForAi(currentBrief, summary).brief`: only values the summary holds (fix B), the rule the
+ * route enforces. Build `summary` with the same brief (`buildFileSummary(records, layout,
+ * currentBrief)`), so every value the file really has is in it.
  */
 export function buildChatRequest(
   state: ChatState,
   summary: FileSummary,
   currentBrief: SearchBrief | undefined,
 ): InterviewRequest {
+  const brief = briefForAi(currentBrief, summary).brief;
   return {
     kind: "interview",
     summary,
     messages: chatMessages(state.items),
-    ...(currentBrief && { currentBrief }),
+    ...(brief && { currentBrief: brief }),
   };
+}
+
+/**
+ * The note to add before a request whose current brief holds values the AI may not see (fix B),
+ * naming them; null when there are none. The values stay in the user's criteria; only the AI's
+ * copy leaves them out, so its suggestion may drop them, and the note says to check it.
+ */
+export function withheldNote(currentBrief: SearchBrief | undefined, summary: FileSummary): string | null {
+  const { withheld } = briefForAi(currentBrief, summary);
+  return withheld.length > 0 ? CHAT_TEXT.withheld(withheld) : null;
 }
 
 const interviewReplySchema = z.object({

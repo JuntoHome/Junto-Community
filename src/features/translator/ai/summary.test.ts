@@ -162,7 +162,7 @@ describe("buildFileSummary: caps, order and dropped values", () => {
     expect(() => fileSummarySchema.parse(summary)).not.toThrow();
   });
 
-  it("drops contact-looking values and cleans and cuts long ones", () => {
+  it("drops contact-looking values and leaves out a value it would have to cut or change", () => {
     const long = `Senior\nOperations Lead ${"A".repeat(200)}`;
     const records = [
       record(1, { title: "jane@example.invalid" }),
@@ -173,13 +173,10 @@ describe("buildFileSummary: caps, order and dropped values", () => {
     ];
     const summary = buildFileSummary(records, "synthetic");
 
-    const cut = `Senior Operations Lead ${"A".repeat(200)}`.slice(0, 80);
-    expect(summary.titles).toEqual([
-      { value: "Owner", count: 1 },
-      { value: cut, count: 1 },
-    ]);
-    expect(summary.titles[1].value).toHaveLength(80);
-    // Dropped values are not a cut.
+    // The long title would have to be cut to 80 characters, which is a value no record has, so
+    // it is left out like the contact-looking ones (fix B): the AI can't propose it.
+    expect(summary.titles).toEqual([{ value: "Owner", count: 1 }]);
+    // Values left out are not a cut.
     expect(summary.truncated.titles).toBe(false);
     const json = JSON.stringify(summary);
     for (const text of ["@", "555", "www.", "example.invalid", "\\n"]) expect(json).not.toContain(text);

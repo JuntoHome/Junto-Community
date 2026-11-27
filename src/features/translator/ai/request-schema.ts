@@ -7,6 +7,7 @@
  */
 import { z } from "zod";
 import { BRIEF_INTENTS, searchBriefSchema } from "../criteria/schema";
+import { briefFitsSummary } from "./brief-for-ai";
 import { introFieldsSchema, MAX_INTRO_NOTE_CHARS } from "./intro";
 import { fileSummarySchema } from "./summary";
 import type { AiRequest, ChatMessage } from "./types";
@@ -75,6 +76,11 @@ export function parseAiRequest(body: unknown): ParsedAiRequest {
       ? { ok: false, problem: "note-too-long" }
       : { ok: true, request };
   }
+
+  // The privacy wall for the brief (fix B): every value must be one the summary holds, and the
+  // assumptions must meet the limits. The browser sends only such a brief (`briefForAi()`), so
+  // one that doesn't fit means a bug or a hand-made request: refused, never passed to the AI.
+  if (request.currentBrief && !briefFitsSummary(request.currentBrief, request.summary)) return { ok: false, problem: "bad-request" };
 
   if (request.messages.length > MAX_MESSAGES) return { ok: false, problem: "conversation-too-long" };
   // An assistant turn is ours, sent back by the browser. One that long means the chat has run on.

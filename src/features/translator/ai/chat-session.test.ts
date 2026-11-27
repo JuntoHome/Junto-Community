@@ -177,7 +177,8 @@ describe("buildChatRequest", () => {
     expect(Object.keys(request).sort()).toEqual(["currentBrief", "kind", "messages", "summary"]);
     expect(request.kind).toBe("interview");
     expect(request.summary).toBe(EXAMPLE_SUMMARY);
-    expect(request.currentBrief).toBe(BUSINESS_OWNER_BRIEF);
+    // A checked copy (fix B): every value is in the summary, so nothing is taken out.
+    expect(request.currentBrief).toStrictEqual(BUSINESS_OWNER_BRIEF);
     for (const message of request.messages) expect(Object.keys(message).sort()).toEqual(["content", "role"]);
     expect(request.messages).toEqual([
       { role: "assistant", content: GREETING },
@@ -473,7 +474,8 @@ describe("characterCount", () => {
 describe("CHAT_TEXT", () => {
   it("has the limit text and no em-dashes", () => {
     expect(CHAT_TEXT.limitReached).toBe("This chat is getting long. Start over chat to keep going, or use the form.");
-    for (const text of Object.values(CHAT_TEXT)) expect(text).not.toMatch(/[\u2013\u2014]/);
+    const texts = Object.values(CHAT_TEXT).map((text) => (typeof text === "function" ? text(["Zuni", "Mesa"]) : text));
+    for (const text of texts) expect(text).not.toMatch(/[\u2013\u2014]/);
   });
 });
 
