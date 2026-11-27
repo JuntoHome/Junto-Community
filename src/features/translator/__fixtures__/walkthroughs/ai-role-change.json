@@ -1,0 +1,26 @@
+{
+  "description": "Role change walkthrough (TR-53): on the Results step, from the confirmed business owner brief, the title preference changes from Owner to Operations Manager and nothing else.",
+  "steps": [
+    {
+      "whenUserSays": { "pattern": "^prefer operations managers instead$", "flags": "i" },
+      "reply": {
+        "message": "I changed the title preference to Operations Manager. Everything else stays the same.",
+        "proposal": {
+          "intent": "business_owner",
+          "mustHaves": [
+            { "field": "city", "operator": "equals", "value": "Phoenix" },
+            { "field": "state", "operator": "equals", "value": "AZ" }
+          ],
+          "preferences": [
+            { "field": "industry", "operator": "equals", "value": "Fabrication" },
+            { "field": "title", "operator": "equals", "value": "Operations Manager" },
+            { "field": "employees", "operator": "range", "value": { "min": 10, "max": 99 } }
+          ],
+          "exclusions": [],
+          "listSize": 40,
+          "assumptions": []
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "description": "Business owner walkthrough (TR-53): a welding supply seller looking for customers in Phoenix. Two follow-up questions, then the business owner brief from criteria/examples.ts.",
+  "steps": [
+    {
+      "whenUserSays": { "pattern": "^I sell welding supplies, looking for customers in Phoenix$", "flags": "i" },
+      "reply": {
+        "message": "Welding supplies sound like a fit for fabrication shops. Who should I look for at those businesses: owners, operations managers or general managers?",
+        "proposal": null
+      }
+    },
+    {
+      "whenUserSays": { "pattern": "^owners, please$", "flags": "i" },
+      "reply": {
+        "message": "Got it. What size of company suits you, and how many businesses should the list have?",
+        "proposal": null
+      }
+    },
+    {
+      "whenUserSays": { "pattern": "^10 to 99 employees, and 40 businesses$", "flags": "i" },
+      "reply": {
+        "message": "Here's what I understood: businesses in Phoenix, AZ, preferring fabrication, owners and 10 to 99 employees, with 40 in the list.",
+        "proposal": {
+          "intent": "business_owner",
+          "mustHaves": [
+            { "field": "city", "operator": "equals", "value": "Phoenix" },
+            { "field": "state", "operator": "equals", "value": "AZ" }
+          ],
+          "preferences": [
+            { "field": "industry", "operator": "equals", "value": "Fabrication" },
+            { "field": "title", "operator": "equals", "value": "Owner" },
+            { "field": "employees", "operator": "range", "value": { "min": 10, "max": 99 } }
+          ],
+          "exclusions": [],
+          "listSize": 40,
+          "assumptions": []
+        }
+      }
+    }
+  ]
+}

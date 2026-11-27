@@ -1,0 +1,12 @@
+{
+  "description": "Ambiguous answer (TR-53): \"Phoenix area\" gets a choice question naming cities from the file summary, and no proposal.",
+  "steps": [
+    {
+      "whenUserSays": { "pattern": "^Phoenix area$", "flags": "i" },
+      "reply": {
+        "message": "This file has a few cities around Phoenix. Which should I use: Phoenix, Glendale, Mesa or Tempe?",
+        "proposal": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "description": "Intro draft (TR-53): the draft for SYN-0001 includes an email address the AI made up, which the app replaces with [contact details].",
+  "steps": [
+    {
+      "whenUserSays": { "pattern": "\"company\":\"Synthetic Company 0001\"" },
+      "reply": {
+        "draft": "Hello, I run a small welding supply business in Phoenix and work with fabrication shops like Synthetic Company 0001. I would like to introduce our products and learn what your team uses today. You can reach me at jane@example.invalid. Would you have fifteen minutes next week for a short call? Thank you for your time."
+      }
+    }
+  ]
+}
