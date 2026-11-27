@@ -17,6 +17,7 @@ export function POST(request: Request) {
     getAdmin,
     aiEnabled,
     callAi: createOpenAiCall(),
-    rateLimit: (userId) => isRateLimited(`translator-ai:${userId}`, AI_REQUESTS_PER_WINDOW),
+    // Only requests that went through count, so the limit lifts as the 10 minutes move on.
+    rateLimit: (userId) => isRateLimited(`translator-ai:${userId}`, AI_REQUESTS_PER_WINDOW, Date.now(), { countRefused: false }),
   });
 }

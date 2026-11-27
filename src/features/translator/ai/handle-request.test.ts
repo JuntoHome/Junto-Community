@@ -85,6 +85,18 @@ async function expectFailure(response: Response, status: number, error?: string)
 }
 
 describe("handleAiRequest: who may call it", () => {
+  it.each([
+    ["the admin check", { getAdmin: async () => Promise.reject(new Error("Supabase settings missing: secret-detail")) }],
+    ["the on/off switch", { aiEnabled: () => { throw new Error("secret-detail"); } }],
+    ["the rate limit", { rateLimit: () => { throw new Error("secret-detail"); } }],
+  ])("returns 500 JSON (not the framework's error page) when %s throws, logging only the code", async (_, override) => {
+    const deps = fakeDeps(override);
+    const body = await expectFailure(await handleAiRequest(post(INTERVIEW), deps), 500, "Something went wrong on our side. Try again, or use the form.");
+    expect(JSON.stringify(body)).not.toContain("secret-detail");
+    expect(deps.callAi).not.toHaveBeenCalled();
+    expect(logged()).toEqual([["translator_ai_server_error"]]);
+  });
+
   it("returns 401 JSON when there is no admin, without calling the AI", async () => {
     const deps = fakeDeps({ getAdmin: async () => null });
     await expectFailure(

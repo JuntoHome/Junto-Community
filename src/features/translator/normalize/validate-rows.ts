@@ -10,7 +10,7 @@ import { normalizeEmployees, type NormalizedRow } from "./normalize";
  */
 
 /** What kind of problem a row has. `possible-duplicate` comes from duplicate grouping (TR-12, duplicates.ts). */
-export type RowIssueCode = "invalid-employees" | "duplicate-id" | "generated-id" | "possible-duplicate";
+export type RowIssueCode = "invalid-employees" | "unreadable-range" | "duplicate-id" | "generated-id" | "possible-duplicate";
 
 /** "warning": the row is kept and ranked. "excluded": the row is left out of everything after this step. */
 export type RowIssueSeverity = "warning" | "excluded";
@@ -53,6 +53,8 @@ export const ROW_ISSUE_REASONS = {
     `Record ID ${quote(recordId)} is also used on row ${firstRow}. Row ${firstRow} is used and this row is left out.`,
   generatedId: (idColumn: string, recordId: string) =>
     `${idColumn} is blank, so this row was given the ID ${recordId}.`,
+  unreadableRange: (range: string) =>
+    `Employee size range "${quote(range)}" isn't a format the Translator can read, so company size is treated as unknown.`,
   generatedIdEveryRow: (idColumn: string) =>
     `No row has an ${idColumn}, so every row was given an ID from its row number (row 2 is ROW-0001).`,
 } as const;
@@ -94,6 +96,24 @@ export function withFreeGeneratedIds(rows: readonly NormalizedRow[]): Normalized
   });
 }
 
+/**
+ * An `unreadable-range` issue when the size range was needed (the employees count is blank or
+ * not a whole number) and has text, but isn't a format TR-10 reads ("10 to 19", "10-19",
+ * "10,000+"). The range formats are guessed (Unverified), so this is the only sign a guess is
+ * wrong for a real file.
+ */
+function rangeIssue(row: NormalizedRow): RowIssue | null {
+  const range = row.record.employeeRange;
+  if (range === null || range.trim() === "" || row.normalized.employees.known) return null;
+  return {
+    sourceRow: row.sourceRow,
+    recordId: row.normalized.recordId,
+    code: "unreadable-range",
+    severity: "warning",
+    reason: ROW_ISSUE_REASONS.unreadableRange(range),
+  };
+}
+
 /** Whole-file issues (sourceRow null) first, then by row number, then by code. */
 export function compareIssues(a: RowIssue, b: RowIssue): number {
   const rowA = a.sourceRow ?? 0;
@@ -108,6 +128,8 @@ export function compareIssues(a: RowIssue, b: RowIssue): number {
  * - **Invalid employees** (warning): the employees cell has text that isn't a whole number
  *   ("25.5", "-3", "N/A"). Blank cells are not flagged. The row is kept with an unknown size
  *   (or the size range, when TR-10 could read one).
+ * - **Unreadable size range** (warning): the size range was needed and has text, but isn't a
+ *   format TR-10 reads. The row is kept with an unknown size.
  * - **Duplicate Record ID** (excluded): IDs are compared with `matchKey()`, so "SYN-0007" and
  *   " syn-0007 " are the same. The row with the lowest `sourceRow` is kept; every later one is excluded.
  * - **Generated ID** (warning): the ID cell was blank, so the parser gave the row a `ROW-0001`
@@ -150,6 +172,8 @@ export function validateRows(rows: readonly NormalizedRow[], layout: LayoutMappi
 
     const employees = employeesIssue(row);
     if (employees) issues.push(employees);
+    const range = rangeIssue(row);
+    if (range) issues.push(range);
 
     if (!summarizeGeneratedIds && row.record.idGenerated) {
       issues.push({

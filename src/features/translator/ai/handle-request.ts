@@ -27,6 +27,8 @@ const ROUTE_TEXT = {
   timeout: "The AI took too long to answer. Try again, or use the form.",
   noAnswer: "The AI couldn't answer right now. Try again, or use the form.",
   unusable: "The AI gave an answer I couldn't use. Your last criteria are kept. Try again or use the form.",
+  /** Something on our side failed before the AI was called (the admin check, for example). */
+  serverError: "Something went wrong on our side. Try again, or use the form.",
 } as const;
 
 export type AiRouteDeps = {
@@ -41,7 +43,7 @@ export type AiRouteDeps = {
 };
 
 /** Codes that may be logged. Nothing else is ever written to the console. */
-type LogCode = InterviewErrorCode | IntroErrorCode | "rate_limited" | "bad_request";
+type LogCode = InterviewErrorCode | IntroErrorCode | "rate_limited" | "bad_request" | "server_error";
 
 /**
  * Writes `translator_ai_<code>`. One string literal per code, never built from a value, so the
@@ -69,6 +71,9 @@ function logCode(code: LogCode): void {
       return;
     case "bad_request":
       console.error("translator_ai_bad_request");
+      return;
+    case "server_error":
+      console.error("translator_ai_server_error");
       return;
   }
 }
@@ -128,6 +133,19 @@ async function readTextWithLimit(request: Request, maxBytes: number): Promise<st
 }
 
 export async function handleAiRequest(request: Request, deps: AiRouteDeps): Promise<Response> {
+  try {
+    return await handle(request, deps);
+  } catch {
+    // A dependency threw before the AI was called (the admin check, the on/off switch or the rate
+    // limit; for example the Supabase settings are missing). Still JSON and `no-store`, never the
+    // framework's error page, and never the error's message (it could quote the request).
+    logCode("server_error");
+    return fail(ROUTE_TEXT.serverError, 500);
+  }
+}
+
+/** Every check in order, then the capability. `handleAiRequest()` catches what this throws. */
+async function handle(request: Request, deps: AiRouteDeps): Promise<Response> {
   const admin = await deps.getAdmin();
   if (!admin) return fail(ROUTE_TEXT.signedOut, 401);
   if (isCrossOrigin(request)) return fail(ROUTE_TEXT.forbidden, 403);

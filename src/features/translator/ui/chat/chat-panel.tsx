@@ -1,6 +1,6 @@
 "use client";
 
-import { type KeyboardEvent, type Ref, useEffect, useId, useImperativeHandle, useRef } from "react";
+import { type KeyboardEvent, type Ref, useEffect, useId, useImperativeHandle, useRef, useState } from "react";
 import { buttonClasses } from "@/components/ui/button";
 import { textareaClasses } from "@/components/ui/form";
 import { cn } from "@/lib/cn";
@@ -161,6 +161,22 @@ export function ChatPanel({
   }));
   const lastItemId = state.items.at(-1)?.id;
 
+  // What the live region says, fixed when a new item arrives, so the history isn't read again:
+  // Cancel, removing a chip or a Save in the criteria summary change the proposal, not this text.
+  // State adjusted while rendering, as React recommends for state that follows a prop.
+  const liveText = latest && revise && proposal ? `${latest} ${changesAnnouncement(changes)}` : latest;
+  const [announced, setAnnounced] = useState({ id: lastItemId, text: liveText });
+  if (announced.id !== lastItemId) setAnnounced({ id: lastItemId, text: liveText });
+
+  // On the Results step the card gives way to the "nothing to update" line when its last change
+  // is removed. The focused remove button goes with it, so focus that line, which says why, but
+  // only when focus was lost (a Save in the criteria summary keeps its own focus).
+  const showNoChange = Boolean(proposal && revise && changes.length === 0);
+  const noChangeRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (showNoChange && document.activeElement === document.body) noChangeRef.current?.focus();
+  }, [showNoChange]);
+
   // After a failure: two AI failures in a row, or the AI turned off. Once per failure.
   const failureKey = state.status === "error" ? state.requestId : -1;
   useEffect(() => {
@@ -218,13 +234,16 @@ export function ChatPanel({
 
       <div aria-live="polite" className="sr-only">
         {/* After the reply only, so the changes aren't read while waiting. */}
-        {latest && revise && proposal ? `${latest} ${changesAnnouncement(changes)}` : latest}
+        {announced.text}
       </div>
 
       {proposal &&
-        (revise && changes.length === 0 ? (
-          // A Save in the criteria summary can make an open proposal the same as the brief.
-          <p className="text-base text-ink">{REVISE_TEXT.noChange}</p>
+        (showNoChange ? (
+          // A Save in the criteria summary, or removing the last changed chip, can make an open
+          // proposal the same as the brief.
+          <p ref={noChangeRef} tabIndex={-1} className="text-base text-ink focus:outline-none">
+            {REVISE_TEXT.noChange}
+          </p>
         ) : (
           <ProposalCard
             proposal={proposal}
