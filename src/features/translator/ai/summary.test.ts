@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { beforeAll, describe, expect, it } from "vitest";
 import { importRows, importWorkbook } from "../__fixtures__/import-pipeline";
-import { RS_SAMPLE_PATH, rsBusiness, rsSheet, SAMPLE_PATH, seededShuffle } from "../__fixtures__/records";
+import { RS_CONTACT_ROWS, RS_SAMPLE_PATH, rsSheet, SAMPLE_PATH } from "../__fixtures__/records";
 import type { TranslatorRecord } from "../import/fields";
 import { fieldOptions } from "../normalize/field-options";
 import { normalizeRecord } from "../normalize/normalize";
@@ -102,41 +102,11 @@ describe("buildFileSummary: the synthetic sample", () => {
   it("passes the strict schema", () => {
     expect(fileSummarySchema.parse(summary)).toEqual(summary);
   });
-
-  it("contains no company, person, ID, email or website", () => {
-    // The sample has these, so the check below means something.
-    const sampleText = JSON.stringify(records.map((r) => r.normalized));
-    for (const text of ["Synthetic Company", "Demo Contact", "SYN-", "@", "example.invalid"]) {
-      expect(sampleText).toContain(text);
-    }
-    const json = JSON.stringify(summary);
-    for (const text of ["Synthetic Company", "Demo Contact", "SYN-", "@", "example.invalid", "http", "www."]) {
-      expect(json).not.toContain(text);
-    }
-  });
-
-  it("gives the same JSON on every run", () => {
-    expect(JSON.stringify(buildFileSummary(records, "synthetic"))).toBe(JSON.stringify(summary));
-  });
 });
 
 describe("buildFileSummary: Reference Solutions records", () => {
-  // Invented rows in the full 396-column layout. Business 3 fills every contact column.
-  const rows = [
-    rsBusiness(1, { "Location Employee Size Actual": null, "Location Employee Size Range": "10,000+" }),
-    rsBusiness(2, { "Location Employee Size Actual": null, "Location Employee Size Range": "20 to 49" }),
-    rsBusiness(3, {
-      "Phone Number Combined": "(602) 555-0103",
-      Website: "www.test-company-03.invalid",
-      Address: "300 Test Street",
-      "ZIP Code": "85281",
-      "Primary NAICS Description": "Invented NAICS Freight Text",
-      "Executive First Name 1": "Other",
-      "Executive Last Name 1": "Executive 03",
-      "Executive Title 1": "Treasurer",
-    }),
-    rsBusiness(4, { City: "Mesa", "Location Employee Size Actual": null }),
-  ];
+  // Invented rows in the full 396-column layout (`RS_CONTACT_ROWS`). Business 3 fills every contact column.
+  const rows = RS_CONTACT_ROWS;
   let summary: FileSummary;
 
   beforeAll(async () => {
@@ -168,24 +138,6 @@ describe("buildFileSummary: Reference Solutions records", () => {
     expect(fileSummarySchema.parse(roundTripped)).toEqual(summary);
   });
 
-  it("contains no company, executive, phone, website, IUSA number, address or NAICS text", () => {
-    const json = JSON.stringify(summary);
-    for (const text of [
-      "Test Company",
-      "Person",
-      "Executive 03",
-      "Treasurer",
-      "555",
-      "test-company-03",
-      "TST-",
-      "Test Street",
-      "85281",
-      "NAICS",
-    ]) {
-      expect(json).not.toContain(text);
-    }
-  });
-
   it("passes the strict schema for the Reference Solutions sample too", async () => {
     const file = await importFile(RS_SAMPLE_PATH);
     const rsSummary = buildFileSummary(file.records, file.layout);
@@ -208,27 +160,6 @@ describe("buildFileSummary: caps, order and dropped values", () => {
     expect(summary.titles[99]).toEqual({ value: "Title 100", count: 51 });
     expect(summary.truncated).toEqual({ cities: false, states: false, industries: false, titles: true });
     expect(() => fileSummarySchema.parse(summary)).not.toThrow();
-  });
-
-  it("sorts equal counts A to Z without regard to case, the same on every run", () => {
-    const records = [
-      ...withTitle("Zeta Lead", 2, 1),
-      ...withTitle("alpha Lead", 2, 10),
-      ...withTitle("Beta Lead", 2, 20),
-      ...withTitle("Owner", 3, 30),
-    ];
-    const expected = [
-      { value: "Owner", count: 3 },
-      { value: "alpha Lead", count: 2 },
-      { value: "Beta Lead", count: 2 },
-      { value: "Zeta Lead", count: 2 },
-    ];
-    expect(buildFileSummary(records, "synthetic").titles).toEqual(expected);
-
-    const json = JSON.stringify(buildFileSummary(records, "synthetic"));
-    for (const seed of [1, 2, 3]) {
-      expect(JSON.stringify(buildFileSummary(seededShuffle(records, seed), "synthetic"))).toBe(json);
-    }
   });
 
   it("drops contact-looking values and cleans and cuts long ones", () => {

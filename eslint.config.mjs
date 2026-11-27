@@ -6,7 +6,7 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   // The Translator never logs content (TR-51): only console.error, and the static test
-  // (src/features/translator/__tests__/no-content-logging.test.ts) checks it carries a fixed code.
+  // (src/features/translator/__tests__/phase2-safety/guardrails.test.ts) checks it carries a fixed code.
   {
     files: ["src/features/translator/**", "src/app/api/translator/**"],
     rules: { "no-console": ["error", { allow: ["error"] }] },

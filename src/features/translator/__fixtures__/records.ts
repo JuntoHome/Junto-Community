@@ -117,6 +117,27 @@ export function rsSheet(rows: readonly FixtureRow[]): FixtureRow[] {
   return [[...RS_HEADERS], ...rows];
 }
 
+/**
+ * Four invented businesses in the full Reference Solutions layout, for the summary and privacy
+ * tests. Business 3 fills every contact column: phone, website, address, ZIP, NAICS text and an
+ * other executive. Two have only a size range, one is in Mesa.
+ */
+export const RS_CONTACT_ROWS: readonly FixtureCell[][] = [
+  rsBusiness(1, { "Location Employee Size Actual": null, "Location Employee Size Range": "10,000+" }),
+  rsBusiness(2, { "Location Employee Size Actual": null, "Location Employee Size Range": "20 to 49" }),
+  rsBusiness(3, {
+    "Phone Number Combined": "(602) 555-0103",
+    Website: "www.test-company-03.invalid",
+    Address: "300 Test Street",
+    "ZIP Code": "85281",
+    "Primary NAICS Description": "Invented NAICS Freight Text",
+    "Executive First Name 1": "Other",
+    "Executive Last Name 1": "Executive 03",
+    "Executive Title 1": "Treasurer",
+  }),
+  rsBusiness(4, { City: "Mesa", "Location Employee Size Actual": null }),
+];
+
 /** A fixed-seed generator (mulberry32): each call gives the next whole number from 0 to 2^32 - 1. */
 function mulberry32(seed: number): () => number {
   let state = seed >>> 0;

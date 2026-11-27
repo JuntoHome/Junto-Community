@@ -1,0 +1,26 @@
+{
+  "description": "The AI answering again after a failure (TR-54): \"show 30 businesses\" changes the business owner brief's list size to 30.",
+  "steps": [
+    {
+      "whenUserSays": { "pattern": "^show 30 businesses$", "flags": "i" },
+      "reply": {
+        "message": "I changed the list size to 30. Everything else stays the same.",
+        "proposal": {
+          "intent": "business_owner",
+          "mustHaves": [
+            { "field": "city", "operator": "equals", "value": "Phoenix" },
+            { "field": "state", "operator": "equals", "value": "AZ" }
+          ],
+          "preferences": [
+            { "field": "industry", "operator": "equals", "value": "Fabrication" },
+            { "field": "title", "operator": "equals", "value": "Owner" },
+            { "field": "employees", "operator": "range", "value": { "min": 10, "max": 99 } }
+          ],
+          "exclusions": [],
+          "listSize": 30,
+          "assumptions": []
+        }
+      }
+    }
+  ]
+}

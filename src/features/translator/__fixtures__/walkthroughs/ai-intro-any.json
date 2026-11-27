@@ -1,0 +1,11 @@
+{
+  "description": "An intro draft for any business (TR-54 privacy tests), with a phone number and a website the AI made up, which the app replaces with [contact details].",
+  "steps": [
+    {
+      "whenUserSays": { "pattern": "^Business facts" },
+      "reply": {
+        "draft": "Hello, I would like to introduce my business and learn about yours. Call me at 602-555-0199 or visit example.invalid to see what we do. Would you have time for a short call next week? Thank you. [Your name]"
+      }
+    }
+  ]
+}

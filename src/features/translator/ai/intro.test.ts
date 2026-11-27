@@ -4,10 +4,9 @@ import { toArrayBuffer } from "../__fixtures__/build-workbook";
 import { createFakeAi, fail } from "../__fixtures__/fake-ai";
 import { importWorkbook } from "../__fixtures__/import-pipeline";
 import { SAMPLE_PATH, SYNTHETIC_HEADERS, syntheticRow } from "../__fixtures__/records";
-import { RS_FIXTURE_HEADERS, RS_FIXTURE_ROW } from "../__fixtures__/rs-row";
+import { fullRsRecord } from "../__fixtures__/rs-row";
 import type { SourceCell } from "../import/map-row";
 import { mapRow } from "../import/map-row";
-import { REFERENCE_SOLUTIONS_MAPPING } from "../import/mappings/reference-solutions";
 import { SYNTHETIC_MAPPING } from "../import/mappings/synthetic";
 import type { GroupedRecord } from "../normalize/duplicates";
 import { normalizeRecord } from "../normalize/normalize";
@@ -28,32 +27,13 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const INTRO_KEYS = ["city", "company", "contactName", "contactTitle", "industry", "state"];
-
 /** A row as `pickIntroFields()` sees it, from one invented synthetic-layout row. */
 const synthetic = (changes: Parameters<typeof syntheticRow>[1] = {}): IntroSource => ({
   record: { normalized: normalizeRecord(mapRow(SYNTHETIC_MAPPING, [...SYNTHETIC_HEADERS], syntheticRow(3, changes) as SourceCell[], 1)) },
 });
 
 /** The invented Reference Solutions row, with an IUSA Number and three other executives filled in. */
-function fullRsRow(): IntroSource {
-  const values = new Map<SourceCell, SourceCell>(RS_FIXTURE_HEADERS.map((header, index) => [header, RS_FIXTURE_ROW[index]]));
-  const changes: [string, SourceCell][] = [
-    ["IUSA Number", "900012345"],
-    ["Executive First Name 1", "Other"],
-    ["Executive Last Name 1", "Exec 01"],
-    ["Executive Title 1", "Vice President"],
-    ["Executive First Name 2", "Other"],
-    ["Executive Last Name 2", "Exec 02"],
-    ["Executive Title 2", "Treasurer"],
-    ["Executive First Name 3", "Other"],
-    ["Executive Last Name 3", "Exec 03"],
-    ["Executive Title 3", "Secretary"],
-  ];
-  for (const [header, value] of changes) values.set(header, value);
-  const row = RS_FIXTURE_HEADERS.map((header) => values.get(header) ?? null);
-  return { record: { normalized: normalizeRecord(mapRow(REFERENCE_SOLUTIONS_MAPPING, RS_FIXTURE_HEADERS, row, 7)) } };
-}
+const fullRsRow = (): IntroSource => ({ record: fullRsRecord() });
 
 const picked = (row: IntroSource): IntroFields => {
   const result = pickIntroFields(row);
@@ -84,46 +64,6 @@ describe("pickIntroFields", () => {
       contactName: "Demo Contact 0001",
       contactTitle: "Owner",
     });
-  });
-
-  it("sends exactly the six keys of a full Reference Solutions row, and none of its other values", () => {
-    const row = fullRsRow();
-    const record = row.record.normalized;
-    // The row really has all of these, so the test would catch a leak.
-    expect(record.phone).toMatchObject({ known: true, value: "(602) 555-0101" });
-    expect(record.website).toMatchObject({ known: true });
-    expect(record.recordId).toBe("900012345");
-    expect(record.address).toMatchObject({ known: true, value: "100 Example Way" });
-    expect(record.zip).toMatchObject({ known: true, value: "85001" });
-    expect(record.naicsDescription).toMatchObject({ known: true, value: "Structural Metal Fabrication" });
-    expect(record.otherExecutives).toHaveLength(3);
-    expect(record.employees).toMatchObject({ known: true });
-
-    const intro = picked(row);
-    expect(Object.keys(intro).sort()).toEqual(INTRO_KEYS);
-    expect(intro).toMatchObject({ company: "Synthetic Fixture Co 001", city: "Phoenix", state: "AZ", contactTitle: "Owner" });
-    const json = JSON.stringify(intro);
-    for (const text of [
-      "555",
-      "0101",
-      "synthetic-fixture",
-      "www.",
-      "900012345",
-      "100 Example Way",
-      "85001",
-      "Structural Metal",
-      "Exec 01",
-      "Exec 02",
-      "Exec 03",
-      "Vice President",
-      "Treasurer",
-      "Secretary",
-      "20 to 49",
-      "25",
-      "Tempe",
-    ]) {
-      expect(json).not.toContain(text);
-    }
   });
 
   it("gives null for SYN-0011's missing title and fills the rest", () => {
