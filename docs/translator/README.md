@@ -172,7 +172,7 @@ Right after a workbook is parsed, every row's record is normalized in the browse
 | `value` | Trimmed, inner whitespace (including non-breaking spaces) collapsed to one space | Display |
 | `key` | `matchKey(value)`; only city, state, industry and title have one | Matching. Never shown |
 
-`matchKey()` (`normalize/match-key.ts`) applies Unicode NFKC, trims, collapses inner whitespace and lower-cases (not locale-based). So `" phoenix "` and `"Phoenix"` both have the key `phoenix`. SearchBrief values go through the same function when they are compared (TR-17). The key is deliberately conservative: punctuation is kept (`St. Louis` and `St Louis` differ), abbreviations aren't expanded (`Arizona` is not `AZ`) and words aren't stemmed ([KNOWN-ISSUES.md](../KNOWN-ISSUES.md#correctness-risks)).
+`matchKey()` (`normalize/match-key.ts`) applies Unicode NFKC, removes invisible characters (the soft hyphen, zero-width space, non-joiner and joiner, word joiner and byte order mark: `INVISIBLE`), trims, collapses inner whitespace and lower-cases (not locale-based). So `" phoenix "`, `"Phoenix"` and `"Phoenix"` with an unseen zero-width space all have the key `phoenix`. The shown value drops those invisible characters too, so the pickers never list two values that look the same (fix C, after TR-55). SearchBrief values go through the same function when they are compared (TR-17). The key is deliberately conservative: punctuation is kept (`St. Louis` and `St Louis` differ), abbreviations aren't expanded (`Arizona` is not `AZ`) and words aren't stemmed ([KNOWN-ISSUES.md](../KNOWN-ISSUES.md#correctness-risks)).
 
 **Unknown values.** A value that is `null`, empty or only spaces is unknown: `{ known: false, reason: "blank", original }`, never `null` or `""`. The original (`null`, or the spaces) is kept for export. A blank cell already reaches this step as `null`, because the parser maps blank and space-only cells to `null`. An employee count that can't be read is unknown with reason `invalid`, so the row checks can flag it without reading the cells again. Ranking treats unknown the same everywhere: a missing value is not a match for an exclusion, fails a must-have and scores 0 on a preference ([Filtering](#filtering), [Scoring](#scoring)).
 
@@ -200,7 +200,7 @@ Each issue is `{ sourceRow, recordId, code, severity, reason }`. `severity` is `
 |---|---|---|---|
 | `invalid-employees` | The employees cell has text that isn't a whole number (`25.5`, `-3`, `N/A`). Blank cells are not flagged | `warning` | Employees value "25.5" isn't a whole number, so company size is treated as unknown. When a size range was read instead, it ends: Using the size range 10 to 19 instead. |
 | `duplicate-id` | The Record ID was already used on an earlier row. IDs are compared with `matchKey()`, so `SYN-0007` and ` syn-0007 ` are the same | `excluded` | Record ID SYN-0007 is also used on row 5. Row 5 is used and this row is left out. |
-| `generated-id` | The ID cell was blank (or the ID column is missing), so the row was given a `ROW-0001` style ID | `warning` | Record ID is blank, so this row was given the ID ROW-0016. (The Reference Solutions layout names its column: IUSA Number is blank, ...) |
+| `generated-id` | The ID cell was blank (or the ID column is missing), so the row was given a `ROW-0001` style ID. When the file itself uses that ID on another row, the generated one gets the first free suffix (`ROW-0001-2`, `withFreeGeneratedIds()`), so a real business is never left out as a duplicate of a blank cell (fix C) | `warning` | Record ID is blank, so this row was given the ID ROW-0016. (The Reference Solutions layout names its column: IUSA Number is blank, ...) |
 
 The reasons are built by `ROW_ISSUE_REASONS` in the same file. Cell values quoted in a reason are trimmed and cut to 40 characters. They are shown on screen but never logged.
 
@@ -225,7 +225,7 @@ After the row checks, the same business listed more than once is folded into one
 **Exact duplicates are grouped.** Two rows are exact duplicates when every field except the Record ID is equal after [cleaning](#cleaning-values):
 
 - Text and category fields are compared by `matchKey()`, so `" Phoenix "` and `"phoenix"` are the same.
-- An unknown value only equals an unknown value with the same reason. A blank never equals an invalid value or a real one, so a blank employee count and `N/A` don't group.
+- An unknown value only equals an unknown value with the same reason. A blank never equals an invalid value or a real one, so a blank employee count and `N/A` don't group. The employee count is compared as its own cell, before any size range fills it in, and the range as its own field, so this holds even when both rows have the same range (fix C).
 - Employees are compared by the count, or by min and max for a range.
 - Other executives are compared in order, by the match keys of each name and title.
 
@@ -952,6 +952,7 @@ npm run test -- edge-cases -t "file gate"        # tests in edge-cases.test.ts w
 | `normalize/normalize.test.ts` | Match keys, unknown values, employee counts and the range fallback |
 | `normalize/validate-rows.test.ts` | Invalid employee counts, duplicate Record IDs, generated IDs |
 | `normalize/duplicates.test.ts` | Grouping in the sample (SYN-0500 under SYN-0001), exact and possible duplicates |
+| `normalize/review-edge-cases.test.ts` | Three edge cases from the review after TR-55 (fix C): a generated ID the file also uses gets a free suffix and both businesses are kept; invisible characters don't split a value or a must-have; a blank and an `N/A` employee count with the same range don't group (and two blanks still do) |
 | `ranking/walkthroughs.test.ts` | The three spec walkthroughs (TR-30) from the sample's bytes through `runPipeline()`: counts, first 8 rows, last row, score spread, the role change's export builders, repeat runs, 3 seeded shuffles, and the golden files |
 | `rs-sample.test.ts` | The [Reference Solutions sample](#the-reference-solutions-sample) (TR-35): its 396 headers, that only mapped columns are filled and every value is invented, the import figures, every documented row, the Phoenix fabrication shortlist and the export's Phone, Website and empty Email |
 | `edge-cases.test.ts` | The spec edge cases (TR-31), each from a real file (below) |
@@ -1690,7 +1691,7 @@ These are thrown, not shown as messages: `The counts summary doesn't add up: ...
 
 The Translator's limitations and accepted risks are owned by [KNOWN-ISSUES.md](../KNOWN-ISSUES.md). The entries are:
 
-- [Correctness risks](../KNOWN-ISSUES.md#correctness-risks): the match key ignores only spacing and case; the employee range formats are guessed (**Unverified**); the first row of a repeated Record ID is kept, not the most complete; duplicate checks only catch near-exact matches; city and state must-haves are independent; the company size preference needs both ends; a Save in the criteria summary replaces unsaved changes on the Criteria step; a size range that only partly fits never matches; all-digit Record IDs sort before every other ID; some no-results hints have no Edit button; switching to the form keeps the Criteria chat as it was.
+- [Correctness risks](../KNOWN-ISSUES.md#correctness-risks): the match key ignores only spacing, case and invisible characters; the employee range formats are guessed (**Unverified**); the first row of a repeated Record ID is kept, not the most complete; duplicate checks only catch near-exact matches; city and state must-haves are independent; the company size preference needs both ends; a Save in the criteria summary replaces unsaved changes on the Criteria step; a size range that only partly fits never matches; all-digit Record IDs sort before every other ID; some no-results hints have no Edit button; switching to the form keeps the Criteria chat as it was.
 - [Security](../KNOWN-ISSUES.md#security): the file gate is client-side only (item 12).
 - [Fix or decide soon](../KNOWN-ISSUES.md#fix-or-decide-soon): few automated tests and no CI.
 

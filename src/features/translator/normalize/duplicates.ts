@@ -1,6 +1,6 @@
 import { FIELD_LABELS, RECORD_FIELDS, type RecordField } from "../import/fields";
 import { matchKey } from "./match-key";
-import type { NormalizedRow } from "./normalize";
+import { normalizeEmployees, type NormalizedRow } from "./normalize";
 import type { NormalizedRecord } from "./types";
 import { compareIssues, quote, type RowIssue } from "./validate-rows";
 
@@ -51,27 +51,29 @@ export const DUPLICATE_REASONS = {
  * with "?" plus its reason, so a blank never equals an invalid value or a real one.
  *
  * - Text and categories: `matchKey(value)`, so " Phoenix " and "phoenix" are the same.
- * - Employees: the count, or "min-max" for a range.
+ * - Employees: the employees cell on its own, as normalizing reads it with no range: the count,
+ *   or unknown with its reason, so a blank count and "N/A" stay different even when both rows
+ *   have the same range. The range is compared as its own field (`employeeRange`).
  * - Other executives: in order, each as [name key, title key] (null for a blank half).
  *   Written as JSON so a "|" or "," inside a name can't make two lists look alike.
  */
-function fieldKey(record: NormalizedRecord, field: ComparedField): string {
+function fieldKey(row: Pick<NormalizedRow, "record" | "normalized">, field: ComparedField): string {
+  const record = row.normalized;
   if (field === "otherExecutives") {
     const keyOrNull = (text: string | null) => (text === null ? null : matchKey(text));
     return `=${JSON.stringify(record.otherExecutives.map((e) => [keyOrNull(e.name), keyOrNull(e.title)]))}`;
   }
   if (field === "employees") {
-    const employees = record.employees;
-    if (!employees.known) return `?${employees.reason}`;
-    return employees.source === "actual" ? `=${employees.count}` : `=${employees.min}-${employees.max}`;
+    const count = normalizeEmployees(row.record.employees, null);
+    return count.known && count.source === "actual" ? `=${count.count}` : `?${count.known ? "range" : count.reason}`;
   }
   const text = record[field];
   return text.known ? `=${matchKey(text.value)}` : `?${text.reason}`;
 }
 
 /** The exact-duplicate signature: every compared field's key, as one JSON string. */
-function signature(record: NormalizedRecord): string {
-  return JSON.stringify(COMPARED_FIELDS.map((field) => fieldKey(record, field)));
+function signature(row: Pick<NormalizedRow, "record" | "normalized">): string {
+  return JSON.stringify(COMPARED_FIELDS.map((field) => fieldKey(row, field)));
 }
 
 /** The match key of a known value, or null when it is unknown. */
@@ -116,7 +118,7 @@ export function groupDuplicates(kept: readonly NormalizedRow[]): DuplicateGroupi
   const bySignature = new Map<string, GroupedRecord>();
   let duplicateCount = 0;
   for (const row of ordered) {
-    const key = signature(row.normalized);
+    const key = signature(row);
     const first = bySignature.get(key);
     if (first) {
       first.duplicateIds.push(row.normalized.recordId);
@@ -155,7 +157,7 @@ export function groupDuplicates(kept: readonly NormalizedRow[]): DuplicateGroupi
       address === null ? group.first : earlier(group.firstWithoutAddress, group.firstByAddress.get(address));
     if (match) {
       const differing = COMPARED_FIELDS.filter(
-        (field) => fieldKey(record.normalized, field) !== fieldKey(match.normalized, field),
+        (field) => fieldKey(record, field) !== fieldKey(match, field),
       ).map((field) => FIELD_LABELS[field]);
       issues.push({
         sourceRow: record.sourceRow,

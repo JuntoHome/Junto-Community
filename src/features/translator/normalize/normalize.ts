@@ -1,6 +1,6 @@
 import { TEXT_FIELDS, type Executive, type TranslatorRecord } from "../import/fields";
 import type { ParsedRow, ParsedWorkbook } from "../import/parse";
-import { matchKey } from "./match-key";
+import { INVISIBLE, matchKey } from "./match-key";
 import {
   CATEGORY_FIELDS,
   type Category,
@@ -26,9 +26,12 @@ export type NormalizedRow = ParsedRow & { normalized: NormalizedRecord };
 /** A parsed workbook whose rows have been normalized. */
 export type NormalizedWorkbook = Omit<ParsedWorkbook, "rows"> & { rows: NormalizedRow[] };
 
-/** Trimmed, with inner whitespace (including non-breaking spaces) collapsed to one space. */
+/**
+ * Invisible characters removed (`INVISIBLE`, as in the match key), trimmed, with inner
+ * whitespace (including non-breaking spaces) collapsed to one space.
+ */
 function tidy(text: string): string {
-  return text.trim().replace(/\s+/g, " ");
+  return text.replace(INVISIBLE, "").trim().replace(/\s+/g, " ");
 }
 
 const unknown = (original: string | null, reason: UnknownText["reason"]): UnknownText => ({
