@@ -243,7 +243,10 @@ function ChatSection({
         simulateFailure={simulateAiFailure}
         aiBudget={aiBudget}
         onUseForm={onUseForm}
-        onTwoFailures={onTwoFailures}
+        // Only while the chat shows. A hidden chat keeps its request in flight; if that request
+        // is the second failure in a row, the user has already chosen the form, so it must not
+        // refill the form, show the "switched" note or move focus.
+        onTwoFailures={hidden ? undefined : onTwoFailures}
         onAiUnavailable={onAiUnavailable}
         onConfirmProposal={onConfirmProposal}
         onEditProposal={onEditProposal}
